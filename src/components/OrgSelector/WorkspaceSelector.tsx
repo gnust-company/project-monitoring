@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { organizations } from '../../data/mockData';
 import { getUserById } from '../../data/mockData';
-import { Layers, Users, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Layers, Users, ArrowRight, ArrowLeft, Plus } from 'lucide-react';
+import CreateWorkspaceModal from '../Modals/CreateWorkspaceModal';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -13,25 +13,22 @@ const fadeUp = {
 };
 
 export default function WorkspaceSelector() {
-  const { selectOrg, goToLanding } = useApp();
+  const { selectOrg, goToLogin, organizations, openCreateWorkspace } = useApp();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white border-b border-hairline">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <button
-            onClick={goToLanding}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-slate-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
+          <button onClick={goToLogin}
+            className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Quay lại
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-slate-900 rounded-md flex items-center justify-center">
+            <div className="w-7 h-7 bg-ink rounded-lg flex items-center justify-center">
               <Layers className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-semibold text-sm text-slate-900">ProjectHub</span>
+            <span className="font-semibold text-sm text-ink">ProjectHub</span>
           </div>
           <div className="w-16" />
         </div>
@@ -39,15 +36,10 @@ export default function WorkspaceSelector() {
 
       {/* Main */}
       <main className="max-w-4xl mx-auto px-6 py-16">
-        <motion.div
-          custom={0}
-          variants={fadeUp}
-          initial="hidden"
-          animate="visible"
-          className="text-center mb-12"
-        >
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Select a Workspace</h1>
-          <p className="text-gray-500">Choose an organization to manage your projects</p>
+        <motion.div custom={0} variants={fadeUp} initial="hidden" animate="visible" className="text-center mb-12">
+          <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-muted mb-3 block">Workspace</span>
+          <h1 className="text-4xl font-semibold text-ink mb-2 tracking-tight">Chọn Workspace</h1>
+          <p className="text-muted">Chọn tổ chức để quản lý dự án của bạn</p>
         </motion.div>
 
         <div className="space-y-4">
@@ -57,69 +49,63 @@ export default function WorkspaceSelector() {
             const devCount = org.members.filter(m => m.role === 'SW_Developer').length;
 
             return (
-              <motion.button
-                key={org.id}
-                custom={i + 1}
-                variants={fadeUp}
-                initial="hidden"
-                animate="visible"
+              <motion.button key={org.id} custom={i + 1} variants={fadeUp} initial="hidden" animate="visible"
                 onClick={() => selectOrg(org.id)}
-                className="w-full flex items-center gap-5 bg-white rounded-xl border border-gray-200 
-                           p-5 text-left hover:shadow-lg hover:border-gray-300 transition-all duration-200
-                           focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 group"
-              >
+                className="w-full flex items-center gap-5 bg-surface-card rounded-xl border border-hairline
+                           p-5 text-left hover:shadow-lg hover:shadow-black/[0.04] hover:border-gray-300
+                           transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-ink/15 focus:ring-offset-2 group card-hover">
                 {/* Org Avatar */}
-                <div className="w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
-                  <span className="text-lg font-bold text-white">{org.name.charAt(0)}</span>
+                <div className="w-14 h-14 bg-ink rounded-xl flex items-center justify-center shrink-0">
+                  <span className="text-lg font-semibold text-white">{org.name.charAt(0)}</span>
                 </div>
-
                 {/* Org Info */}
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                  <h2 className="text-lg font-semibold text-ink group-hover:text-ink transition-colors">
                     {org.name}
                   </h2>
-                  <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" />
-                      {memberCount} members
-                    </span>
-                    <span className="text-gray-300">|</span>
-                    <span>{pmCount} PMs</span>
-                    <span className="text-gray-300">|</span>
-                    <span>{devCount} Devs</span>
+                  <div className="flex items-center gap-3 mt-1 text-sm text-muted">
+                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{memberCount} thành viên</span>
+                    <span className="text-gray-300">·</span>
+                    <span>{pmCount} PM</span>
+                    <span className="text-gray-300">·</span>
+                    <span>{devCount} Dev</span>
                   </div>
                 </div>
-
                 {/* Member Avatars */}
                 <div className="hidden sm:flex items-center">
                   <div className="flex -space-x-2 mr-4">
                     {org.members.slice(0, 4).map(m => {
                       const user = getUserById(m.id);
                       return (
-                        <img
-                          key={m.id}
-                          src={user?.avatar}
-                          alt={user?.name}
-                          className="w-8 h-8 rounded-full border-2 border-white bg-gray-200"
-                          title={user?.name}
-                        />
+                        <img key={m.id} src={user?.avatar} alt={user?.name}
+                          className="w-8 h-8 rounded-full border-2 border-white bg-surface-card" title={user?.name} />
                       );
                     })}
                     {org.members.length > 4 && (
-                      <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-100 
-                                      flex items-center justify-center text-xs text-gray-500 font-medium">
+                      <div className="w-8 h-8 rounded-full border-2 border-white bg-surface-card
+                                      flex items-center justify-center text-xs text-muted font-medium">
                         +{org.members.length - 4}
                       </div>
                     )}
                   </div>
-                  <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-slate-600 
-                                          group-hover:translate-x-1 transition-all" />
+                  <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-ink group-hover:translate-x-1 transition-all" />
                 </div>
               </motion.button>
             );
           })}
+
+          {/* Create Workspace */}
+          <motion.button custom={organizations.length + 1} variants={fadeUp} initial="hidden" animate="visible"
+            onClick={openCreateWorkspace}
+            className="w-full flex items-center justify-center gap-2 bg-white rounded-xl border-2
+                       border-dashed border-gray-300 p-5 text-muted hover:border-ink/30
+                       hover:text-ink transition-all duration-300 group">
+            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+            <span className="text-sm font-medium">Tạo Workspace mới</span>
+          </motion.button>
         </div>
       </main>
+      <CreateWorkspaceModal />
     </div>
   );
 }

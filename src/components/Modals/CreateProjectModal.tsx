@@ -44,41 +44,41 @@ export default function CreateProjectModal() {
           className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-            <h2 className="text-base font-semibold text-slate-900">Tạo Project</h2>
-            <button onClick={closeCreateProject} className="p-1 hover:bg-gray-100 rounded-lg">
-              <X className="w-4 h-4 text-gray-500" />
+          <div className="flex items-center justify-between px-5 py-4 border-b border-hairline">
+            <h2 className="text-base font-bold text-ink">Tạo Dự án</h2>
+            <button onClick={closeCreateProject} className="p-1 hover:bg-stone-100 rounded-lg">
+              <X className="w-4 h-4 text-stone-500" />
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Project Name</label>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">Tên dự án</label>
               <input type="text" value={name} onChange={e => setName(e.target.value)}
-                placeholder="e.g., New E-Commerce Platform"
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm 
-                           focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="VD: Nền tảng thương mại điện tử mới"
+                className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
+                           focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink"
                 required />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Description</label>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">Mô tả</label>
               <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
-                placeholder="Brief project description..."
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm 
-                           focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none" />
+                placeholder="Mô tả ngắn về dự án..."
+                className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
+                           focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink resize-none" />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> Target Date
+              <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
+                <Calendar className="w-3 h-3" /> Ngày mục tiêu
               </label>
               <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm 
-                           focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
+                           focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
             </div>
             <button type="submit"
-              className="w-full py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg 
-                         hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4" /> Tạo Project
+              className="w-full py-2.5 bg-ink text-white text-sm font-semibold rounded-lg
+                         hover:bg-[#242424] transition-colors flex items-center justify-center gap-2">
+              <Plus className="w-4 h-4" /> Tạo Dự án
             </button>
           </form>
         </motion.div>

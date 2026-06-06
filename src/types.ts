@@ -31,49 +31,49 @@ export const PHASE_META: Record<DevPhase, { label: string; color: string; bg: st
     label: 'Project Assessment',
     color: 'text-gray-600',
     bg: 'bg-gray-100',
-    border: 'border-gray-300',
+    border: 'border-gray-200',
     desc: 'Define goals, check feasibility, elicit requirements, produce Need Assessment (BRD)',
   },
   SA: {
     label: 'SW Analysis',
-    color: 'text-sky-600',
-    bg: 'bg-sky-50',
-    border: 'border-sky-300',
+    color: 'text-cyan-700',
+    bg: 'bg-cyan-50',
+    border: 'border-cyan-200',
     desc: 'Define scope, create WBS, risk management, produce Project Charter & User Requirements',
   },
   SD: {
     label: 'SW Design',
-    color: 'text-purple-600',
-    bg: 'bg-purple-50',
-    border: 'border-purple-300',
+    color: 'text-violet-600',
+    bg: 'bg-violet-50',
+    border: 'border-violet-200',
     desc: 'Wireframe, GUI design, HLD/DDD, produce SRS & Design Documents',
   },
   SI: {
     label: 'SW Implementation',
-    color: 'text-blue-700',
+    color: 'text-blue-600',
     bg: 'bg-blue-50',
-    border: 'border-blue-300',
+    border: 'border-blue-200',
     desc: 'Code development, quality assurance, infra setup, produce Source Code & Test Cases',
   },
   ST: {
     label: 'SW Test',
-    color: 'text-amber-600',
-    bg: 'bg-amber-50',
-    border: 'border-amber-300',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+    border: 'border-orange-200',
     desc: 'System testing, performance test, security verification, produce Test Plans & Reports',
   },
   DEP: {
     label: 'SW Deployment',
     color: 'text-emerald-600',
     bg: 'bg-emerald-50',
-    border: 'border-emerald-300',
+    border: 'border-emerald-200',
     desc: 'Deployment scheduling, go-live confirmation, produce Deliverable Schedule & User Guide',
   },
   OM: {
     label: 'O & M',
     color: 'text-slate-600',
-    bg: 'bg-slate-200',
-    border: 'border-slate-400',
+    bg: 'bg-slate-100',
+    border: 'border-slate-300',
     desc: 'PRD incident management, monitoring, security patches, produce Incident Log & RCA',
   },
 };
@@ -140,4 +140,4 @@ export interface ActivityItem {
 
 export type WorkspaceView = 'dashboard' | 'pipeline' | 'team';
 
-export type ZoomLevel = 'week' | 'month' | 'year';
+export type ZoomLevel = 'week' | 'month' | 'quarter';

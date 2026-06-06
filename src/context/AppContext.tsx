@@ -1,24 +1,27 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { Organization, Project, PhaseBlock, WorkspaceView, DevPhase, ProjectStatus, ZoomLevel } from '../types';
-import { organizations, projects, phaseBlocks } from '../data/mockData';
+import { organizations as seedOrgs, projects, phaseBlocks } from '../data/mockData';
 
-// Extend PhaseBlock at runtime with drag state
 export interface PhaseBlockUI extends PhaseBlock {
   // runtime UI only
 }
 
-type AppView = 'landing' | 'workspace-selector' | 'workspace';
+type AppView = 'landing' | 'login' | 'workspace-selector' | 'workspace';
 
 interface AppState {
   currentView: AppView;
   selectedOrgId: string | null;
   workspaceView: WorkspaceView;
 
+  // Auth
+  currentUserEmail: string | null;
+
   // Pipeline state
   searchQuery: string;
   phaseFilter: DevPhase | 'All';
   statusFilter: ProjectStatus | 'All';
   zoomLevel: ZoomLevel;
+  selectedProjectIds: string[] | null; // null = all selected
 
   // Phase detail modal
   selectedPhaseBlockId: string | null;
@@ -28,6 +31,7 @@ interface AppState {
   createProjectOpen: boolean;
   createPhaseOpen: boolean;
   createPhaseProjectId: string | null;
+  createWorkspaceOpen: boolean;
 }
 
 interface AppContextType extends AppState {
@@ -36,15 +40,23 @@ interface AppContextType extends AppState {
 
   // Navigation
   goToLanding: () => void;
+  goToLogin: () => void;
   goToWorkspaceSelector: () => void;
   selectOrg: (orgId: string) => void;
   setWorkspaceView: (view: WorkspaceView) => void;
+
+  // Auth
+  login: (email: string) => void;
+  logout: () => void;
 
   // Filters
   setSearchQuery: (query: string) => void;
   setPhaseFilter: (phase: DevPhase | 'All') => void;
   setStatusFilter: (status: ProjectStatus | 'All') => void;
   setZoomLevel: (zoom: ZoomLevel) => void;
+  setSelectedProjectIds: (ids: string[] | null) => void;
+  toggleProjectSelection: (projectId: string) => void;
+  selectAllProjects: () => void;
 
   // Phase detail
   openPhaseDetail: (phaseBlockId: string) => void;
@@ -55,14 +67,19 @@ interface AppContextType extends AppState {
   closeCreateProject: () => void;
   openCreatePhase: (projectId?: string) => void;
   closeCreatePhase: () => void;
+  openCreateWorkspace: () => void;
+  closeCreateWorkspace: () => void;
 
   // Actions
   addProject: (project: Project) => void;
   addPhaseBlock: (pb: PhaseBlockUI) => void;
   updatePhaseBlock: (id: string, updates: Partial<PhaseBlockUI>) => void;
+  deletePhaseBlock: (id: string) => void;
+  addOrganization: (org: Organization) => void;
 
   // Derived
   selectedOrg: Organization | null;
+  organizations: Organization[];
   orgProjects: Project[];
   orgPhaseBlocks: PhaseBlockUI[];
   selectedPhaseBlock: PhaseBlockUI | null;
@@ -72,36 +89,49 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [pbState, setPbState] = useState<PhaseBlockUI[]>(phaseBlocks as PhaseBlockUI[]);
+  const [projectsState, setProjectsState] = useState<Project[]>([...projects]);
+  const [orgsState, setOrgsState] = useState<Organization[]>([...seedOrgs]);
   const [state, setState] = useState<AppState>({
     currentView: 'landing',
     selectedOrgId: null,
     workspaceView: 'dashboard',
+    currentUserEmail: null,
     searchQuery: '',
     phaseFilter: 'All',
     statusFilter: 'All',
-    zoomLevel: 'month',
+    zoomLevel: 'week',
+    selectedProjectIds: null,
     selectedPhaseBlockId: null,
     phaseDetailOpen: false,
     createProjectOpen: false,
     createPhaseOpen: false,
     createPhaseProjectId: null,
+    createWorkspaceOpen: false,
   });
 
+  // Navigation
   const goToLanding = useCallback(() => {
     setState({
       currentView: 'landing',
       selectedOrgId: null,
       workspaceView: 'dashboard',
+      currentUserEmail: null,
       searchQuery: '',
       phaseFilter: 'All',
       statusFilter: 'All',
-      zoomLevel: 'month',
+      zoomLevel: 'week',
+      selectedProjectIds: null,
       selectedPhaseBlockId: null,
       phaseDetailOpen: false,
       createProjectOpen: false,
       createPhaseOpen: false,
       createPhaseProjectId: null,
+      createWorkspaceOpen: false,
     });
+  }, []);
+
+  const goToLogin = useCallback(() => {
+    setState(prev => ({ ...prev, currentView: 'login' }));
   }, []);
 
   const goToWorkspaceSelector = useCallback(() => {
@@ -112,6 +142,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({
       ...prev, selectedOrgId: orgId, currentView: 'workspace',
       workspaceView: 'pipeline', searchQuery: '', phaseFilter: 'All', statusFilter: 'All',
+      selectedProjectIds: null,
     }));
   }, []);
 
@@ -119,6 +150,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, workspaceView: view }));
   }, []);
 
+  // Auth
+  const login = useCallback((email: string) => {
+    setState(prev => ({ ...prev, currentUserEmail: email, currentView: 'workspace-selector' }));
+  }, []);
+
+  const logout = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      currentView: 'login',
+      selectedOrgId: null,
+      currentUserEmail: null,
+    }));
+  }, []);
+
+  // Filters
   const setSearchQuery = useCallback((query: string) => {
     setState(prev => ({ ...prev, searchQuery: query }));
   }, []);
@@ -135,6 +181,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, zoomLevel: zoom }));
   }, []);
 
+  // Project selection
+  const setSelectedProjectIds = useCallback((ids: string[] | null) => {
+    setState(prev => ({ ...prev, selectedProjectIds: ids }));
+  }, []);
+
+  const toggleProjectSelection = useCallback((projectId: string) => {
+    setState(prev => {
+      const current = prev.selectedProjectIds;
+      if (current === null) {
+        // All selected → deselect this one (select all except this)
+        return { ...prev, selectedProjectIds: [projectId] };
+      }
+      if (current.includes(projectId)) {
+        const next = current.filter(id => id !== projectId);
+        return { ...prev, selectedProjectIds: next.length === 0 ? null : next };
+      }
+      return { ...prev, selectedProjectIds: [...current, projectId] };
+    });
+  }, []);
+
+  const selectAllProjects = useCallback(() => {
+    setState(prev => ({ ...prev, selectedProjectIds: null }));
+  }, []);
+
+  // Phase detail
   const openPhaseDetail = useCallback((phaseBlockId: string) => {
     setState(prev => ({ ...prev, selectedPhaseBlockId: phaseBlockId, phaseDetailOpen: true }));
   }, []);
@@ -143,6 +214,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, selectedPhaseBlockId: null, phaseDetailOpen: false }));
   }, []);
 
+  // Create modals
   const openCreateProject = useCallback(() => {
     setState(prev => ({ ...prev, createProjectOpen: true }));
   }, []);
@@ -159,8 +231,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, createPhaseOpen: false, createPhaseProjectId: null }));
   }, []);
 
+  const openCreateWorkspace = useCallback(() => {
+    setState(prev => ({ ...prev, createWorkspaceOpen: true }));
+  }, []);
+
+  const closeCreateWorkspace = useCallback(() => {
+    setState(prev => ({ ...prev, createWorkspaceOpen: false }));
+  }, []);
+
+  // Data actions
   const addProject = useCallback((project: Project) => {
-    projects.push(project);
+    setProjectsState(prev => [...prev, project]);
   }, []);
 
   const addPhaseBlock = useCallback((pb: PhaseBlockUI) => {
@@ -171,13 +252,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPbState(prev => prev.map(pb => pb.id === id ? { ...pb, ...updates } : pb));
   }, []);
 
+  const deletePhaseBlock = useCallback((id: string) => {
+    setPbState(prev => prev.filter(pb => pb.id !== id));
+  }, []);
+
+  const addOrganization = useCallback((org: Organization) => {
+    setOrgsState(prev => [...prev, org]);
+  }, []);
+
   // Derived
   const selectedOrg = state.selectedOrgId
-    ? organizations.find(o => o.id === state.selectedOrgId) ?? null
+    ? orgsState.find(o => o.id === state.selectedOrgId) ?? null
     : null;
 
   const orgProjects = state.selectedOrgId
-    ? projects.filter(p => p.orgId === state.selectedOrgId)
+    ? projectsState.filter(p => p.orgId === state.selectedOrgId)
     : [];
 
   const orgPhaseBlocks = state.selectedOrgId
@@ -194,23 +283,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       phaseBlocks: pbState,
       setPhaseBlocks: setPbState,
       goToLanding,
+      goToLogin,
       goToWorkspaceSelector,
       selectOrg,
       setWorkspaceView,
+      login,
+      logout,
       setSearchQuery,
       setPhaseFilter,
       setStatusFilter,
       setZoomLevel,
+      setSelectedProjectIds,
+      toggleProjectSelection,
+      selectAllProjects,
       openPhaseDetail,
       closePhaseDetail,
       openCreateProject,
       closeCreateProject,
       openCreatePhase,
       closeCreatePhase,
+      openCreateWorkspace,
+      closeCreateWorkspace,
       addProject,
       addPhaseBlock,
       updatePhaseBlock,
+      deletePhaseBlock,
+      addOrganization,
       selectedOrg,
+      organizations: orgsState,
       orgProjects,
       orgPhaseBlocks,
       selectedPhaseBlock,
