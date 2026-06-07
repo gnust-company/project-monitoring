@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { PHASE_META, DEV_PHASES } from '../../types';
+import { PHASE_META, PHASE_TAG_META } from '../../types';
 import type { PhaseBlock } from '../../types';
 import { Search, Plus, X } from 'lucide-react';
 import {
@@ -66,9 +66,9 @@ function resolveOverlaps(
 // ─── Component ──────────────────────────────────────────────────────
 export default function PipelineTimeline() {
   const {
-    orgProjects, phaseBlocks, searchQuery, phaseFilter, statusFilter, zoomLevel,
+    orgProjects, phaseBlocks, searchQuery, statusFilter, zoomLevel,
     selectedProjectIds,
-    setSearchQuery, setPhaseFilter, setZoomLevel, openPhaseDetail, openCreatePhase,
+    setSearchQuery, setZoomLevel, openPhaseDetail, openCreatePhase,
     updatePhaseBlock, toggleProjectSelection, selectAllProjects,
   } = useApp();
 
@@ -188,11 +188,10 @@ export default function PipelineTimeline() {
 
   const todayPos = getDatePos(today);
 
-  // ─── Helper: get filtered pbs for a project ───────────────────────
+  // ─── Helper: get pbs for a project ───────────────────────
   const getFilteredPbs = useCallback((projectId: string) => {
-    const pbs = phaseBlocks.filter(pb => pb.projectId === projectId);
-    return phaseFilter === 'All' ? pbs : pbs.filter(pb => pb.phaseType === phaseFilter);
-  }, [phaseBlocks, phaseFilter]);
+    return phaseBlocks.filter(pb => pb.projectId === projectId);
+  }, [phaseBlocks]);
 
   // ─── Row indices (auto + manual) ──────────────────────────────────
   const baseRowIndices = useMemo(() => {
@@ -559,10 +558,7 @@ export default function PipelineTimeline() {
               return (
                 <div key={project.id} className="relative border-b border-hairline"
                   style={{ height: rowCount * ROW_HEIGHT }}>
-                  {rowCount > 1 && Array.from({ length: rowCount - 1 }, (_, i) => (
-                    <div key={`s-${i}`} className="absolute left-0 right-0 border-b border-stone-100"
-                      style={{ top: (i + 1) * ROW_HEIGHT }} />
-                  ))}
+
                   {pbs.map(pb => {
                     const pos = layoutMap.get(pb.id);
                     if (!pos) return null;
@@ -575,7 +571,7 @@ export default function PipelineTimeline() {
                     const isDragging = dragPreview?.blockId === pb.id;
                     return (
                       <div key={pb.id}
-                        className={`phase-block absolute rounded-lg border cursor-pointer group overflow-hidden z-10 transition-shadow duration-150
+                        className={`phase-block absolute rounded-lg border cursor-pointer group z-10 transition-shadow duration-150
                           ${meta.bg} ${meta.border}
                           ${isDragging ? 'ring-2 ring-ink/30 ring-offset-1' : ''}
                           ${isHover ? 'shadow-lg' : 'shadow-sm'}`}
@@ -584,7 +580,7 @@ export default function PipelineTimeline() {
                         onMouseEnter={() => setHoverPhase(pb.id)}
                         onMouseLeave={() => setHoverPhase(null)}
                       >
-                        <div className="px-2.5 py-1 flex items-center gap-1.5 h-full">
+                        <div className="px-2.5 py-1 flex items-center gap-1.5 h-full overflow-hidden">
                           <span className={`text-[11px] font-semibold ${meta.color} truncate`}>
                             [{pb.phaseType}] {pb.title}
                           </span>
@@ -608,30 +604,6 @@ export default function PipelineTimeline() {
           </div>
         </div>
 
-      </div>
-
-      {/* Phase Filter Bar */}
-      <div className="flex-shrink-0 bg-white border-t border-hairline px-5 py-2 flex items-center gap-2 overflow-x-auto">
-        <span className="text-xs text-stone-400 mr-1 shrink-0 font-medium">Lọc Phase:</span>
-        <button onClick={() => setPhaseFilter('All')}
-          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors shrink-0
-            ${phaseFilter === 'All' ? 'bg-ink text-white border-ink' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'}`}>
-          Tất cả
-        </button>
-        {DEV_PHASES.map(phase => {
-          const meta = PHASE_META[phase];
-          const count = phaseBlocks.filter(pb => pb.phaseType === phase).length;
-          return (
-            <button key={phase}
-              onClick={() => setPhaseFilter(phaseFilter === phase ? 'All' : phase)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors flex items-center gap-1 shrink-0
-                ${phaseFilter === phase ? `${meta.bg} ${meta.color} ${meta.border}` : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300'}`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${meta.bg.replace('bg-', 'bg-').replace('50', '400')}`} />
-              {phase} ({count})
-            </button>
-          );
-        })}
       </div>
 
       <PhaseDetailModal />

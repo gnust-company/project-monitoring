@@ -1,4 +1,4 @@
-import type { User, Organization, Project, PhaseBlock, ActivityItem } from '../types';
+import type { User, Organization, Project, PhaseBlock, ActivityItem, PhaseTag } from '../types';
 import { DEV_PHASES } from '../types';
 
 const today = new Date('2026-06-02');
@@ -115,18 +115,23 @@ function generateActivity(count: number): ActivityItem[] {
 
 // ─── Phase Blocks ─────────────────────────────────────────────────
 let pbIdCounter = 0;
-function makePb(project: Project, phaseType: string, title: string, startOffset: number, duration: number): PhaseBlock {
+function makePb(project: Project, phaseType: string, title: string, startOffset: number, duration: number, tag?: PhaseTag): PhaseBlock {
   pbIdCounter++;
   const start = addDays(new Date(project.startDate), startOffset);
   const end = addDays(start, duration);
+  const tags: PhaseTag[] = ['Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled'];
+  const chosenTag = tag || tags[Math.floor(Math.random() * 4)]; // rarely Canceled
   return {
     id: `pb-${pbIdCounter}`,
     projectId: project.id,
     phaseType: phaseType as any,
+    tag: chosenTag,
     title,
     description: `${title} phase for ${project.name}.`,
     startDate: formatDate(start),
     endDate: formatDate(end),
+    ...(chosenTag === 'Complete' ? { actualEndDate: formatDate(addDays(end, Math.floor(Math.random() * 5))) } : {}),
+    ...(chosenTag === 'Inprogress' && Math.random() > 0.5 ? { actualEndDate: formatDate(addDays(end, Math.floor(Math.random() * 8) + 1)) } : {}),
     createdBy: project.createdBy,
     participants: ['u1', 'u3', 'u4', 'u5'].slice(0, 2 + Math.floor(Math.random() * 3)),
     checklist: generateChecklist(phaseType),

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { PHASE_META, DEV_PHASES } from '../../types';
-import type { DevPhase, PhaseBlock } from '../../types';
+import { PHASE_META, DEV_PHASES, PHASE_TAG_META } from '../../types';
+import type { DevPhase, PhaseBlock, PhaseTag } from '../../types';
 import { X, Plus, Calendar, HelpCircle, Users } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+
+const TAG_OPTIONS: PhaseTag[] = ['Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled'];
 
 export default function CreatePhaseModal() {
   const {
@@ -14,6 +16,7 @@ export default function CreatePhaseModal() {
 
   const [projectId, setProjectId] = useState(createPhaseProjectId || (orgProjects[0]?.id ?? ''));
   const [phaseType, setPhaseType] = useState<DevPhase>('PA');
+  const [tag, setTag] = useState<PhaseTag>('Todo');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -35,6 +38,7 @@ export default function CreatePhaseModal() {
       id: `pb-${Date.now()}`,
       projectId,
       phaseType,
+      tag,
       title: title.trim(),
       description: description.trim() || `${title} phase block.`,
       startDate,
@@ -124,6 +128,24 @@ export default function CreatePhaseModal() {
                     >
                       {phase}
                       <HelpCircle className="w-2.5 h-2.5 text-gray-400" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Tag */}
+            <div>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">Trạng thái</label>
+              <div className="flex flex-wrap gap-1.5">
+                {TAG_OPTIONS.map(t => {
+                  const tm = PHASE_TAG_META[t];
+                  return (
+                    <button key={t} type="button"
+                      onClick={() => setTag(t)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all
+                        ${tag === t ? `${tm.bg} ${tm.color} ${tm.border}` : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300'}`}>
+                      {tm.label}
                     </button>
                   );
                 })}

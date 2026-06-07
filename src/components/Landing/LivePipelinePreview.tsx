@@ -1,6 +1,5 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
-import { PHASE_META, DEV_PHASES } from '../../types';
-import type { DevPhase } from '../../types';
+import { PHASE_META } from '../../types';
 import { projects, phaseBlocks } from '../../data/mockData';
 import {
   format, parseISO, differenceInDays, addDays, addMonths,
@@ -71,8 +70,7 @@ export default function LivePipelinePreview() {
   const leftContentRef = useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState<'week' | 'month' | 'quarter'>('week');
   const [hoverPhase, setHoverPhase] = useState<string | null>(null);
-  const [phaseFilter, setPhaseFilter] = useState<DevPhase | 'All'>('All');
-  const hasScrolled = useRef(false);
+    const hasScrolled = useRef(false);
 
   // Live block positions (mutated only on drop)
   const [blockPositions, setBlockPositions] = useState<Map<string, { startDate: string; endDate: string }>>(() => {
@@ -171,9 +169,8 @@ export default function LivePipelinePreview() {
 
   // Helper: get filtered pbs for a project
   const getFilteredPbs = useCallback((projectId: string) => {
-    const pbs = demoPhaseBlocks.filter(pb => pb.projectId === projectId);
-    return phaseFilter === 'All' ? pbs : pbs.filter(pb => pb.phaseType === phaseFilter);
-  }, [phaseFilter]);
+    return demoPhaseBlocks.filter(pb => pb.projectId === projectId);
+  }, []);
 
   // Row indices (auto assign from blockPositions + manual overrides)
   const baseRowIndices = useMemo(() => {
@@ -458,7 +455,7 @@ export default function LivePipelinePreview() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left panel */}
         <div className="w-36 shrink-0 bg-surface-soft border-r border-hairline overflow-hidden z-20 relative">
-          <div className="bg-surface-soft border-b border-hairline px-3 flex items-center text-[9px] font-bold text-muted uppercase tracking-wider"
+          <div className="bg-surface-soft border-b border-hairline px-3 flex items-center text-[9px] font-bold text-muted uppercase tracking-wider sticky top-0 z-10"
             style={{ height: HEADER_HEIGHT }}>Dự án</div>
           <div ref={leftContentRef}>
             {filteredProjects.map(project => {
@@ -466,7 +463,7 @@ export default function LivePipelinePreview() {
               const rowCount = rd?.rowCount ?? 1;
               const pbCount = rd?.pbs.length ?? 0;
               return (
-                <div key={project.id} className="px-3 border-b border-hairline bg-surface-soft flex items-center"
+                <div key={project.id} className="px-3 border-b border-hairline bg-surface-soft hover:bg-white transition-colors flex items-center"
                   style={{ height: rowCount * ROW_HEIGHT }}>
                   <div className="w-full min-w-0">
                     <div className="flex items-center gap-1.5">
@@ -544,14 +541,11 @@ export default function LivePipelinePreview() {
               return (
                 <div key={project.id} className="relative border-b border-hairline"
                   style={{ height: rowCount * ROW_HEIGHT }}>
-                  {rowCount > 1 && Array.from({ length: rowCount - 1 }, (_, i) => (
-                    <div key={`s-${i}`} className="absolute left-0 right-0 border-b border-stone-100"
-                      style={{ top: (i + 1) * ROW_HEIGHT }} />
-                  ))}
+
                   {pbs.map(pb => {
                     const pos = layoutMap.get(pb.id);
                     if (!pos) return null;
-                    const meta = PHASE_META[pb.phaseType as DevPhase];
+                    const meta = PHASE_META[pb.phaseType as any];
                     const left = getDatePos(parseISO(pos.startDate));
                     const right = getDatePos(parseISO(pos.endDate));
                     const width = Math.max(20, right - left);
@@ -560,7 +554,7 @@ export default function LivePipelinePreview() {
                     const isDragging = dragPreview?.blockId === pb.id;
                     return (
                       <div key={pb.id}
-                        className={`phase-block absolute rounded-md border cursor-grab overflow-hidden z-10 transition-shadow duration-150
+                        className={`phase-block absolute rounded-md border cursor-grab group z-10 transition-shadow duration-150
                           ${meta.bg} ${meta.border}
                           ${isDragging ? 'ring-2 ring-ink/30 ring-offset-1' : ''}
                           ${isHover ? 'shadow-lg' : 'shadow-sm'}`}
@@ -569,7 +563,7 @@ export default function LivePipelinePreview() {
                         onMouseEnter={() => setHoverPhase(pb.id)}
                         onMouseLeave={() => setHoverPhase(null)}
                       >
-                        <div className="px-2 py-0.5 flex items-center gap-1 h-full">
+                        <div className="px-2 py-0.5 flex items-center gap-1 h-full overflow-hidden">
                           <span className={`text-[10px] font-semibold ${meta.color} truncate`}>
                             [{pb.phaseType}] {pb.title}
                           </span>
@@ -596,28 +590,6 @@ export default function LivePipelinePreview() {
           </div>
         </div>
 
-      </div>
-
-      {/* Filter bar */}
-      <div className="flex-shrink-0 bg-white border-t border-hairline px-4 py-1.5 flex items-center gap-1.5 overflow-x-auto">
-        <span className="text-[9px] text-muted mr-1 shrink-0">Phase:</span>
-        <button onClick={() => setPhaseFilter('All')}
-          className={`px-2 py-0.5 rounded-md text-[9px] font-semibold border transition-colors shrink-0
-            ${phaseFilter === 'All' ? 'bg-ink text-white border-ink' : 'bg-white text-muted border-hairline'}`}>
-          Tất cả
-        </button>
-        {DEV_PHASES.map(phase => {
-          const meta = PHASE_META[phase];
-          const count = demoPhaseBlocks.filter(pb => pb.phaseType === phase).length;
-          return (
-            <button key={phase}
-              onClick={() => setPhaseFilter(phaseFilter === phase ? 'All' : phase)}
-              className={`px-2 py-0.5 rounded-md text-[9px] font-semibold border transition-colors flex items-center gap-0.5 shrink-0
-                ${phaseFilter === phase ? `${meta.bg} ${meta.color} ${meta.border}` : 'bg-white text-muted border-hairline'}`}>
-              {phase} ({count})
-            </button>
-          );
-        })}
       </div>
     </div>
   );

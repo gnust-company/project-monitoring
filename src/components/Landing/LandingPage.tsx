@@ -44,19 +44,106 @@ const smoothScrollToId = (id: string) => {
   requestAnimationFrame(animate);
 };
 
-// ── 7-phase detail data ──────────────────────────────────────
+// ── 7-phase detail data (role → tasks → outputs) ────────────
 const phaseDetail: Record<DevPhase, {
-  deliverables: string[];
-  roles: string[];
+  roles: { role: string; tasks: string[]; outputs: string[] }[];
   icon: typeof FileText;
 }> = {
-  PA: { deliverables: ['BRD (Business Requirement Document)', 'Feasibility Report', 'Project Charter Draft'], roles: ['PM', 'BA'], icon: FileText },
-  SA: { deliverables: ['Project Charter', 'User Requirements', 'WBS (Work Breakdown Structure)'], roles: ['BA', 'SW Architect'], icon: FolderKanban },
-  SD: { deliverables: ['SRS Document', 'HLD/DDD', 'Wireframes & GUI Design'], roles: ['UI Designer', 'SW Architect'], icon: Layers },
-  SI: { deliverables: ['Source Code', 'Unit Test Cases', 'Infrastructure Setup'], roles: ['SW Developer', 'SysOps'], icon: Code2 },
-  ST: { deliverables: ['Test Plans', 'Test Reports', 'Performance & Security Audit'], roles: ['SW Tester', 'SW Developer'], icon: TestTube },
-  DEP: { deliverables: ['Deployment Schedule', 'User Guide', 'Go-live Checklist'], roles: ['SysOps', 'PM'], icon: Rocket },
-  OM: { deliverables: ['Incident Log', 'RCA Reports', 'Monitoring Dashboard'], roles: ['SysOps', 'SW Developer'], icon: Wrench },
+  PA: {
+    roles: [
+      { role: 'Project Manager', tasks: ['Xác định mục tiêu & phạm vi dự án', 'Đánh giá khả thi'],
+        outputs: ['Báo cáo Đánh giá khả thi'] },
+      { role: 'Business Analyst', tasks: ['Thu thập yêu cầu từ các bên liên quan'],
+        outputs: ['Đánh giá Nhu cầu (BRD)'] },
+      { role: 'Software Architect', tasks: ['Đánh giá khả thi về mặt kỹ thuật'],
+        outputs: [] },
+    ],
+    icon: FileText,
+  },
+  SA: {
+    roles: [
+      { role: 'Project Manager', tasks: ['Xác định phạm vi dự án', 'Tạo WBS & kế hoạch tổng thể', 'Quản lý rủi ro', 'Xác định các bên liên quan'],
+        outputs: ['Hiến chương Dự án', 'Sổ đăng ký Các bên liên quan', 'Từ điển WBS & Kế hoạch Rủi ro'] },
+      { role: 'Business Analyst', tasks: ['Thu thập & phân tích yêu cầu'],
+        outputs: ['Yêu cầu Người dùng', 'Tài liệu Phân tích Nguyên nhân (RCA)'] },
+      { role: 'Software Architect', tasks: ['Xác định cấu trúc phần mềm', 'Ước tính cấu hình máy chủ'],
+        outputs: ['Thông số Máy chủ đề xuất'] },
+      { role: 'System Operations', tasks: ['Ước tính cấu hình máy chủ'],
+        outputs: ['Thông số Máy chủ đề xuất'] },
+    ],
+    icon: FolderKanban,
+  },
+  SD: {
+    roles: [
+      { role: 'Project Manager', tasks: ['Yêu cầu môi trường Dev/Test/PRD', 'Tạo kế hoạch chi tiết & Jira tasks'],
+        outputs: ['Lịch trình Dự án'] },
+      { role: 'Business Analyst', tasks: ['Thiết kế giải pháp', 'Tài liệu hóa & truyền đạt yêu cầu'],
+        outputs: ['Đặc tả Yêu cầu Giải pháp (SRS)'] },
+      { role: 'UI Designer', tasks: ['Thiết kế wireframe & tương tác người dùng'],
+        outputs: ['Tài liệu Wireframe'] },
+      { role: 'GUI Designer', tasks: ['Thiết kế giao diện người dùng'],
+        outputs: ['Thiết kế Giao diện (XD)'] },
+      { role: 'Software Architect', tasks: ['Thiết kế Cấp cao (HLD)'],
+        outputs: ['Tài liệu Thiết kế Cấp cao'] },
+      { role: 'Software Developer', tasks: ['Thiết kế Chi tiết (DDD)'],
+        outputs: ['Tài liệu Thiết kế Chi tiết'] },
+    ],
+    icon: Layers,
+  },
+  SI: {
+    roles: [
+      { role: 'Project Manager', tasks: ['Theo dõi tiến độ', 'Lập kế hoạch PII/SOAP/Bảo mật'],
+        outputs: ['Nhật ký Yêu cầu Thay đổi'] },
+      { role: 'Business Analyst', tasks: ['Quản lý yêu cầu thay đổi', 'Truyền đạt yêu cầu'],
+        outputs: ['Tài liệu Thay đổi Yêu cầu'] },
+      { role: 'Software Developer', tasks: ['Phát triển mã nguồn', 'Đảm bảo chất lượng & pháp lý OSL'],
+        outputs: ['Mã nguồn Phần mềm'] },
+      { role: 'Software Tester', tasks: ['Thiết kế test case hệ thống'],
+        outputs: ['Test case Hệ thống'] },
+      { role: 'System Operations', tasks: ['Thiết kế kiến trúc hạ tầng', 'Triển khai hạ tầng STG'],
+        outputs: ['Kiến trúc Hạ tầng & Test case'] },
+    ],
+    icon: Code2,
+  },
+  ST: {
+    roles: [
+      { role: 'Project Manager', tasks: ['Theo dõi tiến độ kiểm thử', 'Đăng ký N-IRP/SWAT', 'Đăng ký App Store'],
+        outputs: ['Nhật ký Vấn đề'] },
+      { role: 'Business Analyst', tasks: ['Hỗ trợ Kiểm thử Chấp nhận (UAT)'],
+        outputs: [] },
+      { role: 'Software Tester', tasks: ['Lập kế hoạch & thực hiện kiểm thử', 'Tạo báo cáo kiểm thử'],
+        outputs: ['Kế hoạch Kiểm thử', 'Báo cáo Kiểm thử'] },
+      { role: 'Software Developer', tasks: ['Xử lý lỗi phát hiện', 'Khắc phục lỗ hổng bảo mật'],
+        outputs: [] },
+      { role: 'System Operations', tasks: ['Triển khai hạ tầng Production', 'Kiểm thử hiệu năng', 'Kiểm tra bảo mật'],
+        outputs: ['Báo cáo Kiểm thử Hiệu năng'] },
+    ],
+    icon: TestTube,
+  },
+  DEP: {
+    roles: [
+      { role: 'Project Manager', tasks: ['Lập lịch trình triển khai', 'Xác nhận Go-live', 'Kiểm tra quy định PII'],
+        outputs: ['Lịch trình Bàn giao'] },
+      { role: 'Business Analyst', tasks: ['Tạo hướng dẫn sử dụng'],
+        outputs: ['Hướng dẫn Sử dụng'] },
+      { role: 'Software Developer', tasks: ['Chuẩn bị phiên bản triển khai'],
+        outputs: ['Báo cáo Kiểm tra Bảo mật'] },
+      { role: 'System Operations', tasks: ['Thực hiện triển khai phần mềm'],
+        outputs: ['Báo cáo Kiểm tra Bảo mật'] },
+    ],
+    icon: Rocket,
+  },
+  OM: {
+    roles: [
+      { role: 'Project Manager', tasks: ['Quản lý sự cố môi trường Production'],
+        outputs: ['Nhật ký Sự cố', 'Báo cáo Phân tích Nguyên nhân (RCA)'] },
+      { role: 'Software Developer', tasks: ['Xử lý sự cố Production', 'Giám sát & khắc phục lỗ hổng bảo mật'],
+        outputs: [] },
+      { role: 'System Operations', tasks: ['Giám sát hệ thống', 'Kiểm tra bảo mật định kỳ'],
+        outputs: [] },
+    ],
+    icon: Wrench,
+  },
 };
 
 const features = [
@@ -64,7 +151,7 @@ const features = [
   { icon: BarChart3, title: 'Timeline Trực Quan', desc: 'Kéo thả, resize phase blocks. Zoom theo tuần, tháng, quý — linh hoạt theo nhu cầu.' },
   { icon: Users, title: 'Hợp Tác Nhóm', desc: 'Checklists, bình luận, tệp đính kèm — tất cả trong một phase block duy nhất.' },
   { icon: Clock, title: 'Today Marker', desc: 'Đường kẻ đỏ đánh dấu ngày hiện tại, biết ngay mọi thứ đang đi trước hay sau.' },
-  { icon: Shield, title: '7 Vai Trò Rõ Ràng', desc: 'PM, BA, Architect, Developer, Tester, SysOps, Designer — ai làm gì, rõ ràng.' },
+  { icon: Shield, title: '8 Vai Trò Rõ Ràng', desc: 'Project Manager, Business Analyst, Software Architect, Developer, Tester, SysOps, UI Designer, GUI Designer — ai làm gì, rõ ràng.' },
   { icon: Zap, title: 'Nhanh & Mượt', desc: 'Drag để sắp xếp, resize để đổi ngày, click để xem chi tiết — tất cả real-time.' },
 ];
 
@@ -155,8 +242,8 @@ export default function LandingPage() {
                 icon: FolderKanban,
                 title: 'Dành cho Project Managers',
                 pains: [
-                  'Nhiều dự án, không thấy cái nào đang落后 — thiếu dashboard tổng quan',
-                  'Status meeting mỗi tuần chỉ để hỏi "Đâu rồi?" — lãng phí thời gian',
+                  'Nhiều dự án, không thấy cái nào đang thực thi — thiếu dashboard tổng quan',
+                  'Status meeting mỗi tuần chỉ để hỏi "Đến đâu rồi?" — lãng phí thời gian',
                   'Deadline đến mà phase trước chưa xong — không có cảnh báo sớm',
                 ],
               },
@@ -203,7 +290,7 @@ export default function LandingPage() {
               7 Giai đoạn chuẩn hóa
             </h2>
             <p className="text-muted max-w-lg text-lg">
-              Mỗi tính năng đi qua 7 giai đoạn. Mỗi giai đoạn có vai trò và sản phẩm bàn giao rõ ràng.
+              Mỗi giai đoạn có vai trò rõ ràng, trách nhiệm cụ thể và sản phẩm bàn giao tương ứng.
             </p>
           </motion.div>
 
@@ -244,7 +331,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="flex-1 lg:pl-12 mt-6 lg:mt-0 min-h-[320px]">
+            <div className="flex-1 lg:pl-12 mt-6 lg:mt-0 min-h-[400px]">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activePhase}
@@ -252,13 +339,14 @@ export default function LandingPage() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.98 }}
                   transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                  className="bg-surface-card rounded-xl border border-hairline p-8 h-full">
+                  className="bg-surface-card rounded-xl border border-hairline p-8">
                   {(() => {
                     const meta = PHASE_META[activePhase];
                     const detail = phaseDetail[activePhase];
                     const Icon = detail.icon;
                     return (
                       <>
+                        {/* Phase header */}
                         <div className="flex items-center gap-4 mb-6">
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${meta.bg} ${meta.color}`}>
                             <Icon className="w-5 h-5" />
@@ -271,39 +359,59 @@ export default function LandingPage() {
                             <p className="text-sm text-muted mt-0.5">{meta.desc}</p>
                           </div>
                         </div>
-                        <div className="grid md:grid-cols-2 gap-6">
-                          <div>
-                            <h4 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-3">Sản phẩm bàn giao</h4>
-                            <ul className="space-y-2">
-                              {detail.deliverables.map((d, i) => (
-                                <motion.li key={i} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: i * 0.08 }}
-                                  className="flex items-start gap-2.5 text-sm text-body">
-                                  <CheckCircle2 className="w-4 h-4 text-muted-soft flex-shrink-0 mt-0.5" />{d}
-                                </motion.li>
-                              ))}
-                            </ul>
+
+                        {/* Column headers */}
+                        <div className="flex border-b border-hairline pb-3 mb-1">
+                          <div className="w-[40%] pr-4 pl-4">
+                            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Vai trò & Trách nhiệm</span>
                           </div>
-                          <div>
-                            <h4 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-3">Vai trò chính</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {detail.roles.map((role, i) => (
-                                <motion.span key={role} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ delay: 0.2 + i * 0.08 }}
-                                  className="px-3 py-1.5 bg-surface-card border border-hairline rounded-lg text-xs font-medium text-body">
-                                  {role}
-                                </motion.span>
-                              ))}
-                            </div>
-                            <div className="mt-6 pt-4 border-t border-hairline">
-                              <div className="flex items-center gap-2 text-xs text-muted">
-                                <span>{activePhase}</span>
-                                <ArrowRight className="w-3 h-3" />
-                                <span className="text-ink">{DEV_PHASES[DEV_PHASES.indexOf(activePhase) + 1] || 'Hoàn thành'}</span>
-                              </div>
-                            </div>
+                          <div className="w-[20%]" />
+                          <div className="w-[40%] pl-4">
+                            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Sản phẩm bàn giao</span>
                           </div>
                         </div>
+
+                        {/* Role rows */}
+                        {detail.roles.flatMap((r, i) => [
+                          /* Role name row */
+                          <div key={`${r.role}-name`}
+                            className={`pl-4 ${i > 0 ? 'border-t border-hairline/60' : ''} pt-3 pb-1`}>
+                            <span className="text-[13px] font-semibold text-ink">{r.role}</span>
+                          </div>,
+                          /* Content row: Tasks | Arrow | Outputs */
+                          <div key={`${r.role}-items`} className="flex items-center pb-3">
+                            {/* Tasks */}
+                            <div className="w-[40%] pr-4 pl-4">
+                              <ul className="space-y-1">
+                                {r.tasks.map((task, j) => (
+                                  <li key={j} className="flex items-center gap-2 text-[13px] text-body leading-relaxed">
+                                    <span className="w-1 h-1 rounded-full bg-ink/25 flex-shrink-0" />
+                                    {task}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            {/* Arrow */}
+                            <div className="w-[20%] flex items-center justify-center">
+                              {r.outputs.length > 0 && (
+                                <ArrowRight className="w-4 h-4 text-ink/35" />
+                              )}
+                            </div>
+                            {/* Outputs */}
+                            <div className="w-[40%] pl-4">
+                              {r.outputs.length > 0 && (
+                                <div className="space-y-1">
+                                  {r.outputs.map((output, k) => (
+                                    <div key={k} className="flex items-center gap-2 text-[13px]">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-muted-soft flex-shrink-0" />
+                                      <span className="text-ink font-medium leading-relaxed">{output}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>,
+                        ])}
                       </>
                     );
                   })()}
