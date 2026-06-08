@@ -26,9 +26,10 @@ export type DevPhase =
 
 export const DEV_PHASES: DevPhase[] = ['PA', 'SA', 'SD', 'SI', 'ST', 'DEP', 'OM'];
 
-export const PHASE_META: Record<DevPhase, { label: string; color: string; bg: string; border: string; desc: string }> = {
+export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; color: string; bg: string; border: string; desc: string }> = {
   PA: {
     label: 'Đánh giá Dự án',
+    fullLabel: 'Project Assessment',
     color: 'text-gray-600',
     bg: 'bg-gray-100',
     border: 'border-gray-200',
@@ -36,6 +37,7 @@ export const PHASE_META: Record<DevPhase, { label: string; color: string; bg: st
   },
   SA: {
     label: 'Phân tích Phần mềm',
+    fullLabel: 'Software Analysis',
     color: 'text-cyan-700',
     bg: 'bg-cyan-50',
     border: 'border-cyan-200',
@@ -43,6 +45,7 @@ export const PHASE_META: Record<DevPhase, { label: string; color: string; bg: st
   },
   SD: {
     label: 'Thiết kế Phần mềm',
+    fullLabel: 'Software Design',
     color: 'text-violet-600',
     bg: 'bg-violet-50',
     border: 'border-violet-200',
@@ -50,6 +53,7 @@ export const PHASE_META: Record<DevPhase, { label: string; color: string; bg: st
   },
   SI: {
     label: 'Phát triển Phần mềm',
+    fullLabel: 'Software Implementation',
     color: 'text-blue-600',
     bg: 'bg-blue-50',
     border: 'border-blue-200',
@@ -57,6 +61,7 @@ export const PHASE_META: Record<DevPhase, { label: string; color: string; bg: st
   },
   ST: {
     label: 'Kiểm thử Phần mềm',
+    fullLabel: 'Software Testing',
     color: 'text-orange-600',
     bg: 'bg-orange-50',
     border: 'border-orange-200',
@@ -64,6 +69,7 @@ export const PHASE_META: Record<DevPhase, { label: string; color: string; bg: st
   },
   DEP: {
     label: 'Triển khai Phần mềm',
+    fullLabel: 'Software Deployment',
     color: 'text-emerald-600',
     bg: 'bg-emerald-50',
     border: 'border-emerald-200',
@@ -71,6 +77,7 @@ export const PHASE_META: Record<DevPhase, { label: string; color: string; bg: st
   },
   OM: {
     label: 'Vận hành & Bảo trì',
+    fullLabel: 'Operation & Maintenance',
     color: 'text-slate-600',
     bg: 'bg-slate-100',
     border: 'border-slate-300',
