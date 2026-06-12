@@ -2,10 +2,10 @@ import { useApp } from '../../context/AppContext';
 import { PHASE_META, DEV_PHASES } from '../../types';
 import {
   FolderKanban, CheckCircle2, AlertTriangle, TrendingUp,
-  Users, ArrowUpRight, GitBranch, Clock, MessageSquare,
-  FileText, Activity, ChevronRight,
+  Users, ArrowUpRight, GitBranch, Clock,
+  Activity, ChevronRight,
 } from 'lucide-react';
-import { parseISO, differenceInDays, format } from 'date-fns';
+import { parseISO, differenceInDays } from 'date-fns';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 
@@ -196,7 +196,7 @@ export default function DashboardView() {
               <div className="text-sm text-muted text-center py-6">Chưa có hoạt động</div>
             ) : (
               <div className="space-y-3">
-                {recentActivity.map((act, i) => {
+                {recentActivity.map(act => {
                   const user = selectedOrg.members.find(m => m.id === act.userId);
                   const timeAgo = (() => {
                     const diff = differenceInDays(new Date(), new Date(act.timestamp));

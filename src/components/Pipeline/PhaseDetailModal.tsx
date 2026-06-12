@@ -1,26 +1,41 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { getUserById } from '../../data/mockData';
+import { getUserById, ROLE_LABELS } from '../../data/mockData';
 import { PHASE_META, PHASE_TAG_META } from '../../types';
-import type { PhaseTag } from '../../types';
+import type { PhaseTag, ChecklistItem, UserRole } from '../../types';
 import {
   X, CheckSquare, Square, MessageSquare, Paperclip, Clock,
-  Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check
+  Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check,
+  Link2, ExternalLink, FileText, ChevronDown, Target, UserCircle2
 } from 'lucide-react';
-import { format, parseISO, differenceInDays, addDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 const ALL_TAGS: PhaseTag[] = ['Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled'];
+
+// Gom checklist/outcome items theo role, giữ thứ tự xuất hiện
+function groupByRole(items: ChecklistItem[]): Array<{ role: UserRole | null; items: ChecklistItem[] }> {
+  const groups: Array<{ role: UserRole | null; items: ChecklistItem[] }> = [];
+  for (const item of items) {
+    const role = item.role ?? null;
+    let group = groups.find(g => g.role === role);
+    if (!group) { group = { role, items: [] }; groups.push(group); }
+    group.items.push(item);
+  }
+  return groups;
+}
 
 export default function PhaseDetailModal() {
   const {
     selectedPhaseBlock, phaseDetailOpen, closePhaseDetail,
-    updatePhaseBlock, deletePhaseBlock, orgProjects, phaseBlocks
+    updatePhaseBlock, deletePhaseBlock, orgProjects, selectedOrg
   } = useApp();
 
   const [commentText, setCommentText] = useState('');
   const [newCheckText, setNewCheckText] = useState('');
+  const [newOutcomeText, setNewOutcomeText] = useState('');
   const [checklist, setChecklist] = useState(selectedPhaseBlock?.checklist || []);
+  const [outcomes, setOutcomes] = useState(selectedPhaseBlock?.outcomes || []);
   const [comments, setComments] = useState(selectedPhaseBlock?.comments || []);
   const [attachments, setAttachments] = useState(selectedPhaseBlock?.attachments || []);
 
@@ -34,16 +49,39 @@ export default function PhaseDetailModal() {
   const [editingCheckId, setEditingCheckId] = useState<string | null>(null);
   const [editingCheckText, setEditingCheckText] = useState('');
 
+  // Document link form
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [linkName, setLinkName] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+
+  // Assignee dropdown
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const assigneeRef = useRef<HTMLDivElement>(null);
+
+  // Collapsible sections — mặc định thu gọn
+  const [expandChecklist, setExpandChecklist] = useState(false);
+  const [expandOutcomes, setExpandOutcomes] = useState(false);
+  const [expandDocs, setExpandDocs] = useState(false);
+
   useEffect(() => {
     if (selectedPhaseBlock) {
       setChecklist(selectedPhaseBlock.checklist);
+      setOutcomes(selectedPhaseBlock.outcomes || []);
       setComments(selectedPhaseBlock.comments);
       setAttachments(selectedPhaseBlock.attachments);
       setCommentText('');
       setNewCheckText('');
+      setNewOutcomeText('');
       setEditingTitle(false);
       setEditingDesc(false);
       setEditingCheckId(null);
+      setShowLinkForm(false);
+      setLinkName('');
+      setLinkUrl('');
+      setAssigneeOpen(false);
+      setExpandChecklist(false);
+      setExpandOutcomes(false);
+      setExpandDocs(false);
     }
   }, [selectedPhaseBlock?.id]);
 
@@ -59,37 +97,18 @@ export default function PhaseDetailModal() {
     };
   }, [phaseDetailOpen, closePhaseDetail]);
 
-  // Auto-adjust adjacent phases
-  const adjustAdjacent = (id: string, field: 'startDate' | 'endDate', newValue: string) => {
-    if (!selectedPhaseBlock) return;
-    const projectPbs = phaseBlocks.filter(pb => pb.projectId === selectedPhaseBlock.projectId);
-    const sorted = [...projectPbs].sort((a, b) => a.startDate.localeCompare(b.startDate));
-    const idx = sorted.findIndex(pb => pb.id === id);
-    if (idx === -1) return;
+  // Close assignee dropdown on outside click
+  useEffect(() => {
+    if (!assigneeOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (assigneeRef.current && !assigneeRef.current.contains(e.target as Node)) setAssigneeOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [assigneeOpen]);
 
-    if (field === 'startDate' && idx > 0) {
-      const left = sorted[idx - 1];
-      const newStart = parseISO(newValue);
-      const leftEnd = parseISO(left.endDate);
-      if (newStart < leftEnd) {
-        const duration = differenceInDays(leftEnd, parseISO(left.startDate));
-        const shiftedEnd = format(addDays(newStart, -1), 'yyyy-MM-dd');
-        const shiftedStart = format(addDays(parseISO(shiftedEnd), -duration), 'yyyy-MM-dd');
-        updatePhaseBlock(left.id, { startDate: shiftedStart, endDate: shiftedEnd });
-      }
-    }
-    if (field === 'endDate' && idx < sorted.length - 1) {
-      const right = sorted[idx + 1];
-      const newEnd = parseISO(newValue);
-      const rightStart = parseISO(right.startDate);
-      if (newEnd > rightStart) {
-        const duration = differenceInDays(parseISO(right.endDate), rightStart);
-        const shiftedStart = format(addDays(newEnd, 1), 'yyyy-MM-dd');
-        const shiftedEnd = format(addDays(parseISO(shiftedStart), duration), 'yyyy-MM-dd');
-        updatePhaseBlock(right.id, { startDate: shiftedStart, endDate: shiftedEnd });
-      }
-    }
-  };
+  const checklistGroups = useMemo(() => groupByRole(checklist), [checklist]);
+  const outcomeGroups = useMemo(() => groupByRole(outcomes), [outcomes]);
 
   const toggleCheckItem = (itemId: string) => {
     if (!selectedPhaseBlock) return;
@@ -100,9 +119,18 @@ export default function PhaseDetailModal() {
     updatePhaseBlock(selectedPhaseBlock.id, { checklist: updated });
   };
 
+  const toggleOutcomeItem = (itemId: string) => {
+    if (!selectedPhaseBlock) return;
+    const updated = outcomes.map(item =>
+      item.id === itemId ? { ...item, done: !item.done } : item
+    );
+    setOutcomes(updated);
+    updatePhaseBlock(selectedPhaseBlock.id, { outcomes: updated });
+  };
+
   const handleAddChecklistItem = () => {
     if (!newCheckText.trim() || !selectedPhaseBlock) return;
-    const newItem = {
+    const newItem: ChecklistItem = {
       id: `chk-${Date.now()}`,
       text: newCheckText.trim(),
       done: false,
@@ -113,11 +141,31 @@ export default function PhaseDetailModal() {
     setNewCheckText('');
   };
 
+  const handleAddOutcomeItem = () => {
+    if (!newOutcomeText.trim() || !selectedPhaseBlock) return;
+    const newItem: ChecklistItem = {
+      id: `out-${Date.now()}`,
+      text: newOutcomeText.trim(),
+      done: false,
+    };
+    const updated = [...outcomes, newItem];
+    setOutcomes(updated);
+    updatePhaseBlock(selectedPhaseBlock.id, { outcomes: updated });
+    setNewOutcomeText('');
+  };
+
   const handleDeleteChecklistItem = (itemId: string) => {
     if (!selectedPhaseBlock) return;
     const updated = checklist.filter(item => item.id !== itemId);
     setChecklist(updated);
     updatePhaseBlock(selectedPhaseBlock.id, { checklist: updated });
+  };
+
+  const handleDeleteOutcomeItem = (itemId: string) => {
+    if (!selectedPhaseBlock) return;
+    const updated = outcomes.filter(item => item.id !== itemId);
+    setOutcomes(updated);
+    updatePhaseBlock(selectedPhaseBlock.id, { outcomes: updated });
   };
 
   const startEditCheckItem = (itemId: string, text: string) => {
@@ -149,15 +197,42 @@ export default function PhaseDetailModal() {
     setCommentText('');
   };
 
-  const handleAttach = () => {
+  const handleAttachFile = () => {
     if (!selectedPhaseBlock) return;
     const newAtt = {
       id: `a-${Date.now()}`,
+      kind: 'file' as const,
       fileName: `document-${Date.now()}.pdf`,
       url: '#',
       uploadedAt: new Date().toISOString(),
     };
     const updated = [...attachments, newAtt];
+    setAttachments(updated);
+    updatePhaseBlock(selectedPhaseBlock.id, { attachments: updated });
+  };
+
+  const handleAttachLink = () => {
+    if (!selectedPhaseBlock || !linkUrl.trim()) return;
+    let url = linkUrl.trim();
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    const newAtt = {
+      id: `a-${Date.now()}`,
+      kind: 'link' as const,
+      fileName: linkName.trim() || url,
+      url,
+      uploadedAt: new Date().toISOString(),
+    };
+    const updated = [...attachments, newAtt];
+    setAttachments(updated);
+    updatePhaseBlock(selectedPhaseBlock.id, { attachments: updated });
+    setLinkName('');
+    setLinkUrl('');
+    setShowLinkForm(false);
+  };
+
+  const handleDeleteAttachment = (attId: string) => {
+    if (!selectedPhaseBlock) return;
+    const updated = attachments.filter(a => a.id !== attId);
     setAttachments(updated);
     updatePhaseBlock(selectedPhaseBlock.id, { attachments: updated });
   };
@@ -196,9 +271,12 @@ export default function PhaseDetailModal() {
 
   const meta = PHASE_META[selectedPhaseBlock.phaseType];
   const creator = getUserById(selectedPhaseBlock.createdBy);
+  const assignee = getUserById(selectedPhaseBlock.assignee || selectedPhaseBlock.createdBy);
   const project = orgProjects.find(p => p.id === selectedPhaseBlock.projectId);
   const completedChecks = checklist.filter(c => c.done).length;
+  const progressPct = checklist.length > 0 ? Math.round((completedChecks / checklist.length) * 100) : 0;
   const tagMeta = PHASE_TAG_META[selectedPhaseBlock.tag];
+  const orgMembers = selectedOrg?.members || [];
 
   return (
     <AnimatePresence>
@@ -210,7 +288,7 @@ export default function PhaseDetailModal() {
         <motion.div
           initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-          className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col"
+          className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
@@ -221,6 +299,9 @@ export default function PhaseDetailModal() {
               </span>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${tagMeta.bg} ${tagMeta.color} border ${tagMeta.border}`}>
                 {tagMeta.label}
+              </span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 border border-gray-200">
+                {progressPct}% hoàn thành
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -286,10 +367,7 @@ export default function PhaseDetailModal() {
                   </label>
                   <input type="date"
                     value={selectedPhaseBlock.startDate}
-                    onChange={e => {
-                      updatePhaseBlock(selectedPhaseBlock.id, { startDate: e.target.value });
-                      adjustAdjacent(selectedPhaseBlock.id, 'startDate', e.target.value);
-                    }}
+                    onChange={e => updatePhaseBlock(selectedPhaseBlock.id, { startDate: e.target.value })}
                     className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs
                                text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
                 </div>
@@ -299,10 +377,7 @@ export default function PhaseDetailModal() {
                   </label>
                   <input type="date"
                     value={selectedPhaseBlock.endDate}
-                    onChange={e => {
-                      updatePhaseBlock(selectedPhaseBlock.id, { endDate: e.target.value });
-                      adjustAdjacent(selectedPhaseBlock.id, 'endDate', e.target.value);
-                    }}
+                    onChange={e => updatePhaseBlock(selectedPhaseBlock.id, { endDate: e.target.value })}
                     className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs
                                text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
                 </div>
@@ -348,90 +423,146 @@ export default function PhaseDetailModal() {
               </div>
             </div>
 
-            {/* Creator & Participants */}
-            <div className="px-6 pb-4 flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">Người tạo:</span>
-                {creator && (
-                  <div className="flex items-center gap-1.5">
-                    <img src={creator.avatar} className="w-5 h-5 rounded-full" alt="" />
-                    <span className="text-xs font-medium text-slate-700">{creator.name}</span>
-                  </div>
-                )}
+            {/* Assignee, Creator & Participants */}
+            <div className="px-6 pb-4 space-y-3">
+              <div className="flex items-center gap-2" ref={assigneeRef}>
+                <span className="text-xs text-gray-400 flex items-center gap-1 w-24 shrink-0">
+                  <UserCircle2 className="w-3.5 h-3.5" /> Assignee:
+                </span>
+                <div className="relative">
+                  <button
+                    onClick={() => setAssigneeOpen(!assigneeOpen)}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 hover:border-gray-300 bg-white transition-colors">
+                    {assignee && <img src={assignee.avatar} className="w-5 h-5 rounded-full" alt="" />}
+                    <span className="text-xs font-medium text-slate-700">{assignee?.name ?? 'Chưa gán'}</span>
+                    <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${assigneeOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {assigneeOpen && (
+                    <div className="absolute z-30 top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto">
+                      {orgMembers.map(member => {
+                        const isSelected = (selectedPhaseBlock.assignee || selectedPhaseBlock.createdBy) === member.id;
+                        return (
+                          <button key={member.id}
+                            onClick={() => {
+                              updatePhaseBlock(selectedPhaseBlock.id, { assignee: member.id });
+                              setAssigneeOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors
+                              ${isSelected ? 'bg-slate-50' : 'hover:bg-gray-50'}`}>
+                            <img src={member.avatar} className="w-5 h-5 rounded-full" alt="" />
+                            <span className="text-xs font-medium text-slate-700 flex-1 truncate">{member.name}</span>
+                            <span className="text-[10px] text-gray-400">{ROLE_LABELS[member.role] ?? member.role}</span>
+                            {isSelected && <Check className="w-3 h-3 text-slate-700" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-3 h-3 text-gray-400" />
-                <div className="flex -space-x-1">
-                  {selectedPhaseBlock.participants.map(uid => {
-                    const u = getUserById(uid);
-                    return <img key={uid} src={u?.avatar} className="w-4 h-4 rounded-full border border-white" alt="" />;
-                  })}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">Người tạo:</span>
+                  {creator && (
+                    <div className="flex items-center gap-1.5">
+                      <img src={creator.avatar} className="w-5 h-5 rounded-full" alt="" />
+                      <span className="text-xs font-medium text-slate-700">{creator.name}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Users className="w-3 h-3 text-gray-400" />
+                  <div className="flex -space-x-1">
+                    {selectedPhaseBlock.participants.map(uid => {
+                      const u = getUserById(uid);
+                      return <img key={uid} src={u?.avatar} className="w-4 h-4 rounded-full border border-white" alt="" />;
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Checklist */}
+            {/* Checklist — grouped by role */}
             <div className="px-6 pb-4">
-              <div className="flex items-center justify-between mb-2">
+              <button onClick={() => setExpandChecklist(!expandChecklist)}
+                className="w-full flex items-center justify-between mb-2 group/sec">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                   <CheckSquare className="w-3.5 h-3.5" />
                   Checklist ({completedChecks}/{checklist.length})
                 </h3>
-                <span className="text-[10px] text-gray-400">
-                  {checklist.length > 0 ? Math.round((completedChecks / checklist.length) * 100) : 0}%
+                <span className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-400">{progressPct}%</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-gray-400 group-hover/sec:text-gray-600 transition-transform ${expandChecklist ? 'rotate-180' : ''}`} />
                 </span>
-              </div>
+              </button>
               <div className="w-full h-1.5 bg-gray-100 rounded-full mb-3 overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full transition-all"
-                  style={{ width: checklist.length > 0 ? `${(completedChecks / checklist.length) * 100}%` : '0%' }} />
+                  style={{ width: `${progressPct}%` }} />
               </div>
-              <div className="space-y-0.5">
-                {checklist.map(item => (
-                  <div key={item.id} className="flex items-center gap-1 group">
-                    <button
-                      onClick={() => toggleCheckItem(item.id)}
-                      className="flex-1 flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
-                    >
-                      {item.done
-                        ? <CheckSquare className="w-4 h-4 text-emerald-500 shrink-0" />
-                        : <Square className="w-4 h-4 text-gray-300 shrink-0" />
-                      }
-                      {editingCheckId === item.id ? (
-                        <input type="text" value={editingCheckText}
-                          onChange={e => setEditingCheckText(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') saveEditCheckItem(); if (e.key === 'Escape') setEditingCheckId(null); }}
-                          autoFocus
-                          onClick={e => e.stopPropagation()}
-                          className="flex-1 text-sm bg-gray-50 border border-slate-300 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-slate-400" />
-                      ) : (
-                        <span className={`text-sm ${item.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                          {item.text}
+              {expandChecklist && (<>
+              <div className="space-y-2">
+                {checklistGroups.map(group => {
+                  const groupDone = group.items.filter(i => i.done).length;
+                  return (
+                    <div key={group.role ?? 'general'}>
+                      <div className="flex items-center gap-2 px-1 mb-0.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          {group.role ? (ROLE_LABELS[group.role] ?? group.role) : 'Chung'}
                         </span>
-                      )}
-                    </button>
-                    {editingCheckId === item.id ? (
-                      <button onClick={saveEditCheckItem}
-                        className="p-1 hover:bg-emerald-50 rounded transition-colors">
-                        <Check className="w-3.5 h-3.5 text-emerald-500" />
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => startEditCheckItem(item.id, item.text)}
-                          className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-all"
-                          title="Sửa">
-                          <Pencil className="w-3 h-3 text-gray-400" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteChecklistItem(item.id)}
-                          className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all"
-                          title="Xóa">
-                          <Trash2 className="w-3 h-3 text-red-400" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                ))}
+                        <span className="text-[10px] text-gray-400">{groupDone}/{group.items.length}</span>
+                        <div className="flex-1 h-px bg-gray-100" />
+                      </div>
+                      <div className="space-y-0.5">
+                        {group.items.map(item => (
+                          <div key={item.id} className="flex items-center gap-1 group">
+                            <button
+                              onClick={() => toggleCheckItem(item.id)}
+                              className="flex-1 flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                            >
+                              {item.done
+                                ? <CheckSquare className="w-4 h-4 text-emerald-500 shrink-0" />
+                                : <Square className="w-4 h-4 text-gray-300 shrink-0" />
+                              }
+                              {editingCheckId === item.id ? (
+                                <input type="text" value={editingCheckText}
+                                  onChange={e => setEditingCheckText(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') saveEditCheckItem(); if (e.key === 'Escape') setEditingCheckId(null); }}
+                                  autoFocus
+                                  onClick={e => e.stopPropagation()}
+                                  className="flex-1 text-sm bg-gray-50 border border-slate-300 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-slate-400" />
+                              ) : (
+                                <span className={`text-sm ${item.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                                  {item.text}
+                                </span>
+                              )}
+                            </button>
+                            {editingCheckId === item.id ? (
+                              <button onClick={saveEditCheckItem}
+                                className="p-1 hover:bg-emerald-50 rounded transition-colors">
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => startEditCheckItem(item.id, item.text)}
+                                  className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-all"
+                                  title="Sửa">
+                                  <Pencil className="w-3 h-3 text-gray-400" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteChecklistItem(item.id)}
+                                  className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all"
+                                  title="Xóa">
+                                  <Trash2 className="w-3 h-3 text-red-400" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               {/* Add checklist item */}
               <div className="flex gap-2 mt-2">
@@ -453,32 +584,152 @@ export default function PhaseDetailModal() {
                   <Plus className="w-3 h-3" /> Thêm
                 </button>
               </div>
+              </>)}
             </div>
 
-            {/* Attachments */}
+            {/* Outcomes — grouped by role */}
             <div className="px-6 pb-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2
-                             flex items-center gap-1.5">
-                <Paperclip className="w-3.5 h-3.5" /> Tệp đính kèm ({attachments.length})
-              </h3>
-              <div className="space-y-1.5 mb-2">
-                {attachments.map(att => (
-                  <div key={att.id} className="flex items-center gap-2.5 p-2 bg-gray-50 rounded-lg border border-gray-100">
-                    <div className="w-7 h-7 bg-slate-100 rounded-md flex items-center justify-center">
-                      <Paperclip className="w-3.5 h-3.5 text-slate-500" />
+              <button onClick={() => setExpandOutcomes(!expandOutcomes)}
+                className="w-full flex items-center justify-between mb-2 group/sec">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5" />
+                  Outcomes ({outcomes.filter(o => o.done).length}/{outcomes.length})
+                </h3>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 group-hover/sec:text-gray-600 transition-transform ${expandOutcomes ? 'rotate-180' : ''}`} />
+              </button>
+              {expandOutcomes && (<>
+              <div className="space-y-2">
+                {outcomeGroups.map(group => (
+                  <div key={group.role ?? 'general'}>
+                    <div className="flex items-center gap-2 px-1 mb-0.5">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                        {group.role ? (ROLE_LABELS[group.role] ?? group.role) : 'Chung'}
+                      </span>
+                      <div className="flex-1 h-px bg-gray-100" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-900 truncate">{att.fileName}</p>
-                      <p className="text-[10px] text-gray-400">{format(parseISO(att.uploadedAt), 'dd/MM/yyyy')}</p>
+                    <div className="space-y-0.5">
+                      {group.items.map(item => (
+                        <div key={item.id} className="flex items-center gap-1 group">
+                          <button
+                            onClick={() => toggleOutcomeItem(item.id)}
+                            className="flex-1 flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                          >
+                            {item.done
+                              ? <CheckSquare className="w-4 h-4 text-blue-500 shrink-0" />
+                              : <Square className="w-4 h-4 text-gray-300 shrink-0" />
+                            }
+                            <span className={`text-sm ${item.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                              {item.text}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOutcomeItem(item.id)}
+                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all"
+                            title="Xóa">
+                            <Trash2 className="w-3 h-3 text-red-400" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
-              <button onClick={handleAttach}
-                className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-500
-                           hover:border-gray-300 transition-colors flex items-center justify-center gap-1.5">
-                <Paperclip className="w-3.5 h-3.5" /> Đính kèm tệp
+              <div className="flex gap-2 mt-2">
+                <input
+                  type="text"
+                  value={newOutcomeText}
+                  onChange={e => setNewOutcomeText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddOutcomeItem(); }}
+                  placeholder="Thêm outcome..."
+                  className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs
+                             text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                />
+                <button
+                  onClick={handleAddOutcomeItem}
+                  disabled={!newOutcomeText.trim()}
+                  className="px-2.5 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800
+                             transition-colors disabled:opacity-40 flex items-center gap-1 text-xs"
+                >
+                  <Plus className="w-3 h-3" /> Thêm
+                </button>
+              </div>
+              </>)}
+            </div>
+
+            {/* Document — files & links */}
+            <div className="px-6 pb-4">
+              <button onClick={() => setExpandDocs(!expandDocs)}
+                className="w-full flex items-center justify-between mb-2 group/sec">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider
+                               flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5" /> Document ({attachments.length})
+                </h3>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 group-hover/sec:text-gray-600 transition-transform ${expandDocs ? 'rotate-180' : ''}`} />
               </button>
+              {expandDocs && (<>
+              <div className="space-y-1.5 mb-2">
+                {attachments.map(att => (
+                  <div key={att.id} className="flex items-center gap-2.5 p-2 bg-gray-50 rounded-lg border border-gray-100 group">
+                    <div className="w-7 h-7 bg-slate-100 rounded-md flex items-center justify-center shrink-0">
+                      {att.kind === 'link'
+                        ? <Link2 className="w-3.5 h-3.5 text-blue-500" />
+                        : <Paperclip className="w-3.5 h-3.5 text-slate-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {att.kind === 'link' ? (
+                        <a href={att.url} target="_blank" rel="noopener noreferrer"
+                          className="text-xs font-medium text-blue-600 hover:underline truncate flex items-center gap-1">
+                          {att.fileName} <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        </a>
+                      ) : (
+                        <p className="text-xs font-medium text-slate-900 truncate">{att.fileName}</p>
+                      )}
+                      <p className="text-[10px] text-gray-400">
+                        {att.kind === 'link' ? att.url : format(parseISO(att.uploadedAt), 'dd/MM/yyyy')}
+                      </p>
+                    </div>
+                    <button onClick={() => handleDeleteAttachment(att.id)}
+                      className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all" title="Xóa">
+                      <Trash2 className="w-3 h-3 text-red-400" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {showLinkForm && (
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                  <input type="text" value={linkName} onChange={e => setLinkName(e.target.value)}
+                    placeholder="Tên tài liệu (tùy chọn)"
+                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs
+                               text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                  <input type="url" value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAttachLink(); }}
+                    placeholder="https://..."
+                    autoFocus
+                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs
+                               text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => { setShowLinkForm(false); setLinkName(''); setLinkUrl(''); }}
+                      className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700">Hủy</button>
+                    <button onClick={handleAttachLink} disabled={!linkUrl.trim()}
+                      className="px-3 py-1.5 bg-slate-900 text-white text-xs rounded-lg hover:bg-slate-800 disabled:opacity-40 flex items-center gap-1">
+                      <Link2 className="w-3 h-3" /> Đính kèm link
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={handleAttachFile}
+                  className="py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-500
+                             hover:border-gray-300 transition-colors flex items-center justify-center gap-1.5">
+                  <Paperclip className="w-3.5 h-3.5" /> Upload tệp
+                </button>
+                <button onClick={() => setShowLinkForm(true)}
+                  className="py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-500
+                             hover:border-gray-300 transition-colors flex items-center justify-center gap-1.5">
+                  <Link2 className="w-3.5 h-3.5" /> Đính kèm link
+                </button>
+              </div>
+              </>)}
             </div>
 
             {/* Comments */}

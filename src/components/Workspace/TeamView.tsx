@@ -1,6 +1,6 @@
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
-import { Mail, Shield, FolderKanban, CheckCircle2 } from 'lucide-react';
+import { Mail, Shield, FolderKanban } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { PHASE_META } from '../../types';
@@ -168,7 +168,7 @@ export default function TeamView() {
                           <span className="text-xs text-stone-600 truncate flex-1">{a.project}</span>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             {a.phases.slice(0, 3).map(p => {
-                              const meta = PHASE_META[p];
+                              const meta = PHASE_META[p as keyof typeof PHASE_META];
                               return (
                                 <span key={p} className={`text-[8px] font-bold px-1 py-0.5 rounded ${meta.bg} ${meta.color}`}>
                                   {p}

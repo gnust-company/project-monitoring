@@ -6,7 +6,7 @@ import { Bell, ChevronRight, LogOut, Settings, User, CheckCircle2 } from 'lucide
 export default function WorkspaceHeader() {
   const {
     selectedOrg, workspaceView, currentUserEmail,
-    logout, goToWorkspaceSelector, organizations, orgProjects, phaseBlocks,
+    logout, goToWorkspaceSelector, organizations,
   } = useApp();
 
   const [showNotif, setShowNotif] = useState(false);

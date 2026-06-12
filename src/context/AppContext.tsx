@@ -31,7 +31,11 @@ interface AppState {
   createProjectOpen: boolean;
   createPhaseOpen: boolean;
   createPhaseProjectId: string | null;
+  createPhaseDates: { startDate: string; endDate: string } | null;
   createWorkspaceOpen: boolean;
+
+  // Layout
+  sidebarCollapsed: boolean;
 }
 
 interface AppContextType extends AppState {
@@ -65,10 +69,11 @@ interface AppContextType extends AppState {
   // Create modals
   openCreateProject: () => void;
   closeCreateProject: () => void;
-  openCreatePhase: (projectId?: string) => void;
+  openCreatePhase: (projectId?: string, dates?: { startDate: string; endDate: string }) => void;
   closeCreatePhase: () => void;
   openCreateWorkspace: () => void;
   closeCreateWorkspace: () => void;
+  toggleSidebar: () => void;
 
   // Actions
   addProject: (project: Project) => void;
@@ -106,7 +111,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     createProjectOpen: false,
     createPhaseOpen: false,
     createPhaseProjectId: null,
+    createPhaseDates: null,
     createWorkspaceOpen: false,
+    sidebarCollapsed: false,
   });
 
   // Navigation
@@ -126,7 +133,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createProjectOpen: false,
       createPhaseOpen: false,
       createPhaseProjectId: null,
+      createPhaseDates: null,
       createWorkspaceOpen: false,
+      sidebarCollapsed: false,
     });
   }, []);
 
@@ -223,12 +232,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, createProjectOpen: false }));
   }, []);
 
-  const openCreatePhase = useCallback((projectId?: string) => {
-    setState(prev => ({ ...prev, createPhaseOpen: true, createPhaseProjectId: projectId || null }));
+  const openCreatePhase = useCallback((projectId?: string, dates?: { startDate: string; endDate: string }) => {
+    setState(prev => ({ ...prev, createPhaseOpen: true, createPhaseProjectId: projectId || null, createPhaseDates: dates || null }));
   }, []);
 
   const closeCreatePhase = useCallback(() => {
-    setState(prev => ({ ...prev, createPhaseOpen: false, createPhaseProjectId: null }));
+    setState(prev => ({ ...prev, createPhaseOpen: false, createPhaseProjectId: null, createPhaseDates: null }));
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setState(prev => ({ ...prev, sidebarCollapsed: !prev.sidebarCollapsed }));
   }, []);
 
   const openCreateWorkspace = useCallback(() => {
@@ -304,6 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       closeCreatePhase,
       openCreateWorkspace,
       closeCreateWorkspace,
+      toggleSidebar,
       addProject,
       addPhaseBlock,
       updatePhaseBlock,

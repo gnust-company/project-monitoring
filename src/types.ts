@@ -26,13 +26,14 @@ export type DevPhase =
 
 export const DEV_PHASES: DevPhase[] = ['PA', 'SA', 'SD', 'SI', 'ST', 'DEP', 'OM'];
 
-export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; color: string; bg: string; border: string; desc: string }> = {
+export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; color: string; bg: string; border: string; solid: string; desc: string }> = {
   PA: {
     label: 'Đánh giá Dự án',
     fullLabel: 'Project Assessment',
     color: 'text-gray-600',
     bg: 'bg-gray-100',
     border: 'border-gray-200',
+    solid: 'bg-gray-400',
     desc: 'Xác định mục tiêu, đánh giá khả thi, thu thập yêu cầu → Báo cáo Khả thi & BRD',
   },
   SA: {
@@ -41,6 +42,7 @@ export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; co
     color: 'text-cyan-700',
     bg: 'bg-cyan-50',
     border: 'border-cyan-200',
+    solid: 'bg-cyan-500',
     desc: 'Xác định phạm vi, tạo WBS, quản lý rủi ro → Hiến chương Dự án & Yêu cầu Người dùng',
   },
   SD: {
@@ -49,6 +51,7 @@ export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; co
     color: 'text-violet-600',
     bg: 'bg-violet-50',
     border: 'border-violet-200',
+    solid: 'bg-violet-500',
     desc: 'Wireframe, GUI, HLD/DDD, SRS → Tài liệu Thiết kế',
   },
   SI: {
@@ -57,6 +60,7 @@ export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; co
     color: 'text-blue-600',
     bg: 'bg-blue-50',
     border: 'border-blue-200',
+    solid: 'bg-blue-500',
     desc: 'Phát triển mã nguồn, thiết lập hạ tầng, test case → Mã nguồn & Test Case',
   },
   ST: {
@@ -65,6 +69,7 @@ export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; co
     color: 'text-orange-600',
     bg: 'bg-orange-50',
     border: 'border-orange-200',
+    solid: 'bg-orange-500',
     desc: 'Kiểm thử hệ thống, hiệu năng, bảo mật → Kế hoạch & Báo cáo Kiểm thử',
   },
   DEP: {
@@ -73,6 +78,7 @@ export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; co
     color: 'text-emerald-600',
     bg: 'bg-emerald-50',
     border: 'border-emerald-200',
+    solid: 'bg-emerald-500',
     desc: 'Lịch trình triển khai, xác nhận Go-live → Lịch bàn giao & Hướng dẫn Sử dụng',
   },
   OM: {
@@ -81,9 +87,96 @@ export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; co
     color: 'text-slate-600',
     bg: 'bg-slate-100',
     border: 'border-slate-300',
+    solid: 'bg-slate-500',
     desc: 'Quản lý sự cố PRD, giám sát, vá bảo mật → Nhật ký Sự cố & Báo cáo RCA',
   },
 };
+
+// ─── Role-based task & outcome sources per phase ───────────────────
+// Nguồn checklist/outcome chuẩn cho từng phase, gắn với role tương ứng.
+export const PHASE_ROLE_TASKS: Record<DevPhase, Array<{ role: UserRole; tasks: string[] }>> = {
+  PA: [
+    { role: 'PM', tasks: ['Define goals and objectives', 'Check feasibilities', 'Produce Feasibility Report'] },
+    { role: 'BA', tasks: ['Elicit requirements', 'Produce BRD (Need Assessment)'] },
+  ],
+  SA: [
+    { role: 'PM', tasks: ['Define project scope', 'Create WBS', 'Create risk management plan', 'Produce Project Charter'] },
+    { role: 'BA', tasks: ['Elicit & analyze requirements'] },
+    { role: 'SysOps', tasks: ['Estimate server config'] },
+  ],
+  SD: [
+    { role: 'UI_Designer', tasks: ['Design wireframes'] },
+    { role: 'GUI', tasks: ['Design UI (GUI)'] },
+    { role: 'SW_Architect', tasks: ['Create HLD', 'Create Detailed Design'] },
+    { role: 'BA', tasks: ['Produce SRS', 'Document requirements'] },
+  ],
+  SI: [
+    { role: 'SW_Developer', tasks: ['Develop source code', 'Guarantee SW quality', 'Guarantee OSL legal', 'Manage change requests'] },
+    { role: 'SW_Tester', tasks: ['Design system test cases'] },
+    { role: 'SysOps', tasks: ['Setup STG infra'] },
+  ],
+  ST: [
+    { role: 'SW_Tester', tasks: ['Conduct system test', 'Performance testing', 'Create test report', 'Support UAT'] },
+    { role: 'SysOps', tasks: ['Security verification'] },
+    { role: 'SW_Developer', tasks: ['OSL verification'] },
+  ],
+  DEP: [
+    { role: 'SysOps', tasks: ['Prepare deployment version', 'Make deployment schedule', 'Security check'] },
+    { role: 'PM', tasks: ['Confirm Go-live', 'Verify PII regulation'] },
+    { role: 'BA', tasks: ['Create user guide'] },
+  ],
+  OM: [
+    { role: 'SysOps', tasks: ['Monitor system', 'Handle PRD incidents', 'Fix security vulnerabilities', 'Self-conduct security audit'] },
+    { role: 'PM', tasks: ['Produce incident log', 'RCA reports'] },
+  ],
+};
+
+export const PHASE_ROLE_OUTCOMES: Record<DevPhase, Array<{ role: UserRole; outcomes: string[] }>> = {
+  PA: [
+    { role: 'PM', outcomes: ['Feasibility Report'] },
+    { role: 'BA', outcomes: ['BRD (Need Assessment)'] },
+  ],
+  SA: [
+    { role: 'PM', outcomes: ['Project Charter'] },
+    { role: 'BA', outcomes: ['User Requirements'] },
+  ],
+  SD: [
+    { role: 'SW_Architect', outcomes: ['HLD / Detailed Design'] },
+    { role: 'BA', outcomes: ['SRS'] },
+    { role: 'UI_Designer', outcomes: ['Wireframes & GUI Design'] },
+  ],
+  SI: [
+    { role: 'SW_Developer', outcomes: ['Source Code'] },
+    { role: 'SW_Tester', outcomes: ['System Test Cases'] },
+  ],
+  ST: [
+    { role: 'SW_Tester', outcomes: ['Test Plan', 'Test Report'] },
+  ],
+  DEP: [
+    { role: 'SysOps', outcomes: ['Release Schedule'] },
+    { role: 'BA', outcomes: ['User Guide'] },
+  ],
+  OM: [
+    { role: 'SysOps', outcomes: ['Incident Log'] },
+    { role: 'PM', outcomes: ['RCA Reports'] },
+  ],
+};
+
+// Sinh checklist mặc định (theo role) cho một phase
+export function buildDefaultChecklist(phase: DevPhase, idPrefix = `chk-${Date.now()}`): ChecklistItem[] {
+  let i = 0;
+  return PHASE_ROLE_TASKS[phase].flatMap(({ role, tasks }) =>
+    tasks.map(text => ({ id: `${idPrefix}-${i++}`, text, done: false, role }))
+  );
+}
+
+// Sinh outcome mặc định (theo role) cho một phase
+export function buildDefaultOutcomes(phase: DevPhase, idPrefix = `out-${Date.now()}`): ChecklistItem[] {
+  let i = 0;
+  return PHASE_ROLE_OUTCOMES[phase].flatMap(({ role, outcomes }) =>
+    outcomes.map(text => ({ id: `${idPrefix}-${i++}`, text, done: false, role }))
+  );
+}
 
 export type ProjectStatus = 'On Track' | 'At Risk' | 'Delayed';
 
@@ -115,6 +208,7 @@ export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
+  role?: UserRole; // đầu việc thuộc role nào trong phase
 }
 
 export interface PhaseBlock {
@@ -128,8 +222,10 @@ export interface PhaseBlock {
   endDate: string;          // ISO — ngày kết thúc dự kiến
   actualEndDate?: string;   // ISO — ngày kết thúc thực tế (nếu có)
   createdBy: string; // userId
+  assignee: string; // userId — mặc định là người tạo, có thể đổi sang thành viên khác
   participants: string[]; // userIds
   checklist: ChecklistItem[];
+  outcomes: ChecklistItem[];
   comments: Comment[];
   attachments: Attachment[];
   activityLog: ActivityItem[];
@@ -144,6 +240,7 @@ export interface Comment {
 
 export interface Attachment {
   id: string;
+  kind: 'file' | 'link'; // file upload hoặc link tài liệu ở nền tảng khác
   fileName: string;
   url: string;
   uploadedAt: string;

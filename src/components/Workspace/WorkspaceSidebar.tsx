@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard, GitBranch, Users, Layers, Plus,
-  Check, ChevronDown, LogOut,
+  Check, ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import type { WorkspaceView } from '../../types';
 
@@ -15,10 +15,11 @@ const navItems: { view: WorkspaceView; label: string; icon: typeof LayoutDashboa
 export default function WorkspaceSidebar() {
   const {
     selectedOrg, workspaceView, setWorkspaceView,
-    logout, goToWorkspaceSelector, openCreateProject,
+    goToWorkspaceSelector, openCreateProject,
     orgProjects, phaseBlocks, currentUserEmail, organizations,
     selectedProjectIds,
-    setSelectedProjectIds, selectAllProjects, toggleProjectSelection,
+    selectAllProjects, toggleProjectSelection,
+    sidebarCollapsed, toggleSidebar,
   } = useApp();
 
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
@@ -41,15 +42,69 @@ export default function WorkspaceSidebar() {
     return () => document.removeEventListener('mousedown', handler);
   }, [showWorkspaceMenu]);
 
+  // ─── Collapsed: icon-only rail ────────────────────────────────────
+  if (sidebarCollapsed) {
+    return (
+      <aside className="fixed left-0 top-0 bottom-0 w-16 bg-surface-dark text-white flex flex-col z-30 transition-all duration-200">
+        <div className="p-3 border-b border-white/[0.06] flex flex-col items-center gap-2">
+          <div className="w-8 h-8 bg-white/[0.06] rounded-lg flex items-center justify-center" title="ProjectHub">
+            <Layers className="w-4 h-4 text-white/60" />
+          </div>
+          {selectedOrg && (
+            <button onClick={goToWorkspaceSelector} title={selectedOrg.name}
+              className="w-8 h-8 bg-white/[0.08] rounded-lg flex items-center justify-center hover:bg-white/[0.14] transition-colors">
+              <span className="text-[11px] font-semibold text-white/70">{selectedOrg.name.charAt(0)}</span>
+            </button>
+          )}
+        </div>
+
+        <div className="px-2 pt-3 pb-1 flex justify-center">
+          <button onClick={openCreateProject} title="Tạo Dự án"
+            className="w-9 h-9 flex items-center justify-center rounded-lg
+                       bg-white/[0.04] hover:bg-white/[0.08] text-on-dark-soft hover:text-white transition-all">
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
+        <nav className="px-2 py-2 space-y-1 flex flex-col items-center">
+          {navItems.map(item => (
+            <button key={item.view} title={item.label}
+              onClick={() => setWorkspaceView(item.view)}
+              className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all
+                         ${workspaceView === item.view
+                           ? 'bg-white/[0.08] text-white'
+                           : 'text-white/30 hover:text-white hover:bg-white/[0.04]'
+                         }`}>
+              <item.icon className="w-4 h-4" />
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex-1" />
+
+        <div className="p-2 border-t border-white/[0.06] flex flex-col items-center gap-2">
+          {currentUser && (
+            <img src={currentUser.avatar} alt="" title={currentUser.name}
+              className="w-7 h-7 rounded-full bg-white/10" />
+          )}
+          <button onClick={toggleSidebar} title="Mở rộng sidebar"
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.06] transition-all">
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-60 bg-surface-dark text-white flex flex-col z-30">
+    <aside className="fixed left-0 top-0 bottom-0 w-60 bg-surface-dark text-white flex flex-col z-30 transition-all duration-200">
       {/* Logo + Workspace Switcher */}
       <div className="p-4 border-b border-white/[0.06]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 bg-white/[0.06] rounded-lg flex items-center justify-center">
             <Layers className="w-4 h-4 text-white/60" />
           </div>
-          <span className="font-semibold text-sm tracking-tight">ProjectHub</span>
+          <span className="font-semibold text-sm tracking-tight flex-1">ProjectHub</span>
         </div>
         {selectedOrg && (
           <div className="mt-3 relative" ref={wsMenuRef}>
@@ -175,6 +230,11 @@ export default function WorkspaceSidebar() {
             </div>
           </div>
         )}
+        <button onClick={toggleSidebar} title="Thu gọn sidebar"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium
+                     text-white/30 hover:text-white hover:bg-white/[0.06] transition-all">
+          <PanelLeftClose className="w-3.5 h-3.5" /> Thu gọn
+        </button>
       </div>
     </aside>
   );

@@ -1,16 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { PHASE_META, DEV_PHASES, PHASE_TAG_META } from '../../types';
-import type { DevPhase, PhaseBlock, PhaseTag } from '../../types';
-import { X, Plus, Calendar, Users, Trash2, ChevronDown } from 'lucide-react';
+import { PHASE_META, DEV_PHASES, PHASE_TAG_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
+import type { DevPhase, PhaseBlock, PhaseTag, UserRole } from '../../types';
+import { ROLE_LABELS } from '../../data/mockData';
+import { X, Plus, Calendar, Users, Trash2, ChevronDown, Target, CheckSquare } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 
 const TAG_OPTIONS: PhaseTag[] = ['Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled'];
 
+type DraftItem = { text: string; done: boolean; role?: UserRole };
+
+function defaultChecklist(phase: DevPhase): DraftItem[] {
+  return PHASE_ROLE_TASKS[phase].flatMap(({ role, tasks }) =>
+    tasks.map(text => ({ text, done: false, role }))
+  );
+}
+
+function defaultOutcomes(phase: DevPhase): DraftItem[] {
+  return PHASE_ROLE_OUTCOMES[phase].flatMap(({ role, outcomes }) =>
+    outcomes.map(text => ({ text, done: false, role }))
+  );
+}
+
 export default function CreatePhaseModal() {
   const {
-    createPhaseOpen, closeCreatePhase, createPhaseProjectId,
+    createPhaseOpen, closeCreatePhase, createPhaseProjectId, createPhaseDates,
     orgProjects, addPhaseBlock, selectedOrg
   } = useApp();
 
@@ -21,11 +36,42 @@ export default function CreatePhaseModal() {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(addDays(new Date(), 14), 'yyyy-MM-dd'));
+  const [assignee, setAssignee] = useState('u1');
   const [participants, setParticipants] = useState<string[]>(['u1']);
   const [showParticipants, setShowParticipants] = useState(false);
   const [phaseDropdownOpen, setPhaseDropdownOpen] = useState(false);
-  const [checklistItems, setChecklistItems] = useState<{ text: string; done: boolean }[]>([]);
+  const [checklistItems, setChecklistItems] = useState<DraftItem[]>(defaultChecklist('PA'));
+  const [outcomeItems, setOutcomeItems] = useState<DraftItem[]>(defaultOutcomes('PA'));
   const [newCheckText, setNewCheckText] = useState('');
+  const [newOutcomeText, setNewOutcomeText] = useState('');
+
+  // Đồng bộ form mỗi khi mở modal (prefill từ kéo-thả trên timeline)
+  useEffect(() => {
+    if (!createPhaseOpen) return;
+    setProjectId(createPhaseProjectId || (orgProjects[0]?.id ?? ''));
+    setPhaseType('PA');
+    setTag('Todo');
+    setTitle('');
+    setDescription('');
+    setStartDate(createPhaseDates?.startDate ?? format(new Date(), 'yyyy-MM-dd'));
+    setEndDate(createPhaseDates?.endDate ?? format(addDays(new Date(), 14), 'yyyy-MM-dd'));
+    setAssignee('u1');
+    setParticipants(['u1']);
+    setShowParticipants(false);
+    setPhaseDropdownOpen(false);
+    setChecklistItems(defaultChecklist('PA'));
+    setOutcomeItems(defaultOutcomes('PA'));
+    setNewCheckText('');
+    setNewOutcomeText('');
+  }, [createPhaseOpen, createPhaseProjectId, createPhaseDates]);
+
+  // Đổi loại phase → sinh lại checklist & outcome từ nguồn theo role
+  const changePhaseType = (phase: DevPhase) => {
+    setPhaseType(phase);
+    setChecklistItems(defaultChecklist(phase));
+    setOutcomeItems(defaultOutcomes(phase));
+    setPhaseDropdownOpen(false);
+  };
 
   const toggleParticipant = (uid: string) => {
     setParticipants(prev =>
@@ -46,11 +92,19 @@ export default function CreatePhaseModal() {
       startDate,
       endDate,
       createdBy: 'u1',
+      assignee,
       participants,
       checklist: checklistItems.map((item, i) => ({
         id: `chk-${Date.now()}-${i}`,
         text: item.text,
         done: item.done,
+        role: item.role,
+      })),
+      outcomes: outcomeItems.map((item, i) => ({
+        id: `out-${Date.now()}-${i}`,
+        text: item.text,
+        done: item.done,
+        role: item.role,
       })),
       comments: [],
       attachments: [],
@@ -58,19 +112,63 @@ export default function CreatePhaseModal() {
         { id: `act-${Date.now()}`, userId: 'u1', action: 'created phase block', target: title, timestamp: new Date().toISOString() }
       ],
     };
-    addPhaseBlock(pb as any);
-    setTitle('');
-    setDescription('');
-    setParticipants(['u1']);
-    setShowParticipants(false);
-    setChecklistItems([]);
-    setNewCheckText('');
+    addPhaseBlock(pb);
     closeCreatePhase();
   };
 
   if (!createPhaseOpen) return null;
 
   const orgMembers = selectedOrg?.members || [];
+  const lockedProject = createPhaseProjectId
+    ? orgProjects.find(p => p.id === createPhaseProjectId)
+    : null;
+
+  const renderDraftList = (
+    items: DraftItem[],
+    setItems: React.Dispatch<React.SetStateAction<DraftItem[]>>,
+  ) => {
+    // Gom theo role, giữ thứ tự — index gốc để sửa/xóa đúng item
+    const groups: Array<{ role: UserRole | undefined; entries: Array<{ item: DraftItem; idx: number }> }> = [];
+    items.forEach((item, idx) => {
+      let g = groups.find(x => x.role === item.role);
+      if (!g) { g = { role: item.role, entries: [] }; groups.push(g); }
+      g.entries.push({ item, idx });
+    });
+    return groups.map(group => (
+      <div key={group.role ?? 'general'} className="mb-1.5">
+        <div className="flex items-center gap-2 px-0.5 mb-1">
+          <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wide">
+            {group.role ? (ROLE_LABELS[group.role] ?? group.role) : 'Chung'}
+          </span>
+          <div className="flex-1 h-px bg-stone-100" />
+        </div>
+        <div className="space-y-1">
+          {group.entries.map(({ item, idx }) => (
+            <div key={idx} className="flex items-center gap-1.5 group">
+              <input
+                type="text"
+                value={item.text}
+                onChange={e => {
+                  const next = [...items];
+                  next[idx] = { ...next[idx], text: e.target.value };
+                  setItems(next);
+                }}
+                className="flex-1 px-2.5 py-1 bg-white border border-stone-200 rounded-md text-xs text-stone-700
+                           focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink"
+              />
+              <button
+                type="button"
+                onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-stone-100 rounded"
+              >
+                <Trash2 className="w-3 h-3 text-stone-400" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    ));
+  };
 
   return (
     <AnimatePresence>
@@ -93,13 +191,19 @@ export default function CreatePhaseModal() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
-            {/* Project */}
+            {/* Project — khóa cứng khi tạo bằng kéo-thả trên timeline */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Dự án</label>
-              <select value={projectId} onChange={e => setProjectId(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink">
-                {orgProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              {lockedProject ? (
+                <div className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-700 font-medium">
+                  {lockedProject.name}
+                </div>
+              ) : (
+                <select value={projectId} onChange={e => setProjectId(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink">
+                  {orgProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              )}
             </div>
 
             {/* Phase Type */}
@@ -126,7 +230,7 @@ export default function CreatePhaseModal() {
                     return (
                       <button
                         key={phase} type="button"
-                        onClick={() => { setPhaseType(phase); setPhaseDropdownOpen(false); }}
+                        onClick={() => changePhaseType(phase)}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors
                           ${isSelected ? `${meta.bg}` : 'hover:bg-stone-50'}`}
                       >
@@ -197,6 +301,17 @@ export default function CreatePhaseModal() {
               </div>
             </div>
 
+            {/* Assignee */}
+            <div>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">Assignee</label>
+              <select value={assignee} onChange={e => setAssignee(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink">
+                {orgMembers.map(m => (
+                  <option key={m.id} value={m.id}>{m.name} — {ROLE_LABELS[m.role] ?? m.role}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Participants */}
             <div>
               <button
@@ -235,37 +350,12 @@ export default function CreatePhaseModal() {
               )}
             </div>
 
-            {/* Checklist */}
+            {/* Checklist — tự sinh theo role từ nguồn, có thể chỉnh sửa */}
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1.5 block">
-                Checklist ({checklistItems.length})
+              <label className="text-xs font-semibold text-stone-700 mb-1.5 block flex items-center gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5" /> Checklist theo role ({checklistItems.length})
               </label>
-              {checklistItems.length > 0 && (
-                <div className="space-y-1 mb-2">
-                  {checklistItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 group">
-                      <input
-                        type="text"
-                        value={item.text}
-                        onChange={e => {
-                          const next = [...checklistItems];
-                          next[idx] = { ...next[idx], text: e.target.value };
-                          setChecklistItems(next);
-                        }}
-                        className="flex-1 px-2.5 py-1 bg-white border border-stone-200 rounded-md text-xs text-stone-700
-                                   focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setChecklistItems(prev => prev.filter((_, i) => i !== idx))}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-stone-100 rounded"
-                      >
-                        <Trash2 className="w-3 h-3 text-stone-400" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {renderDraftList(checklistItems, setChecklistItems)}
               <div className="flex gap-1.5">
                 <input
                   type="text"
@@ -288,6 +378,43 @@ export default function CreatePhaseModal() {
                     if (newCheckText.trim()) {
                       setChecklistItems(prev => [...prev, { text: newCheckText.trim(), done: false }]);
                       setNewCheckText('');
+                    }
+                  }}
+                  className="px-2.5 py-1.5 bg-stone-100 text-stone-600 rounded-lg hover:bg-stone-200 transition-colors flex-shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Outcomes — tự sinh theo role từ nguồn, có thể chỉnh sửa */}
+            <div>
+              <label className="text-xs font-semibold text-stone-700 mb-1.5 block flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5" /> Outcomes theo role ({outcomeItems.length})
+              </label>
+              {renderDraftList(outcomeItems, setOutcomeItems)}
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={newOutcomeText}
+                  onChange={e => setNewOutcomeText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newOutcomeText.trim()) {
+                      e.preventDefault();
+                      setOutcomeItems(prev => [...prev, { text: newOutcomeText.trim(), done: false }]);
+                      setNewOutcomeText('');
+                    }
+                  }}
+                  placeholder="Thêm outcome..."
+                  className="flex-1 px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-xs
+                             focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newOutcomeText.trim()) {
+                      setOutcomeItems(prev => [...prev, { text: newOutcomeText.trim(), done: false }]);
+                      setNewOutcomeText('');
                     }
                   }}
                   className="px-2.5 py-1.5 bg-stone-100 text-stone-600 rounded-lg hover:bg-stone-200 transition-colors flex-shrink-0"

@@ -5,7 +5,7 @@ import { PHASE_META, DEV_PHASES } from '../../types';
 import type { DevPhase } from '../../types';
 import {
   BarChart3, Layers, Users, Zap, ArrowRight,
-  Shield, Clock, TrendingUp, CheckCircle2,
+  Shield, Clock, CheckCircle2,
   ChevronRight, AlertTriangle, FolderKanban,
   FileText, Code2, TestTube, Rocket, Wrench,
 } from 'lucide-react';
@@ -461,7 +461,7 @@ export default function LandingPage() {
             { step: '01', title: 'Tạo Workspace', desc: 'Thêm tổ chức, mời team members vào workspace chung.' },
             { step: '02', title: 'Tạo Dự án & Phase', desc: 'Chọn dự án, tạo phase blocks trên timeline với drag & drop.' },
             { step: '03', title: 'Track & Collaborate', desc: 'Kéo thả, comment, checklist — Tất cả trong 1 chỗ.' },
-          ].map((item, i) => (
+          ].map(item => (
             <motion.div key={item.step} variants={fadeUp}
               className="bg-white rounded-xl border border-hairline p-8 text-center card-hover">
               <span className="text-5xl font-semibold text-ink/[0.06] block mb-4">{item.step}</span>

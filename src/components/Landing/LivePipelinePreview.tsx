@@ -545,7 +545,7 @@ export default function LivePipelinePreview() {
                   {pbs.map(pb => {
                     const pos = layoutMap.get(pb.id);
                     if (!pos) return null;
-                    const meta = PHASE_META[pb.phaseType as any];
+                    const meta = PHASE_META[pb.phaseType as keyof typeof PHASE_META];
                     const left = getDatePos(parseISO(pos.startDate));
                     const right = getDatePos(parseISO(pos.endDate));
                     const width = Math.max(20, right - left);

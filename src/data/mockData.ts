@@ -1,5 +1,5 @@
-import type { User, Organization, Project, PhaseBlock, ActivityItem, PhaseTag } from '../types';
-import { DEV_PHASES } from '../types';
+import type { User, Organization, Project, PhaseBlock, ActivityItem, PhaseTag, ChecklistItem, DevPhase } from '../types';
+import { DEV_PHASES, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../types';
 
 const today = new Date('2026-06-02');
 
@@ -67,21 +67,28 @@ export const projects: Project[] = [
 ];
 
 // ─── Generate Phase Blocks ────────────────────────────────────────
-function generateChecklist(phase: string): Array<{ id: string; text: string; done: boolean }> {
-  const checklists: Record<string, string[]> = {
-    PA: ['Define goals and objectives', 'Check feasibilities', 'Elicit requirements', 'Produce BRD (Need Assessment)', 'Produce Feasibility Report'],
-    SA: ['Define project scope', 'Create WBS', 'Create risk management plan', 'Elicit & analyze requirements', 'Estimate server config', 'Produce Project Charter'],
-    SD: ['Design wireframes', 'Design UI (GUI)', 'Create HLD', 'Create Detailed Design', 'Produce SRS', 'Document requirements'],
-    SI: ['Develop source code', 'Guarantee SW quality', 'Guarantee OSL legal', 'Design system test cases', 'Setup STG infra', 'Manage change requests'],
-    ST: ['Conduct system test', 'Performance testing', 'Security verification', 'OSL verification', 'Create test report', 'Support UAT'],
-    DEP: ['Prepare deployment version', 'Make deployment schedule', 'Confirm Go-live', 'Verify PII regulation', 'Create user guide', 'Security check'],
-    OM: ['Monitor system', 'Handle PRD incidents', 'Fix security vulnerabilities', 'Self-conduct security audit', 'Produce incident log', 'RCA reports'],
-  };
-  return (checklists[phase] || []).map((text, i) => ({
-    id: `chk-${phase}-${i}`,
-    text,
-    done: Math.random() > 0.6,
-  }));
+function generateChecklist(phase: DevPhase, pbId: number): ChecklistItem[] {
+  let i = 0;
+  return PHASE_ROLE_TASKS[phase].flatMap(({ role, tasks }) =>
+    tasks.map(text => ({
+      id: `chk-${pbId}-${i++}`,
+      text,
+      done: Math.random() > 0.6,
+      role,
+    }))
+  );
+}
+
+function generateOutcomes(phase: DevPhase, pbId: number): ChecklistItem[] {
+  let i = 0;
+  return PHASE_ROLE_OUTCOMES[phase].flatMap(({ role, outcomes }) =>
+    outcomes.map(text => ({
+      id: `out-${pbId}-${i++}`,
+      text,
+      done: Math.random() > 0.5,
+      role,
+    }))
+  );
 }
 
 function generateComments(count: number) {
@@ -133,12 +140,14 @@ function makePb(project: Project, phaseType: string, title: string, startOffset:
     ...(chosenTag === 'Complete' ? { actualEndDate: formatDate(addDays(end, Math.floor(Math.random() * 5))) } : {}),
     ...(chosenTag === 'Inprogress' && Math.random() > 0.5 ? { actualEndDate: formatDate(addDays(end, Math.floor(Math.random() * 8) + 1)) } : {}),
     createdBy: project.createdBy,
+    assignee: project.createdBy,
     participants: ['u1', 'u3', 'u4', 'u5'].slice(0, 2 + Math.floor(Math.random() * 3)),
-    checklist: generateChecklist(phaseType),
+    checklist: generateChecklist(phaseType as DevPhase, pbIdCounter),
+    outcomes: generateOutcomes(phaseType as DevPhase, pbIdCounter),
     comments: generateComments(2 + Math.floor(Math.random() * 3)),
     attachments: [
-      { id: `a-${pbIdCounter}-1`, fileName: `${phaseType.toLowerCase()}-doc.pdf`, url: '#', uploadedAt: formatDate(addDays(today, -10)) },
-      { id: `a-${pbIdCounter}-2`, fileName: `requirements-${phaseType.toLowerCase()}.xlsx`, url: '#', uploadedAt: formatDate(addDays(today, -7)) },
+      { id: `a-${pbIdCounter}-1`, kind: 'file' as const, fileName: `${phaseType.toLowerCase()}-doc.pdf`, url: '#', uploadedAt: formatDate(addDays(today, -10)) },
+      { id: `a-${pbIdCounter}-2`, kind: 'link' as const, fileName: `Spec ${phaseType} (Google Docs)`, url: 'https://docs.google.com/', uploadedAt: formatDate(addDays(today, -7)) },
     ],
     activityLog: generateActivity(4),
   };

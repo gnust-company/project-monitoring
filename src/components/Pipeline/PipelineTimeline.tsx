@@ -1,8 +1,9 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { PHASE_META, PHASE_TAG_META } from '../../types';
+import { PHASE_META, DEV_PHASES } from '../../types';
 import type { PhaseBlock } from '../../types';
-import { Search, Plus, X } from 'lucide-react';
+import { getUserById } from '../../data/mockData';
+import { Search, X, MousePointer2, Hand, SquarePen } from 'lucide-react';
 import {
   format, parseISO, differenceInDays, addDays, addMonths,
   eachWeekOfInterval, eachMonthOfInterval, startOfQuarter, getQuarter
@@ -13,6 +14,7 @@ import CreatePhaseModal from '../Modals/CreatePhaseModal';
 const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 52;
 const DRAG_THRESHOLD = 4;
+const MIN_CREATE_WIDTH = 16; // px tối thiểu để coi là kéo tạo phase
 
 // ─── Initial row assignment (greedy, non-overlapping) ───────────────
 function assignRows(pbs: PhaseBlock[]): Map<string, number> {
@@ -33,62 +35,37 @@ function assignRows(pbs: PhaseBlock[]): Map<string, number> {
   return rowMap;
 }
 
-// ─── Overlap resolution: push non-dragged blocks right ──────────────
-function resolveOverlaps(
-  blocks: Array<{ id: string; startDate: string; endDate: string }>,
-  dragId?: string
-): Map<string, { startDate: string; endDate: string }> {
-  const result = new Map<string, { startDate: string; endDate: string }>();
-  const sorted = [...blocks].sort((a, b) =>
-    a.startDate.localeCompare(b.startDate) || a.id.localeCompare(b.id)
-  );
-
-  for (let i = 0; i < sorted.length; i++) {
-    const curr = sorted[i];
-    const duration = differenceInDays(parseISO(curr.endDate), parseISO(curr.startDate));
-    let start = parseISO(curr.startDate);
-
-    if (curr.id !== dragId) {
-      for (let j = 0; j < i; j++) {
-        const prevEnd = parseISO(result.get(sorted[j].id)!.endDate);
-        if (start < prevEnd) start = prevEnd;
-      }
-    }
-
-    result.set(curr.id, {
-      startDate: format(start, 'yyyy-MM-dd'),
-      endDate: format(addDays(start, duration), 'yyyy-MM-dd'),
-    });
-  }
-  return result;
-}
-
 // ─── Component ──────────────────────────────────────────────────────
 export default function PipelineTimeline() {
   const {
     orgProjects, phaseBlocks, searchQuery, statusFilter, zoomLevel,
     selectedProjectIds,
     setSearchQuery, setZoomLevel, openPhaseDetail, openCreatePhase,
-    updatePhaseBlock, toggleProjectSelection, selectAllProjects,
+    updatePhaseBlock,
   } = useApp();
 
   const boardRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
-  const isPanning = useRef(false);
-  const panStartX = useRef(0);
-  const panStartY = useRef(0);
-  const panScrollLeft = useRef(0);
-  const panScrollTop = useRef(0);
   const [hoverPhase, setHoverPhase] = useState<string | null>(null);
   const [manualRows, setManualRows] = useState<Map<string, number>>(new Map());
+  // 'view': kéo chuột trên vùng trống = pan lịch; 'edit': kéo ngang trên hàng dự án = tạo phase
+  const [boardMode, setBoardMode] = useState<'view' | 'edit'>('view');
 
-  // Drag preview state
+  // Drag preview state (di chuyển hoặc resize block)
   const [dragPreview, setDragPreview] = useState<{
     blockId: string;
     projectId: string;
     startDate: string;
     endDate: string;
     row: number;
+  } | null>(null);
+
+  // Drag-to-create preview state
+  const [createPreview, setCreatePreview] = useState<{
+    projectId: string;
+    rowTop: number; // px top trong content (đã gồm header)
+    x1: number;
+    x2: number;
   } | null>(null);
 
   // RAF throttle
@@ -203,7 +180,10 @@ export default function PipelineTimeline() {
     return result;
   }, [filteredProjects, getFilteredPbs, manualRows]);
 
-  // ─── Layout: resolves overlaps considering drag preview ───────────
+  // ─── Layout ───────────────────────────────────────────────────────
+  // Quy tắc va chạm: KHÔNG dịch ngang block khác. Block bị block đang
+  // kéo/resize chạm vào sẽ "xuống dòng" — mỗi block bị đụng nhận một
+  // dòng mới tinh bên dưới.
   const layoutMap = useMemo(() => {
     const map = new Map<string, { startDate: string; endDate: string; row: number }>();
 
@@ -221,17 +201,36 @@ export default function PipelineTimeline() {
       });
 
       const rows = new Map<number, BP[]>();
+      let maxRow = 0;
       for (const b of blocks) {
         if (!rows.has(b.row)) rows.set(b.row, []);
         rows.get(b.row)!.push(b);
+        maxRow = Math.max(maxRow, b.row);
       }
 
-      for (const [_, rowBlocks] of rows) {
-        const resolved = resolveOverlaps(rowBlocks, dragPreview?.blockId);
-        resolved.forEach((pos, id) => {
-          const b = rowBlocks.find(x => x.id === id)!;
-          map.set(id, { ...pos, row: b.row });
+      const overlaps = (a: BP, b: BP) => a.startDate < b.endDate && b.startDate < a.endDate;
+      const activeId = dragPreview?.blockId;
+      const bumped: BP[] = [];
+
+      for (const [, rowBlocks] of rows) {
+        // Block đang kéo được ưu tiên giữ nguyên dòng; còn lại theo startDate
+        const sorted = [...rowBlocks].sort((a, b) => {
+          if (a.id === activeId) return -1;
+          if (b.id === activeId) return 1;
+          return a.startDate.localeCompare(b.startDate) || a.id.localeCompare(b.id);
         });
+        const kept: BP[] = [];
+        for (const b of sorted) {
+          if (kept.some(k => overlaps(k, b))) bumped.push(b);
+          else kept.push(b);
+        }
+        for (const b of kept) map.set(b.id, { startDate: b.startDate, endDate: b.endDate, row: b.row });
+      }
+
+      // Mỗi block bị đụng nhận một dòng hoàn toàn mới
+      for (const b of bumped) {
+        maxRow += 1;
+        map.set(b.id, { startDate: b.startDate, endDate: b.endDate, row: maxRow });
       }
     }
     return map;
@@ -264,28 +263,114 @@ export default function PipelineTimeline() {
     return () => right.removeEventListener('scroll', onScroll);
   }, []);
 
-  // ─── Pan (scroll by dragging empty area) ───────────────
+  // ─── Commit layout sau khi kéo/resize ─────────────────────────────
+  const commitLayout = useCallback((projectId: string, draggedId: string) => {
+    const currentLayout = layoutMapRef.current;
+    const pbs = getFilteredPbs(projectId);
+    const dragged = pbs.find(p => p.id === draggedId);
+    const draggedPos = currentLayout.get(draggedId);
+    // Chỉ block được kéo mới đổi ngày — các block khác giữ nguyên lịch
+    if (dragged && draggedPos &&
+        (draggedPos.startDate !== dragged.startDate || draggedPos.endDate !== dragged.endDate)) {
+      updatePhaseBlock(draggedId, { startDate: draggedPos.startDate, endDate: draggedPos.endDate });
+    }
+    setManualRows(prev => {
+      const next = new Map(prev);
+      for (const pb of pbs) {
+        const pos = currentLayout.get(pb.id);
+        if (pos) next.set(pb.id, pos.row);
+      }
+      return next;
+    });
+  }, [getFilteredPbs, updatePhaseBlock]);
 
+  // ─── Board mousedown: pan (kéo dọc) hoặc tạo phase (kéo ngang) ────
   const handleBoardMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.phase-block')) return;
-    isPanning.current = true;
-    panStartX.current = e.clientX;
-    panStartY.current = e.clientY;
-    panScrollLeft.current = boardRef.current?.scrollLeft || 0;
-    panScrollTop.current = boardRef.current?.scrollTop || 0;
-  }, []);
+    if (e.button !== 0) return;
+    const board = boardRef.current;
+    if (!board) return;
 
-  const handleBoardMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isPanning.current || !boardRef.current) return;
-    boardRef.current.scrollLeft = panScrollLeft.current - (e.clientX - panStartX.current);
-    boardRef.current.scrollTop = panScrollTop.current - (e.clientY - panStartY.current);
-    boardRef.current.style.cursor = 'grabbing';
-  }, []);
+    const rect = board.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const startScrollLeft = board.scrollLeft;
+    const startScrollTop = board.scrollTop;
 
-  const handleBoardMouseUp = useCallback(() => {
-    isPanning.current = false;
-    if (boardRef.current) boardRef.current.style.cursor = '';
-  }, []);
+    // Xác định project tại vị trí nhấn chuột
+    const contentX = e.clientX - rect.left + board.scrollLeft;
+    const contentY = e.clientY - rect.top + board.scrollTop - HEADER_HEIGHT;
+    let targetProject: { id: string; top: number; rowCount: number } | null = null;
+    let cum = 0;
+    for (const project of filteredProjects) {
+      const rd = projectRowData.get(project.id);
+      const h = (rd?.rowCount ?? 1) * ROW_HEIGHT;
+      if (contentY >= cum && contentY < cum + h) {
+        targetProject = { id: project.id, top: cum, rowCount: rd?.rowCount ?? 1 };
+        break;
+      }
+      cum += h;
+    }
+
+    // Hàng (trong project) ngay dưới con trỏ — để đặt preview đúng dòng
+    const rowInProject = targetProject
+      ? Math.max(0, Math.min(targetProject.rowCount - 1, Math.floor((contentY - targetProject.top) / ROW_HEIGHT)))
+      : 0;
+
+    let mode: 'pending' | 'pan' | 'create' = 'pending';
+
+    const handleMove = (me: MouseEvent) => {
+      const dx = me.clientX - startClientX;
+      const dy = me.clientY - startClientY;
+
+      if (mode === 'pending') {
+        if (Math.abs(dx) <= DRAG_THRESHOLD && Math.abs(dy) <= DRAG_THRESHOLD) return;
+        // Chế độ Xem: luôn pan. Chế độ Tạo phase: kéo ngang trong hàng dự án → tạo, còn lại → pan
+        mode = boardMode === 'edit' && targetProject && Math.abs(dx) >= Math.abs(dy) ? 'create' : 'pan';
+        if (mode === 'pan') board.style.cursor = 'grabbing';
+      }
+
+      if (mode === 'pan') {
+        board.scrollLeft = startScrollLeft - (me.clientX - startClientX);
+        board.scrollTop = startScrollTop - (me.clientY - startClientY);
+        return;
+      }
+
+      // create mode
+      const curX = me.clientX - rect.left + board.scrollLeft;
+      setCreatePreview({
+        projectId: targetProject!.id,
+        rowTop: HEADER_HEIGHT + targetProject!.top + rowInProject * ROW_HEIGHT,
+        x1: Math.max(0, Math.min(contentX, curX)),
+        x2: Math.max(contentX, curX),
+      });
+    };
+
+    const handleUp = (me: MouseEvent) => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      board.style.cursor = '';
+
+      if (mode === 'create' && targetProject) {
+        const curX = me.clientX - rect.left + board.scrollLeft;
+        const x1 = Math.max(0, Math.min(contentX, curX));
+        const x2 = Math.max(contentX, curX);
+        if (x2 - x1 >= MIN_CREATE_WIDTH) {
+          const start = getPosDate(x1);
+          let end = getPosDate(x2);
+          if (differenceInDays(end, start) < 1) end = addDays(start, 1);
+          openCreatePhase(targetProject.id, {
+            startDate: format(start, 'yyyy-MM-dd'),
+            endDate: format(end, 'yyyy-MM-dd'),
+          });
+        }
+      }
+      setCreatePreview(null);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [filteredProjects, projectRowData, getPosDate, openCreatePhase, boardMode]);
 
   // ─── Block drag with preview ──────────────────────────────────────
   const handleBlockMouseDown = useCallback((e: React.MouseEvent, pb: PhaseBlock, projectId: string) => {
@@ -363,22 +448,7 @@ export default function PipelineTimeline() {
       rafRef.current = 0;
 
       if (hasMoved) {
-        const currentLayout = layoutMapRef.current;
-        const pbs = getFilteredPbs(projectId);
-        for (const pb of pbs) {
-          const pos = currentLayout.get(pb.id);
-          if (pos && (pos.startDate !== pb.startDate || pos.endDate !== pb.endDate)) {
-            updatePhaseBlock(pb.id, { startDate: pos.startDate, endDate: pos.endDate });
-          }
-        }
-        setManualRows(prev => {
-          const next = new Map(prev);
-          for (const pb of pbs) {
-            const pos = currentLayout.get(pb.id);
-            if (pos) next.set(pb.id, pos.row);
-          }
-          return next;
-        });
+        commitLayout(projectId, pb.id);
       } else {
         openPhaseDetail(pb.id);
       }
@@ -390,7 +460,66 @@ export default function PipelineTimeline() {
 
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
-  }, [getDatePos, getPosDate, getFilteredPbs, baseRowIndices, projectRowData, updatePhaseBlock, openPhaseDetail]);
+  }, [getDatePos, getPosDate, baseRowIndices, projectRowData, commitLayout, openPhaseDetail]);
+
+  // ─── Resize 2 đầu block ───────────────────────────────────────────
+  const handleResizeMouseDown = useCallback((
+    e: React.MouseEvent, pb: PhaseBlock, projectId: string, edge: 'left' | 'right'
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const startX = e.clientX;
+    const row = baseRowIndices.get(pb.id) ?? 0;
+    const origStartPos = getDatePos(parseISO(pb.startDate));
+    const origEndPos = getDatePos(parseISO(pb.endDate));
+    let hasMoved = false;
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const dx = moveEvent.clientX - startX;
+      if (!hasMoved && Math.abs(dx) > DRAG_THRESHOLD) hasMoved = true;
+      if (!hasMoved) return;
+
+      pendingPos.current = { dx, dy: 0 };
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          const pos = pendingPos.current;
+          if (!pos) { rafRef.current = 0; return; }
+
+          let newStart = parseISO(pb.startDate);
+          let newEnd = parseISO(pb.endDate);
+          if (edge === 'left') {
+            newStart = getPosDate(Math.max(0, origStartPos + pos.dx));
+            if (differenceInDays(newEnd, newStart) < 1) newStart = addDays(newEnd, -1);
+          } else {
+            newEnd = getPosDate(origEndPos + pos.dx);
+            if (differenceInDays(newEnd, newStart) < 1) newEnd = addDays(newStart, 1);
+          }
+
+          setDragPreview({
+            blockId: pb.id,
+            projectId,
+            startDate: format(newStart, 'yyyy-MM-dd'),
+            endDate: format(newEnd, 'yyyy-MM-dd'),
+            row,
+          });
+          rafRef.current = 0;
+        });
+      }
+    };
+
+    const handleUp = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+      if (hasMoved) commitLayout(projectId, pb.id);
+      setDragPreview(null);
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [getDatePos, getPosDate, baseRowIndices, commitLayout]);
 
   // ─── Scroll to today ──────────────────────────────────────────────
   const hasScrolled = useRef(false);
@@ -432,6 +561,10 @@ export default function PipelineTimeline() {
             <span className="text-xs text-stone-400 font-light">{filteredProjects.length} dự án · {phaseBlocks.length} phase</span>
           </div>
           <div className="flex items-center gap-2">
+            <span className="hidden lg:flex items-center gap-1.5 text-[11px] text-stone-400 font-light">
+              <MousePointer2 className="w-3 h-3" />
+              {boardMode === 'edit' ? 'Kéo thả trên hàng dự án để tạo phase' : 'Kéo chuột để di chuyển lịch'}
+            </span>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
               <input type="text" placeholder="Tìm kiếm dự án..."
@@ -446,6 +579,21 @@ export default function PipelineTimeline() {
                   <X className="w-3 h-3 text-stone-500" />
                 </button>
               )}
+            </div>
+            {/* Chế độ tương tác: Xem (pan) / Tạo phase (kéo để tạo) */}
+            <div className="flex items-center bg-stone-100 rounded-lg p-0.5">
+              <button onClick={() => setBoardMode('view')}
+                title="Chế độ xem — kéo chuột để di chuyển lịch"
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors
+                  ${boardMode === 'view' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+                <Hand className="w-3.5 h-3.5" /> Xem
+              </button>
+              <button onClick={() => setBoardMode('edit')}
+                title="Chế độ tạo phase — kéo ngang trên hàng dự án để tạo phase"
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors
+                  ${boardMode === 'edit' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+                <SquarePen className="w-3.5 h-3.5" /> Tạo phase
+              </button>
             </div>
             <div className="flex items-center bg-stone-100 rounded-lg p-0.5">
               <button onClick={() => {
@@ -465,11 +613,6 @@ export default function PipelineTimeline() {
                 </button>
               ))}
             </div>
-            <button onClick={() => openCreatePhase()}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg
-                         hover:bg-[#242424] transition-colors">
-              <Plus className="w-3.5 h-3.5" /> Tạo Phase
-            </button>
           </div>
         </div>
       </div>
@@ -509,8 +652,9 @@ export default function PipelineTimeline() {
         </div>
 
         {/* Right - Timeline scrollable area */}
-        <div ref={boardRef} className="flex-1 overflow-auto relative select-none"
-          onMouseDown={handleBoardMouseDown} onMouseMove={handleBoardMouseMove} onMouseUp={handleBoardMouseUp}>
+        <div ref={boardRef}
+          className={`flex-1 overflow-auto relative select-none ${boardMode === 'edit' ? 'cursor-crosshair' : 'cursor-grab'}`}
+          onMouseDown={handleBoardMouseDown}>
           <div className="relative min-h-full" style={{ width: totalWidth + 200 }}>
             {/* Sticky header: column labels only — z-20 covers blocks */}
             <div className="sticky top-0 z-20 bg-stone-50 border-b border-hairline" style={{ height: HEADER_HEIGHT }}>
@@ -550,6 +694,24 @@ export default function PipelineTimeline() {
               <div className="w-0.5 h-full bg-[#ef4444]/75 -translate-x-1/2" />
             </div>
 
+            {/* Drag-to-create preview */}
+            {createPreview && (
+              <div className="absolute z-10 rounded-lg border-2 border-dashed border-ink/40 bg-ink/[0.04] pointer-events-none
+                              flex items-center justify-center"
+                style={{
+                  left: createPreview.x1,
+                  width: Math.max(2, createPreview.x2 - createPreview.x1),
+                  top: createPreview.rowTop + 6,
+                  height: ROW_HEIGHT - 12,
+                }}>
+                {createPreview.x2 - createPreview.x1 > 90 && (
+                  <span className="text-[10px] font-semibold text-ink/60 whitespace-nowrap px-2">
+                    {format(getPosDate(createPreview.x1), 'dd/MM')} – {format(getPosDate(createPreview.x2), 'dd/MM')}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Project rows */}
             {filteredProjects.map((project) => {
               const rd = projectRowData.get(project.id);
@@ -569,27 +731,54 @@ export default function PipelineTimeline() {
                     const top = pos.row * ROW_HEIGHT + 6;
                     const isHover = hoverPhase === pb.id;
                     const isDragging = dragPreview?.blockId === pb.id;
+                    const totalChecks = pb.checklist.length;
+                    const doneChecks = pb.checklist.filter(c => c.done).length;
+                    const pct = totalChecks > 0 ? Math.round((doneChecks / totalChecks) * 100) : 0;
+                    const assignee = getUserById(pb.assignee || pb.createdBy);
                     return (
                       <div key={pb.id}
-                        className={`phase-block absolute rounded-lg border cursor-pointer group z-10 transition-shadow duration-150
+                        className={`phase-block absolute rounded-lg border cursor-pointer group transition-shadow duration-150
                           ${meta.bg} ${meta.border}
                           ${isDragging ? 'ring-2 ring-ink/30 ring-offset-1' : ''}
-                          ${isHover ? 'shadow-lg' : 'shadow-sm'}`}
+                          ${isHover ? 'shadow-lg z-50' : 'shadow-sm z-10'}`}
                         style={{ left, width, top, height: ROW_HEIGHT - 12 }}
                         onMouseDown={e => handleBlockMouseDown(e, pb, project.id)}
                         onMouseEnter={() => setHoverPhase(pb.id)}
                         onMouseLeave={() => setHoverPhase(null)}
                       >
                         <div className="px-2.5 py-1 flex items-center gap-1.5 h-full overflow-hidden">
-                          <span className={`text-[11px] font-semibold ${meta.color} truncate`}>
+                          <span className={`text-[11px] font-semibold ${meta.color} truncate flex-1`}>
                             [{pb.phaseType}] {pb.title}
                           </span>
+                          {width > 110 && (
+                            <span className="text-[9px] font-bold text-stone-500/80 shrink-0">{pct}%</span>
+                          )}
+                          {width > 80 && assignee && (
+                            <img src={assignee.avatar} alt="" title={assignee.name}
+                              className="w-4 h-4 rounded-full border border-white/80 shrink-0" />
+                          )}
+                        </div>
+                        {/* Progress theo checklist */}
+                        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/[0.06] rounded-b-lg overflow-hidden">
+                          <div className={`h-full ${meta.solid} transition-all`} style={{ width: `${pct}%` }} />
+                        </div>
+                        {/* Resize handles */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          onMouseDown={e => handleResizeMouseDown(e, pb, project.id, 'left')}>
+                          <div className="w-1 h-5 rounded-full bg-ink/30" />
+                        </div>
+                        <div
+                          className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          onMouseDown={e => handleResizeMouseDown(e, pb, project.id, 'right')}>
+                          <div className="w-1 h-5 rounded-full bg-ink/30" />
                         </div>
                         {isHover && !isDragging && (
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5
-                            bg-surface-dark text-white text-[10px] rounded-lg shadow-xl whitespace-nowrap z-30">
+                            bg-surface-dark text-white text-[10px] rounded-lg shadow-xl whitespace-nowrap z-50">
                             <div className="font-bold">{pb.title}</div>
-                            <div className="text-stone-400">{meta.label}</div>
+                            <div className="text-stone-400">{meta.fullLabel} · {pct}% hoàn thành</div>
+                            {assignee && <div className="text-stone-400">Assignee: {assignee.name}</div>}
                             <div className="text-stone-500 font-light">{format(parseISO(pos.startDate), 'dd/MM/yyyy')} – {format(parseISO(pos.endDate), 'dd/MM/yyyy')}</div>
                           </div>
                         )}
@@ -601,6 +790,22 @@ export default function PipelineTimeline() {
             })}
             {/* Spacer */}
             <div style={{ height: 32 }} />
+          </div>
+        </div>
+
+        {/* Legend — chú thích các phase */}
+        <div className="absolute bottom-3 right-3 z-30 bg-white/95 backdrop-blur border border-hairline rounded-lg shadow-md px-3 py-2 pointer-events-none">
+          <div className="flex items-center gap-3 flex-wrap">
+            {DEV_PHASES.map(phase => {
+              const meta = PHASE_META[phase];
+              return (
+                <span key={phase} className="flex items-center gap-1.5 text-[9px] text-stone-500">
+                  <span className={`w-2 h-2 rounded-sm ${meta.solid}`} />
+                  <span className="font-bold text-stone-600">{phase}</span>
+                  <span className="font-light hidden xl:inline">{meta.fullLabel}</span>
+                </span>
+              );
+            })}
           </div>
         </div>
 
