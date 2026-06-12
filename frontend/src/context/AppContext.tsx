@@ -27,6 +27,10 @@ interface AppState {
   selectedPhaseBlockId: string | null;
   phaseDetailOpen: boolean;
 
+  // Project detail modal
+  selectedProjectDetailId: string | null;
+  projectDetailOpen: boolean;
+
   // Create modals
   createProjectOpen: boolean;
   createPhaseOpen: boolean;
@@ -66,6 +70,10 @@ interface AppContextType extends AppState {
   openPhaseDetail: (phaseBlockId: string) => void;
   closePhaseDetail: () => void;
 
+  // Project detail
+  openProjectDetail: (projectId: string) => void;
+  closeProjectDetail: () => void;
+
   // Create modals
   openCreateProject: () => void;
   closeCreateProject: () => void;
@@ -77,6 +85,8 @@ interface AppContextType extends AppState {
 
   // Actions
   addProject: (project: Project) => void;
+  updateProject: (id: string, updates: Partial<Project>) => void;
+  deleteProject: (id: string) => void;
   addPhaseBlock: (pb: PhaseBlockUI) => void;
   updatePhaseBlock: (id: string, updates: Partial<PhaseBlockUI>) => void;
   deletePhaseBlock: (id: string) => void;
@@ -88,6 +98,7 @@ interface AppContextType extends AppState {
   orgProjects: Project[];
   orgPhaseBlocks: PhaseBlockUI[];
   selectedPhaseBlock: PhaseBlockUI | null;
+  selectedProjectDetail: Project | null;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -108,6 +119,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     selectedProjectIds: null,
     selectedPhaseBlockId: null,
     phaseDetailOpen: false,
+    selectedProjectDetailId: null,
+    projectDetailOpen: false,
     createProjectOpen: false,
     createPhaseOpen: false,
     createPhaseProjectId: null,
@@ -130,6 +143,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectedProjectIds: null,
       selectedPhaseBlockId: null,
       phaseDetailOpen: false,
+      selectedProjectDetailId: null,
+      projectDetailOpen: false,
       createProjectOpen: false,
       createPhaseOpen: false,
       createPhaseProjectId: null,
@@ -223,6 +238,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, selectedPhaseBlockId: null, phaseDetailOpen: false }));
   }, []);
 
+  // Project detail
+  const openProjectDetail = useCallback((projectId: string) => {
+    setState(prev => ({ ...prev, selectedProjectDetailId: projectId, projectDetailOpen: true }));
+  }, []);
+
+  const closeProjectDetail = useCallback(() => {
+    setState(prev => ({ ...prev, selectedProjectDetailId: null, projectDetailOpen: false }));
+  }, []);
+
   // Create modals
   const openCreateProject = useCallback(() => {
     setState(prev => ({ ...prev, createProjectOpen: true }));
@@ -255,6 +279,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Data actions
   const addProject = useCallback((project: Project) => {
     setProjectsState(prev => [...prev, project]);
+  }, []);
+
+  const updateProject = useCallback((id: string, updates: Partial<Project>) => {
+    setProjectsState(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+  }, []);
+
+  // Xóa dự án kéo theo toàn bộ phase blocks của nó
+  const deleteProject = useCallback((id: string) => {
+    setProjectsState(prev => prev.filter(p => p.id !== id));
+    setPbState(prev => prev.filter(pb => pb.projectId !== id));
+    setState(prev => ({
+      ...prev,
+      selectedProjectIds: prev.selectedProjectIds?.filter(pid => pid !== id) ?? null,
+    }));
   }, []);
 
   const addPhaseBlock = useCallback((pb: PhaseBlockUI) => {
@@ -290,6 +328,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ? pbState.find(pb => pb.id === state.selectedPhaseBlockId) ?? null
     : null;
 
+  const selectedProjectDetail = state.selectedProjectDetailId
+    ? projectsState.find(p => p.id === state.selectedProjectDetailId) ?? null
+    : null;
+
   return (
     <AppContext.Provider value={{
       ...state,
@@ -311,6 +353,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectAllProjects,
       openPhaseDetail,
       closePhaseDetail,
+      openProjectDetail,
+      closeProjectDetail,
       openCreateProject,
       closeCreateProject,
       openCreatePhase,
@@ -319,6 +363,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       closeCreateWorkspace,
       toggleSidebar,
       addProject,
+      updateProject,
+      deleteProject,
       addPhaseBlock,
       updatePhaseBlock,
       deletePhaseBlock,
@@ -328,6 +374,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       orgProjects,
       orgPhaseBlocks,
       selectedPhaseBlock,
+      selectedProjectDetail,
     }}>
       {children}
     </AppContext.Provider>

@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
+import { useRef, useMemo, useState, useCallback, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PHASE_META, DEV_PHASES } from '../../types';
 import type { PhaseBlock } from '../../types';
@@ -15,6 +15,38 @@ const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 52;
 const DRAG_THRESHOLD = 4;
 const MIN_CREATE_WIDTH = 16; // px tối thiểu để coi là kéo tạo phase
+
+// ─── Tooltip bám con trỏ, tự kẹp trong viewport ─────────────────────
+// Dọc: ưu tiên phía trên con trỏ, chạm mép trên (boundary) thì lật xuống dưới.
+// Ngang: kẹp vào trong — sát trái dạt phải, sát phải dạt trái.
+function CursorTooltip({ x, y, boundary, children }: {
+  x: number; y: number; boundary: number; children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 220, h: 72 });
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (w !== size.w || h !== size.h) setSize({ w, h });
+  });
+
+  const MARGIN = 8;
+  const OFFSET = 14;
+  const showBelow = y - OFFSET - size.h < boundary;
+  const top = showBelow ? y + OFFSET : y - OFFSET - size.h;
+  const left = Math.max(MARGIN, Math.min(x - size.w / 2, window.innerWidth - size.w - MARGIN));
+
+  return (
+    <div ref={ref}
+      className="fixed z-[9999] px-2.5 py-1.5 bg-surface-dark text-white text-[10px] rounded-lg shadow-xl
+                 whitespace-nowrap pointer-events-none"
+      style={{ left, top }}>
+      {children}
+    </div>
+  );
+}
 
 // ─── Initial row assignment (greedy, non-overlapping) ───────────────
 function assignRows(pbs: PhaseBlock[]): Map<string, number> {
@@ -41,12 +73,13 @@ export default function PipelineTimeline() {
     orgProjects, phaseBlocks, searchQuery, statusFilter, zoomLevel,
     selectedProjectIds,
     setSearchQuery, setZoomLevel, openPhaseDetail, openCreatePhase,
-    updatePhaseBlock,
+    openProjectDetail, updatePhaseBlock,
   } = useApp();
 
   const boardRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
-  const [hoverPhase, setHoverPhase] = useState<string | null>(null);
+  // Tooltip hover: bám theo tọa độ con trỏ (viewport)
+  const [hoverInfo, setHoverInfo] = useState<{ id: string; x: number; y: number } | null>(null);
   const [manualRows, setManualRows] = useState<Map<string, number>>(new Map());
   // 'view': kéo chuột trên vùng trống = pan lịch; 'edit': kéo ngang trên hàng dự án = tạo phase
   const [boardMode, setBoardMode] = useState<'view' | 'edit'>('view');
@@ -258,6 +291,7 @@ export default function PipelineTimeline() {
     if (!right || !leftContent) return;
     const onScroll = () => {
       leftContent.style.transform = `translateY(${-right.scrollTop}px)`;
+      setHoverInfo(null); // tọa độ tooltip không còn đúng khi scroll
     };
     right.addEventListener('scroll', onScroll);
     return () => right.removeEventListener('scroll', onScroll);
@@ -630,7 +664,10 @@ export default function PipelineTimeline() {
               const rowCount = rd?.rowCount ?? 1;
               const pbCount = rd?.pbs.length ?? 0;
               return (
-                <div key={project.id} className="px-4 border-b border-hairline bg-surface-soft hover:bg-white transition-colors flex items-center"
+                <div key={project.id}
+                  onClick={() => openProjectDetail(project.id)}
+                  title="Xem chi tiết dự án"
+                  className="px-4 border-b border-hairline bg-surface-soft hover:bg-white transition-colors flex items-center cursor-pointer"
                   style={{ height: rowCount * ROW_HEIGHT }}>
                   <div className="w-full">
                     <div className="flex items-center gap-2">
@@ -729,7 +766,7 @@ export default function PipelineTimeline() {
                     const right = getDatePos(parseISO(pos.endDate));
                     const width = Math.max(24, right - left);
                     const top = pos.row * ROW_HEIGHT + 6;
-                    const isHover = hoverPhase === pb.id;
+                    const isHover = hoverInfo?.id === pb.id;
                     const isDragging = dragPreview?.blockId === pb.id;
                     const totalChecks = pb.checklist.length;
                     const doneChecks = pb.checklist.filter(c => c.done).length;
@@ -742,9 +779,10 @@ export default function PipelineTimeline() {
                           ${isDragging ? 'ring-2 ring-ink/30 ring-offset-1' : ''}
                           ${isHover ? 'shadow-lg z-50' : 'shadow-sm z-10'}`}
                         style={{ left, width, top, height: ROW_HEIGHT - 12 }}
-                        onMouseDown={e => handleBlockMouseDown(e, pb, project.id)}
-                        onMouseEnter={() => setHoverPhase(pb.id)}
-                        onMouseLeave={() => setHoverPhase(null)}
+                        onMouseDown={e => { setHoverInfo(null); handleBlockMouseDown(e, pb, project.id); }}
+                        onMouseEnter={e => setHoverInfo({ id: pb.id, x: e.clientX, y: e.clientY })}
+                        onMouseMove={e => setHoverInfo({ id: pb.id, x: e.clientX, y: e.clientY })}
+                        onMouseLeave={() => setHoverInfo(null)}
                       >
                         <div className="px-2.5 py-1 flex items-center gap-1.5 h-full overflow-hidden">
                           <span className={`text-[11px] font-semibold ${meta.color} truncate flex-1`}>
@@ -773,15 +811,6 @@ export default function PipelineTimeline() {
                           onMouseDown={e => handleResizeMouseDown(e, pb, project.id, 'right')}>
                           <div className="w-1 h-5 rounded-full bg-ink/30" />
                         </div>
-                        {isHover && !isDragging && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5
-                            bg-surface-dark text-white text-[10px] rounded-lg shadow-xl whitespace-nowrap z-50">
-                            <div className="font-bold">{pb.title}</div>
-                            <div className="text-stone-400">{meta.fullLabel} · {pct}% hoàn thành</div>
-                            {assignee && <div className="text-stone-400">Assignee: {assignee.name}</div>}
-                            <div className="text-stone-500 font-light">{format(parseISO(pos.startDate), 'dd/MM/yyyy')} – {format(parseISO(pos.endDate), 'dd/MM/yyyy')}</div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -810,6 +839,26 @@ export default function PipelineTimeline() {
         </div>
 
       </div>
+
+      {/* Tooltip — bám con trỏ, fixed trên viewport, tự kẹp vào trong màn hình */}
+      {hoverInfo && !dragPreview && !createPreview && (() => {
+        const pb = phaseBlocks.find(b => b.id === hoverInfo.id);
+        const pos = layoutMap.get(hoverInfo.id);
+        if (!pb || !pos) return null;
+        const meta = PHASE_META[pb.phaseType];
+        const totalChecks = pb.checklist.length;
+        const pct = totalChecks > 0 ? Math.round((pb.checklist.filter(c => c.done).length / totalChecks) * 100) : 0;
+        const assignee = getUserById(pb.assignee || pb.createdBy);
+        const boardTop = boardRef.current?.getBoundingClientRect().top ?? 0;
+        return (
+          <CursorTooltip x={hoverInfo.x} y={hoverInfo.y} boundary={boardTop + HEADER_HEIGHT}>
+            <div className="font-bold">{pb.title}</div>
+            <div className="text-stone-400">{meta.fullLabel} · {pct}% hoàn thành</div>
+            {assignee && <div className="text-stone-400">Assignee: {assignee.name}</div>}
+            <div className="text-stone-500 font-light">{format(parseISO(pos.startDate), 'dd/MM/yyyy')} – {format(parseISO(pos.endDate), 'dd/MM/yyyy')}</div>
+          </CursorTooltip>
+        );
+      })()}
 
       <PhaseDetailModal />
       <CreatePhaseModal />

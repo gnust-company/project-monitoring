@@ -6,6 +6,7 @@ import TeamView from './TeamView';
 import PipelineTimeline from '../Pipeline/PipelineTimeline';
 import CreateProjectModal from '../Modals/CreateProjectModal';
 import CreateWorkspaceModal from '../Modals/CreateWorkspaceModal';
+import ProjectDetailModal from '../Modals/ProjectDetailModal';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const pageVariants = {
@@ -42,6 +43,7 @@ export default function WorkspaceLayout() {
       </main>
       <CreateProjectModal />
       <CreateWorkspaceModal />
+      <ProjectDetailModal />
     </div>
   );
 }

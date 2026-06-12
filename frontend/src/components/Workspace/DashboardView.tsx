@@ -24,7 +24,7 @@ const statusConfig = {
 };
 
 export default function DashboardView() {
-  const { selectedOrg, orgProjects, phaseBlocks, setWorkspaceView } = useApp();
+  const { selectedOrg, orgProjects, phaseBlocks, setWorkspaceView, openProjectDetail } = useApp();
 
   const stats = useMemo(() => {
     const total = orgProjects.length;
@@ -299,9 +299,7 @@ export default function DashboardView() {
               const latestPhaseMeta = latestPhase ? PHASE_META[latestPhase.phaseType] : null;
               return (
                 <div key={project.id}
-                  onClick={() => {
-                    setWorkspaceView('pipeline');
-                  }}
+                  onClick={() => openProjectDetail(project.id)}
                   className="bg-white rounded-xl border border-hairline p-5 card-hover cursor-pointer group">
                   <div className="flex items-center justify-between mb-4">
                     <div className="w-10 h-10 bg-surface-card rounded-lg flex items-center justify-center">

@@ -1,0 +1,131 @@
+"""Domain entities — dataclasses thuần Python, không phụ thuộc ORM/framework.
+
+Đây là "ngôn ngữ chung" của toàn hệ thống; application layer chỉ thao tác
+trên các entity này thông qua ports.
+"""
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from uuid import UUID
+
+from app.domain.value_objects import (
+    AttachmentKind,
+    DevPhase,
+    PhaseItemKind,
+    PhaseTag,
+    ProjectStatus,
+    UserRole,
+)
+
+
+@dataclass(slots=True)
+class User:
+    id: UUID
+    email: str
+    name: str
+    role: UserRole
+    avatar_url: str | None = None
+    created_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class Organization:
+    id: UUID
+    name: str
+    member_ids: list[UUID] = field(default_factory=list)
+    created_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class Project:
+    id: UUID
+    org_id: UUID
+    name: str
+    description: str
+    status: ProjectStatus
+    start_date: date
+    target_date: date
+    progress: int  # 0-100
+    created_by: UUID
+    created_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class PhaseItem:
+    """Một dòng checklist hoặc outcome trong phase, gắn với role (tùy chọn)."""
+    id: UUID
+    kind: PhaseItemKind
+    text: str
+    done: bool = False
+    role: UserRole | None = None
+    position: int = 0
+
+
+@dataclass(slots=True)
+class Comment:
+    id: UUID
+    author_id: UUID
+    content: str
+    created_at: datetime
+
+
+@dataclass(slots=True)
+class Attachment:
+    id: UUID
+    kind: AttachmentKind
+    file_name: str
+    url: str
+    uploaded_by: UUID | None = None
+    uploaded_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class ActivityEntry:
+    id: UUID
+    user_id: UUID
+    action: str
+    target: str
+    created_at: datetime
+
+
+@dataclass(slots=True)
+class PhaseBlock:
+    """Aggregate root của một phase block trên timeline."""
+    id: UUID
+    project_id: UUID
+    phase_type: DevPhase
+    tag: PhaseTag
+    title: str
+    description: str
+    start_date: date
+    end_date: date
+    created_by: UUID
+    assignee: UUID  # mặc định = created_by, đổi được sang thành viên khác
+    actual_end_date: date | None = None
+    display_row: int | None = None  # hàng hiển thị trên timeline (FE quản lý)
+    participant_ids: list[UUID] = field(default_factory=list)
+    items: list[PhaseItem] = field(default_factory=list)  # checklist + outcomes
+    comments: list[Comment] = field(default_factory=list)
+    attachments: list[Attachment] = field(default_factory=list)
+    activity_log: list[ActivityEntry] = field(default_factory=list)
+
+    @property
+    def progress_pct(self) -> int:
+        """Tiến độ phase = % checklist hoàn thành."""
+        checks = [i for i in self.items if i.kind == PhaseItemKind.CHECKLIST]
+        if not checks:
+            return 0
+        return round(sum(1 for i in checks if i.done) / len(checks) * 100)
+
+
+@dataclass(slots=True)
+class PhaseTaskTemplate:
+    """Nguồn sinh checklist/outcome mặc định theo (phase, role).
+
+    Tương ứng PHASE_ROLE_TASKS / PHASE_ROLE_OUTCOMES ở frontend.
+    """
+    id: UUID
+    phase_type: DevPhase
+    role: UserRole
+    kind: PhaseItemKind
+    text: str
+    position: int = 0

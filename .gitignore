@@ -1,3 +1,14 @@
+# Frontend
 node_modules
 dist/
 .vite/
+
+# Backend (Python)
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/

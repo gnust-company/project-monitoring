@@ -3,6 +3,19 @@
 > Thiết kế từ góc nhìn USER, không phải từ góc nhìn CODE.
 > Mỗi screen phải trả lời: **User cần gì ở đây? Họ muốn làm gì tiếp theo?**
 
+> **Cập nhật 13/06/2026** — Các mục sau trong "Thiếu hiện tại" / Priority Matrix đã được implement:
+> - ✅ Phase block tooltip (mục 6.2 / #11) — tooltip bám con trỏ, tự kẹp trong viewport, lật trên/dưới
+> - ✅ Mini progress bar trên phase block (#12) — tiến độ theo checklist
+> - ✅ Sidebar collapse/expand (#19) — thu về icon-rail, toggle ở đáy sidebar
+> - ✅ Phase templates (#16) — checklist & outcomes tự sinh theo loại phase × role (PHASE_ROLE_TASKS/OUTCOMES)
+> - ✅ Sidebar project shortcuts (#10) — checkbox filter dự án
+> - ✅ Tạo phase bằng kéo-thả trên timeline (mode Xem / Tạo phase) — thay cho button
+> - ✅ Resize 2 đầu phase block; block bị va chạm tự xuống dòng mới
+> - ✅ Document trên phase: upload file + đính kèm link
+> - ✅ Assignee cho phase (mặc định người tạo, đổi được)
+> - ✅ Legend chú thích 7 phase trên timeline
+> - ✅ **Project Detail Modal** (mới, ngoài design gốc) — click dự án ở Pipeline/Dashboard → modal giữa màn hình: sửa inline tên/mô tả/trạng thái/ngày/tiến độ, stats, xóa có xác nhận
+
 ---
 
 ## 1. LANDING PAGE

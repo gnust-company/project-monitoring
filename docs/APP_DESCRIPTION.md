@@ -86,7 +86,13 @@ PA → SA → SD → SI → ST → DEP → OM
 - **Phase distribution** — Phase nào đang active nhiều nhất
 - **Quick actions** — Tạo dự án, tạo phase, navigate nhanh
 
-### 4.5. Collaboration
+### 4.5. Project Detail Modal
+- Click vào dự án (panel trái của Pipeline hoặc card trên Dashboard) → modal giữa màn hình
+- **Sửa inline**: tên, mô tả, trạng thái, ngày bắt đầu/mục tiêu, tiến độ (slider)
+- **Stats nhanh**: số phase, phase hoàn thành, ngày còn lại tới deadline, phân bố phase theo loại
+- **Xóa dự án** — xác nhận 2 bước, xóa kèm toàn bộ phase blocks
+
+### 4.6. Collaboration
 - **Checklist** — Task breakdown trong mỗi phase
 - **Comments** — Thảo luận trực tiếp trên phase
 - **Attachments** — Đính kèm tài liệu
@@ -149,3 +155,44 @@ PA → SA → SD → SI → ST → DEP → OM
 3. **Status at a glance** — 1 giây nhìn thấy cái gì OK, cái nào cần attention
 4. **Context-aware actions** — Action buttons xuất hiện khi cần, không lúc nào cũng hiện
 5. **Vietnamese-first UI** — Giữ technical terms (Phase, Pipeline, Dashboard) nhưng labels tiếng Việt
+
+---
+
+## 8. Kiến trúc hệ thống
+
+Monorepo 2 phần, giao tiếp qua REST API:
+
+```
+project-monitoring/
+├── frontend/    # React SPA (hiện chạy mock data)
+├── backend/     # Python API (Clean Architecture)
+└── docs/        # APP_DESCRIPTION.md · API_CONTRACT.md · SCHEMA.md
+```
+
+### Frontend
+
+| Thành phần | Công nghệ |
+|---|---|
+| Framework | React 19 + TypeScript + Vite |
+| Styling | Tailwind CSS (Linear/Cal.com design system) |
+| Animation | framer-motion |
+| State | React Context (`AppContext`) — hiện dùng mock data trong `src/data/mockData.ts` |
+
+### Backend
+
+| Thành phần | Công nghệ |
+|---|---|
+| Ngôn ngữ / Framework | Python 3.12 · FastAPI |
+| Kiến trúc | **Clean Architecture** — 4 tầng: `domain → application → infrastructure / presentation` |
+| Database | **PostgreSQL 16** · SQLAlchemy 2.0 (async) + asyncpg |
+| Migrations | Alembic |
+| Auth | JWT (python-jose) |
+
+Quy tắc phụ thuộc: tầng trong không biết tầng ngoài — `domain` (entities thuần) ← `application` (use cases + ports) ← `infrastructure` (PostgreSQL repos) / `presentation` (FastAPI routers). Chi tiết: `backend/README.md`.
+
+### Lộ trình thay mock data
+
+1. **Hợp đồng trước, code sau** — FE và BE cùng bám [API_CONTRACT.md](./API_CONTRACT.md); database theo [SCHEMA.md](./SCHEMA.md)
+2. BE implement các router theo contract (Projects đã có làm mẫu end-to-end)
+3. Seed `phase_task_templates` từ `PHASE_ROLE_TASKS`/`PHASE_ROLE_OUTCOMES` (frontend/src/types.ts)
+4. FE thay `mockData.ts` bằng API client (fetch theo contract), `AppContext` giữ nguyên interface để components không phải sửa
