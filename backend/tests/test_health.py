@@ -1,0 +1,8 @@
+"""Slice 0 — smoke test: app khởi động, health endpoint OK, harness chạy được."""
+from httpx import AsyncClient
+
+
+async def test_health_ok(client: AsyncClient):
+    resp = await client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}

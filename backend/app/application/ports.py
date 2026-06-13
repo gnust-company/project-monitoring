@@ -9,7 +9,10 @@ from uuid import UUID
 from app.domain.entities import (
     ActivityEntry,
     Attachment,
+    ChangeRequest,
     Comment,
+    Membership,
+    Notification,
     Organization,
     PhaseBlock,
     PhaseItem,
@@ -17,7 +20,7 @@ from app.domain.entities import (
     Project,
     User,
 )
-from app.domain.value_objects import DevPhase
+from app.domain.value_objects import DevPhase, WorkspaceRole
 
 
 class UserRepository(ABC):
@@ -28,7 +31,16 @@ class UserRepository(ABC):
     async def get_by_email(self, email: str) -> User | None: ...
 
     @abstractmethod
+    async def get_password_hash(self, user_id: UUID) -> str | None: ...
+
+    @abstractmethod
     async def create(self, user: User, password_hash: str) -> User: ...
+
+    @abstractmethod
+    async def update(self, user: User) -> User: ...
+
+    @abstractmethod
+    async def count(self) -> int: ...
 
 
 class OrganizationRepository(ABC):
@@ -42,10 +54,58 @@ class OrganizationRepository(ABC):
     async def create(self, org: Organization) -> Organization: ...
 
     @abstractmethod
-    async def add_member(self, org_id: UUID, user_id: UUID) -> None: ...
+    async def rename(self, org_id: UUID, name: str) -> Organization | None: ...
+
+    @abstractmethod
+    async def delete(self, org_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def add_member(
+        self, org_id: UUID, user_id: UUID, role: WorkspaceRole = WorkspaceRole.MEMBER
+    ) -> None: ...
+
+    @abstractmethod
+    async def remove_member(self, org_id: UUID, user_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def get_membership(self, org_id: UUID, user_id: UUID) -> Membership | None: ...
 
     @abstractmethod
     async def list_members(self, org_id: UUID) -> list[User]: ...
+
+    @abstractmethod
+    async def list_owner_ids(self, org_id: UUID) -> list[UUID]: ...
+
+
+class ChangeRequestRepository(ABC):
+    @abstractmethod
+    async def get(self, cr_id: UUID) -> ChangeRequest | None: ...
+
+    @abstractmethod
+    async def create(self, cr: ChangeRequest) -> ChangeRequest: ...
+
+    @abstractmethod
+    async def update(self, cr: ChangeRequest) -> ChangeRequest: ...
+
+    @abstractmethod
+    async def list_pending_by_org(self, org_id: UUID) -> list[ChangeRequest]: ...
+
+
+class NotificationRepository(ABC):
+    @abstractmethod
+    async def create(self, notification: Notification) -> Notification: ...
+
+    @abstractmethod
+    async def list_for_user(self, user_id: UUID, *, unread_only: bool = False) -> list[Notification]: ...
+
+    @abstractmethod
+    async def count_unread(self, user_id: UUID) -> int: ...
+
+    @abstractmethod
+    async def mark_read(self, notification_id: UUID, user_id: UUID) -> bool: ...
+
+    @abstractmethod
+    async def mark_all_read(self, user_id: UUID) -> int: ...
 
 
 class ProjectRepository(ABC):
@@ -76,6 +136,9 @@ class PhaseBlockRepository(ABC):
     async def list_by_org(self, org_id: UUID) -> list[PhaseBlock]: ...
 
     @abstractmethod
+    async def get_project_id(self, block_id: UUID) -> UUID | None: ...
+
+    @abstractmethod
     async def create(self, block: PhaseBlock) -> PhaseBlock: ...
 
     @abstractmethod
@@ -84,9 +147,12 @@ class PhaseBlockRepository(ABC):
     @abstractmethod
     async def delete(self, block_id: UUID) -> None: ...
 
-    # ── Sub-resources ────────────────────────────────────────────────
+    # ── Items ────────────────────────────────────────────────────────
     @abstractmethod
     async def add_item(self, block_id: UUID, item: PhaseItem) -> PhaseItem: ...
+
+    @abstractmethod
+    async def get_item(self, item_id: UUID) -> PhaseItem | None: ...
 
     @abstractmethod
     async def update_item(self, item: PhaseItem) -> PhaseItem: ...
@@ -94,17 +160,38 @@ class PhaseBlockRepository(ABC):
     @abstractmethod
     async def delete_item(self, item_id: UUID) -> None: ...
 
+    # ── Comments ─────────────────────────────────────────────────────
     @abstractmethod
     async def add_comment(self, block_id: UUID, comment: Comment) -> Comment: ...
 
     @abstractmethod
+    async def list_comments(self, block_id: UUID) -> list[Comment]: ...
+
+    # ── Attachments ──────────────────────────────────────────────────
+    @abstractmethod
     async def add_attachment(self, block_id: UUID, attachment: Attachment) -> Attachment: ...
+
+    @abstractmethod
+    async def get_attachment(self, attachment_id: UUID) -> Attachment | None: ...
+
+    @abstractmethod
+    async def list_attachments(self, block_id: UUID) -> list[Attachment]: ...
 
     @abstractmethod
     async def delete_attachment(self, attachment_id: UUID) -> None: ...
 
+
+class ActivityLogRepository(ABC):
+    """Nhật ký — phase changelog (theo block) và project changelog (theo project)."""
+
     @abstractmethod
-    async def add_activity(self, block_id: UUID, entry: ActivityEntry) -> ActivityEntry: ...
+    async def add(self, entry: ActivityEntry) -> ActivityEntry: ...
+
+    @abstractmethod
+    async def list_by_phase(self, block_id: UUID) -> list[ActivityEntry]: ...
+
+    @abstractmethod
+    async def list_by_project(self, project_id: UUID) -> list[ActivityEntry]: ...
 
 
 class PhaseTaskTemplateRepository(ABC):
@@ -112,3 +199,23 @@ class PhaseTaskTemplateRepository(ABC):
 
     @abstractmethod
     async def list_by_phase(self, phase: DevPhase) -> list[PhaseTaskTemplate]: ...
+
+
+class ObjectStorage(ABC):
+    """Lưu trữ object (S3-compatible / MinIO) cho document & avatar."""
+
+    @abstractmethod
+    async def put(self, bucket: str, key: str, data: bytes, content_type: str) -> str:
+        """Lưu object, trả về URL công khai để tải."""
+        ...
+
+    @abstractmethod
+    async def delete(self, bucket: str, key: str) -> None: ...
+
+    @abstractmethod
+    def public_url(self, bucket: str, key: str) -> str: ...
+
+    @abstractmethod
+    def key_from_url(self, bucket: str, url: str) -> str | None:
+        """Tách key từ public URL (để xóa). None nếu URL không thuộc bucket này."""
+        ...

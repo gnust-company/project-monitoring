@@ -3,7 +3,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.presentation.api.routers import health, projects
+from app.presentation.api.routers import (
+    auth,
+    change_requests,
+    health,
+    notifications,
+    organizations,
+    phase_blocks,
+    projects,
+    templates,
+    users,
+)
 
 settings = get_settings()
 
@@ -22,4 +32,11 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router)
+app.include_router(organizations.router)
 app.include_router(projects.router)
+app.include_router(change_requests.router)
+app.include_router(notifications.router)
+app.include_router(phase_blocks.router)
+app.include_router(templates.router)
+app.include_router(users.router)

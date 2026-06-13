@@ -41,33 +41,50 @@ Quy tắc:
 - `application` chỉ thao tác qua entities và ports; không import `infrastructure`.
 - Đổi DB/framework chỉ đụng `infrastructure` và `presentation`.
 
-## Chạy dev
+## Chạy cả stack (khuyến nghị)
+
+Một lệnh dựng Postgres + MinIO + backend + frontend:
+
+```bash
+cp .env.example .env          # ở thư mục gốc repo
+docker compose up --build
+```
+
+- API + Swagger: http://localhost:8000/docs
+- Frontend: http://localhost:5173
+- MinIO console: http://localhost:9001 (minioadmin / minioadmin)
+
+Backend tự chạy `alembic upgrade head` khi khởi động (tạo schema + seed templates).
+
+## Chạy backend riêng (dev)
 
 ```bash
 cd backend
-python -m venv .venv && .venv\Scripts\activate   # Windows
-pip install -e ".[dev]"
-copy .env.example .env                            # rồi sửa DATABASE_URL
-
-# PostgreSQL local (ví dụ qua Docker):
-docker run -d --name projecthub-pg -e POSTGRES_USER=projecthub \
-  -e POSTGRES_PASSWORD=projecthub -e POSTGRES_DB=projecthub -p 5432:5432 postgres:16
-
-# Tạo schema lần đầu: chạy docs/SCHEMA.md (phần DDL) hoặc alembic upgrade head (khi đã có migration)
-
-uvicorn app.main:app --reload --port 8000
+uv sync --extra dev
+# Postgres + MinIO qua docker compose:
+docker compose up -d postgres minio minio-setup
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
-Swagger UI: http://localhost:8000/docs
+## Test (TDD)
+
+Chạy trên Postgres test DB thật (`projecthub_test`), mỗi test 1 transaction rollback;
+slice MinIO cần `minio` + `minio-setup` đang chạy.
+
+```bash
+docker exec project-monitoring-postgres-1 psql -U projecthub -c "CREATE DATABASE projecthub_test"  # lần đầu
+uv run pytest -q
+```
 
 ## Trạng thái
 
-Đây là skeleton chuẩn bị thay mock data của frontend bằng data thật:
-- ✅ Cấu trúc Clean Architecture đầy đủ 4 tầng
-- ✅ Domain entities + enums khớp `frontend/src/types.ts`
-- ✅ Ports (abstract repositories) cho toàn bộ aggregate
-- ✅ ORM models khớp `docs/SCHEMA.md`
-- ✅ Ví dụ wiring end-to-end: **Projects** (router → use case → repository)
-- ⬜ Các use case / router còn lại — implement theo `docs/API_CONTRACT.md`
-- ⬜ Auth JWT (đã có config, chưa có endpoint)
-- ⬜ Alembic migrations
+Backend đã implement đầy đủ (32 test xanh), thay mock data của frontend:
+- ✅ Clean Architecture 4 tầng + ports + ORM khớp `docs/SCHEMA.md`
+- ✅ Auth JWT + first-run setup super-user
+- ✅ Permission 2 chiều: `is_superuser` + workspace `owner|member`; member sửa/xóa dự án qua **approval queue**
+- ✅ Organizations + members, Projects, Phase blocks (+ items / comments / changelog)
+- ✅ Changelog 2 cấp (phase + dự án), Notifications in-app
+- ✅ Attachments (link + file) & avatar qua **MinIO**, Templates (seed 56 dòng)
+- ✅ Alembic migrations + docker-compose toàn stack
+- ⬜ Frontend wiring (thay `AppContext` mock bằng API client)

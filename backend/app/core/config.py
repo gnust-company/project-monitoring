@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 1440
     cors_origins: str = "http://localhost:5173"
 
+    # MinIO / object storage (S3-compatible)
+    minio_endpoint: str = "http://localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_region: str = "us-east-1"
+    minio_public_url: str = "http://localhost:9000"  # base URL FE dùng để tải file
+    minio_bucket_attachments: str = "attachments"
+    minio_bucket_avatars: str = "avatars"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

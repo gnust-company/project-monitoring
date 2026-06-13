@@ -7,13 +7,18 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from uuid import UUID
 
+from typing import Any
+
 from app.domain.value_objects import (
     AttachmentKind,
+    ChangeRequestAction,
+    ChangeRequestStatus,
     DevPhase,
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
     UserRole,
+    WorkspaceRole,
 )
 
 
@@ -24,7 +29,17 @@ class User:
     name: str
     role: UserRole
     avatar_url: str | None = None
+    is_superuser: bool = False
     created_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class Membership:
+    """Quan hệ user ↔ workspace, kèm cấp quyền (owner/member)."""
+    user_id: UUID
+    org_id: UUID
+    role: WorkspaceRole = WorkspaceRole.MEMBER
+    joined_at: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -80,11 +95,15 @@ class Attachment:
 
 @dataclass(slots=True)
 class ActivityEntry:
+    """Một dòng nhật ký. project_id luôn có (changelog dự án); phase_block_id
+    NULL với sự kiện cấp dự án (tạo/xóa phase) để còn giữ lại sau khi phase bị xóa."""
     id: UUID
+    project_id: UUID
     user_id: UUID
     action: str
     target: str
     created_at: datetime
+    phase_block_id: UUID | None = None
 
 
 @dataclass(slots=True)
@@ -115,6 +134,37 @@ class PhaseBlock:
         if not checks:
             return 0
         return round(sum(1 for i in checks if i.done) / len(checks) * 100)
+
+
+@dataclass(slots=True)
+class ChangeRequest:
+    """Yêu cầu thay đổi (sửa/xóa dự án) do member tạo, chờ owner duyệt."""
+    id: UUID
+    org_id: UUID
+    project_id: UUID
+    requested_by: UUID
+    action: ChangeRequestAction
+    payload: dict[str, Any]  # nội dung thay đổi đề xuất (rỗng nếu là delete)
+    status: ChangeRequestStatus = ChangeRequestStatus.PENDING
+    reviewed_by: UUID | None = None
+    created_at: datetime | None = None
+    resolved_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class Notification:
+    """Thông báo in-app gửi tới một user."""
+    id: UUID
+    user_id: UUID
+    type: str
+    title: str
+    body: str = ""
+    org_id: UUID | None = None
+    project_id: UUID | None = None
+    phase_block_id: UUID | None = None
+    change_request_id: UUID | None = None
+    read: bool = False
+    created_at: datetime | None = None
 
 
 @dataclass(slots=True)
