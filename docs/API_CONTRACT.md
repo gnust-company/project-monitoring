@@ -27,21 +27,37 @@ Schema database tương ứng: [SCHEMA.md](./SCHEMA.md).
 
 ## Resources
 
-### Auth
+### Auth & first-run setup
 
 | Method | Path | Mô tả |
 |---|---|---|
-| POST | `/auth/register` | Đăng ký. Body: `{ email, password, name, role }` — `role` **bắt buộc**, chọn lúc tạo account (form đăng ký FE có dropdown vai trò) |
+| GET | `/auth/setup-status` | `{ needsSetup: bool }` — `true` khi DB chưa có user nào (FE hiện view tạo super-user) |
+| POST | `/auth/setup` | Tạo tài khoản đầu tiên (`isSuperuser=true`). Body như `register`. **Khóa** sau khi đã có user (409). → `{ accessToken, user }` |
+| POST | `/auth/register` | Đăng ký. Body: `{ email, password, name, role }` — `role` **bắt buộc**. → `{ accessToken, user }` |
 | POST | `/auth/login` | Body: `{ email, password }` → `{ accessToken, user }` |
 | GET | `/auth/me` | User hiện tại từ token |
 
 **User shape** (mọi nơi trả user đều dùng shape này):
 
 ```json
-{ "id": "uuid", "email": "a@b.c", "name": "Sarah Chen", "avatar": "https://...", "role": "PM" }
+{ "id": "uuid", "email": "a@b.c", "name": "Sarah Chen", "avatar": "https://...", "role": "PM", "isSuperuser": false }
 ```
 
-`role` ∈ `PM | BA | SW_Architect | SysOps | UI_Designer | GUI | SW_Developer | SW_Tester`
+`role` ∈ `PM | BA | SW_Architect | SysOps | UI_Designer | GUI | SW_Developer | SW_Tester` (vai trò công việc).
+
+### Phân quyền (permission)
+
+Hai chiều **độc lập**:
+- `user.isSuperuser` — admin toàn cục (tạo ở first-run setup), làm được mọi thứ.
+- Cấp workspace (`organization_members.role`) ∈ `owner | member`:
+  - **owner** (người tạo) / **superuser**: toàn quyền workspace + dự án + phase + thành viên.
+  - **member**: tạo dự án/phase được; **sửa/xóa dự án phải owner duyệt** (→ 202 + ChangeRequest);
+    **không** sửa workspace hay quản lý thành viên (→ 403).
+
+| Mã | Khi nào |
+|---|---|
+| 202 | member sửa/xóa dự án → tạo ChangeRequest chờ duyệt (không áp dụng ngay) |
+| 403 | không thuộc workspace, hoặc member làm hành động owner-only |
 
 ### Users / Profile
 
@@ -50,8 +66,8 @@ Nguồn cho **Profile view** (FE: trang Hồ sơ mở từ avatar/sidebar).
 | Method | Path | Mô tả |
 |---|---|---|
 | GET | `/users/me` | = `/auth/me` |
-| PATCH | `/users/me` | Cập nhật hồ sơ. Body (partial): `{ name?, role?, avatar? }` |
-| GET | `/users/me/assigned-phase-blocks` | Phase block mà user là `assignee` (cho mục "Phase được giao" ở Profile) |
+| PATCH | `/users/me` | Cập nhật hồ sơ. Body (partial): `{ name?, role? }` |
+| POST | `/users/me/avatar` | `multipart/form-data` field `file` → upload MinIO (bucket `avatars`), set `avatar` → trả User |
 
 **Profile stats** — FE có thể tự tổng hợp từ `/organizations` + `/organizations/{orgId}/phase-blocks`, hoặc BE cấp endpoint gộp:
 
@@ -91,8 +107,9 @@ Nguồn cho **Workspace Settings view** (FE: trang Cài đặt mở từ sidebar
 | GET | `/organizations/{orgId}/projects` | Dự án trong workspace |
 | POST | `/organizations/{orgId}/projects` | Body: `{ name, description, startDate, targetDate, status? }` |
 | GET | `/projects/{projectId}` | Chi tiết |
-| PATCH | `/projects/{projectId}` | Partial update các field trên + `progress` |
-| DELETE | `/projects/{projectId}` | → 204 |
+| PATCH | `/projects/{projectId}` | Partial update + `progress`. Owner → 200 (áp dụng). **Member → 202 + ChangeRequest** |
+| DELETE | `/projects/{projectId}` | Owner → 204. **Member → 202 + ChangeRequest** |
+| GET | `/projects/{projectId}/activity` | Changelog dự án (ai tạo/sửa/xóa phase) — nguồn cho Project Detail Modal |
 
 ```json
 {
@@ -191,21 +208,62 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
 | Method | Path | Mô tả |
 |---|---|---|
 | GET | `/phase-blocks/{blockId}/attachments` | |
-| POST | `/phase-blocks/{blockId}/attachments` | 2 dạng — xem dưới |
-| DELETE | `/phase-blocks/{blockId}/attachments/{attachmentId}` | → 204 |
-
-- **Link**: `Content-Type: application/json` → `{ "kind": "link", "fileName": "Spec (Google Docs)", "url": "https://..." }`
-- **File**: `Content-Type: multipart/form-data`, field `file` → BE upload storage, tự set `kind: "file"` + `url`
+| POST | `/phase-blocks/{blockId}/attachments/link` | JSON `{ fileName, url }` → `kind: "link"` |
+| POST | `/phase-blocks/{blockId}/attachments/file` | `multipart/form-data` field `file` → upload MinIO (bucket `attachments`), BE set `kind: "file"` + `url` |
+| DELETE | `/phase-blocks/{blockId}/attachments/{attachmentId}` | xóa row + object MinIO → 204 |
 
 ```json
-{ "id": "uuid", "kind": "link", "fileName": "Spec (Google Docs)", "url": "https://...", "uploadedAt": "..." }
+{ "id": "uuid", "kind": "link", "fileName": "Spec (Google Docs)", "url": "https://...", "uploadedBy": "uuid", "uploadedAt": "..." }
 ```
 
-### Activity Log
+### Change Requests (approval queue)
+
+Owner/superuser xử lý yêu cầu sửa/xóa dự án của member.
 
 | Method | Path | Mô tả |
 |---|---|---|
-| GET | `/phase-blocks/{blockId}/activity` | BE tự ghi khi có mutation; FE chỉ đọc |
+| GET | `/organizations/{orgId}/change-requests` | Danh sách `pending` (owner-only) |
+| POST | `/change-requests/{id}/approve` | Owner duyệt → áp dụng thay đổi/xóa, báo người tạo |
+| POST | `/change-requests/{id}/reject` | Owner từ chối → báo người tạo |
+
+```json
+{ "id": "uuid", "orgId": "uuid", "projectId": "uuid", "requestedBy": "uuid",
+  "action": "update_project", "payload": { "name": "..." }, "status": "pending",
+  "reviewedBy": null, "createdAt": "...", "resolvedAt": null }
+```
+
+`action` ∈ `update_project | delete_project` · `status` ∈ `pending | approved | rejected`
+
+### Notifications (in-app)
+
+FE poll định kỳ + badge chưa đọc. BE tự sinh khi có sự kiện.
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/notifications?unreadOnly=false` | Thông báo của user hiện tại (mới nhất trước) |
+| GET | `/notifications/unread-count` | `{ count }` |
+| POST | `/notifications/{id}/read` | Đánh dấu đã đọc → 204 |
+| POST | `/notifications/read-all` | Đánh dấu tất cả đã đọc → `{ count }` |
+
+```json
+{ "id": "uuid", "type": "phase_assigned", "title": "...", "body": "",
+  "orgId": "uuid", "projectId": "uuid", "phaseBlockId": "uuid", "changeRequestId": null,
+  "read": false, "createdAt": "..." }
+```
+
+`type` ∈ `member_added | member_removed | phase_assigned | phase_created | phase_updated | phase_deleted | comment_added | change_request_created | change_request_approved | change_request_rejected`
+
+### Activity Log (changelog)
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/phase-blocks/{blockId}/activity` | Changelog 1 phase (đổi ngày, thêm người, đổi trạng thái...) |
+| GET | `/projects/{projectId}/activity` | Changelog dự án (tạo/sửa/xóa phase) — giữ cả dòng của phase đã xóa |
+
+```json
+{ "id": "uuid", "projectId": "uuid", "phaseBlockId": "uuid", "userId": "uuid",
+  "action": "changed end date", "target": "2026-06-20 → 2026-06-24", "createdAt": "..." }
+```
 
 ### Templates
 

@@ -106,8 +106,32 @@ Thiết kế để sếp/PM nhìn 5 giây nắm tình hình:
 ### 4.8. Collaboration
 - **Checklist** — Task breakdown trong mỗi phase
 - **Comments** — Thảo luận trực tiếp trên phase
-- **Attachments** — Đính kèm tài liệu
+- **Attachments** — Đính kèm tài liệu (file lưu MinIO) hoặc link tài liệu ngoài
 - **Activity Log** — Ai đã làm gì, khi nào
+
+### 4.9. Permissions & first-run setup
+- **First run**: khi hệ thống chưa có tài khoản nào → hiện view *tạo super-user*. Tài khoản
+  đầu tiên là **admin toàn cục** (toàn quyền).
+- **2 chiều quyền độc lập**: *vai trò công việc* (PM/BA/Dev/Tester... — dùng sinh checklist)
+  tách khỏi *cấp quyền* trong workspace.
+- **Workspace creator (owner)**: toàn quyền với workspace và artifact bên trong (dự án, phase,
+  thành viên).
+- **Member**: tham gia, tạo dự án/phase được; nhưng **sửa/xóa dự án phải owner duyệt**, và
+  không sửa được cài đặt workspace / thành viên.
+
+### 4.10. Approval queue (duyệt thay đổi)
+Member bấm sửa/xóa dự án → tạo **Change Request** trạng thái *pending*; owner nhận thông báo,
+bấm **Duyệt** (áp dụng) hoặc **Từ chối**. Có lịch sử, người yêu cầu được báo kết quả.
+
+### 4.11. Notifications (thông báo in-app)
+Sự kiện sinh thông báo: được thêm vào workspace, được giao phase, có bình luận, change-request
+được tạo/duyệt/từ chối... FE poll định kỳ, hiện badge số chưa đọc, đánh dấu đã đọc.
+
+### 4.12. Changelog 2 cấp
+- **Changelog phase** (trong Phase Detail): chi tiết khi sửa 1 phase — đổi ngày, thêm người,
+  đổi trạng thái...
+- **Changelog dự án** (trong Project Detail Modal): ai đã tạo / sửa / xóa phase. Dòng "đã xóa
+  phase X" vẫn giữ lại sau khi phase bị xóa.
 
 ---
 

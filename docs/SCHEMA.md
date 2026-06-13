@@ -37,6 +37,13 @@ CREATE TYPE phase_tag AS ENUM ('Backlog', 'Todo', 'Inprogress', 'Complete', 'Can
 CREATE TYPE attachment_kind AS ENUM ('file', 'link');
 
 CREATE TYPE phase_item_kind AS ENUM ('checklist', 'outcome');
+
+-- Cấp quyền trong workspace (độc lập với user_role là vai trò công việc)
+CREATE TYPE workspace_role AS ENUM ('owner', 'member');
+
+-- Hàng đợi duyệt khi member sửa/xóa dự án
+CREATE TYPE change_request_action AS ENUM ('update_project', 'delete_project');
+CREATE TYPE change_request_status AS ENUM ('pending', 'approved', 'rejected');
 ```
 
 > Giá trị enum giữ nguyên chuỗi của frontend (`types.ts`) để FE không phải map lại.
@@ -50,12 +57,16 @@ CREATE TABLE users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email         VARCHAR(255) NOT NULL UNIQUE,
   name          VARCHAR(255) NOT NULL,
-  avatar_url    VARCHAR(1024),
-  role          user_role NOT NULL,
+  avatar_url    VARCHAR(1024),                    -- public URL trên MinIO (bucket avatars)
+  role          user_role NOT NULL,               -- vai trò công việc (sinh checklist)
   password_hash VARCHAR(255) NOT NULL,
+  is_superuser  BOOLEAN NOT NULL DEFAULT false,   -- admin toàn cục, tạo ở first-run setup
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
+
+> **first-run setup**: khi `users` rỗng, app chỉ cho phép `POST /auth/setup` tạo tài
+> khoản đầu tiên với `is_superuser = true`. Sau đó endpoint này bị khóa.
 
 ### organizations (Workspace)
 
@@ -69,10 +80,15 @@ CREATE TABLE organizations (
 CREATE TABLE organization_members (
   org_id    UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role      workspace_role NOT NULL DEFAULT 'member',  -- người tạo workspace = 'owner'
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, user_id)
 );
 ```
+
+> **Quyền**: `owner`/`superuser` toàn quyền với workspace + artifact (dự án, phase,
+> thành viên). `member` tạo dự án/phase được, nhưng **sửa/xóa dự án phải owner duyệt**
+> (qua `change_requests`) và **không** sửa được workspace hay quản lý thành viên.
 
 ### projects
 
@@ -181,17 +197,24 @@ CREATE INDEX idx_attachments_block ON attachments(phase_block_id);
 
 ### activity_log
 
+Một bảng phục vụ **2 changelog**: cấp phase (`WHERE phase_block_id = X`) và cấp dự án
+(`WHERE project_id = P`). `project_id` luôn có; `phase_block_id` NULL với sự kiện cấp dự
+án (tạo/xóa phase) và được `SET NULL` khi phase bị xóa → dòng "đã xóa phase Y" vẫn còn
+trong changelog dự án.
+
 ```sql
 CREATE TABLE activity_log (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  phase_block_id UUID NOT NULL REFERENCES phase_blocks(id) ON DELETE CASCADE,
+  project_id     UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  phase_block_id UUID REFERENCES phase_blocks(id) ON DELETE SET NULL,  -- NULL = sự kiện cấp dự án
   user_id        UUID REFERENCES users(id) ON DELETE SET NULL,
-  action         VARCHAR(255) NOT NULL,
-  target         VARCHAR(255) NOT NULL DEFAULT '',
+  action         VARCHAR(255) NOT NULL,        -- vd 'changed end date', 'created phase'
+  target         VARCHAR(255) NOT NULL DEFAULT '',  -- vd '2026-06-20 → 2026-06-24'
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_activity_block ON activity_log(phase_block_id, created_at DESC);
+CREATE INDEX idx_activity_project ON activity_log(project_id, created_at DESC);
+CREATE INDEX idx_activity_block   ON activity_log(phase_block_id, created_at DESC);
 ```
 
 ### phase_task_templates
@@ -211,7 +234,52 @@ CREATE TABLE phase_task_templates (
 CREATE INDEX idx_templates_phase ON phase_task_templates(phase_type, kind);
 ```
 
-**Seed data**: chuyển nguyên nội dung `PHASE_ROLE_TASKS` và `PHASE_ROLE_OUTCOMES` từ `frontend/src/types.ts` vào bảng này (VD: `('PA', 'PM', 'checklist', 'Define goals and objectives', 0)` ...).
+**Seed data**: chuyển nguyên nội dung `PHASE_ROLE_TASKS` và `PHASE_ROLE_OUTCOMES` từ `frontend/src/types.ts` vào bảng này (VD: `('PA', 'PM', 'checklist', 'Define goals and objectives', 0)` ...). Nguồn sự thật ở backend: `app/domain/phase_templates.py`; seed bằng migration `0002_seed_templates` (56 dòng).
+
+### change_requests — hàng đợi duyệt
+
+Member sửa/xóa dự án → tạo 1 bản ghi `pending`; owner duyệt (áp dụng) hoặc từ chối.
+
+```sql
+CREATE TABLE change_requests (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id       UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  project_id   UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  requested_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  action       change_request_action NOT NULL,           -- update_project | delete_project
+  payload      JSONB NOT NULL DEFAULT '{}',               -- thay đổi đề xuất (rỗng nếu delete)
+  status       change_request_status NOT NULL DEFAULT 'pending',
+  reviewed_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at  TIMESTAMPTZ
+);
+
+CREATE INDEX idx_cr_org    ON change_requests(org_id);
+CREATE INDEX idx_cr_status ON change_requests(status);
+```
+
+### notifications — thông báo in-app
+
+Sinh tự động khi có sự kiện (thêm thành viên, được giao phase, bình luận, change-request
+tạo/duyệt/từ chối...). FE poll `GET /notifications` + badge chưa đọc.
+
+```sql
+CREATE TABLE notifications (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,   -- người nhận
+  type              VARCHAR(50) NOT NULL,        -- member_added, phase_assigned, comment_added, ...
+  title             VARCHAR(512) NOT NULL,
+  body              TEXT NOT NULL DEFAULT '',
+  org_id            UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  project_id        UUID REFERENCES projects(id) ON DELETE CASCADE,
+  phase_block_id    UUID REFERENCES phase_blocks(id) ON DELETE CASCADE,
+  change_request_id UUID REFERENCES change_requests(id) ON DELETE CASCADE,
+  read              BOOLEAN NOT NULL DEFAULT false,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_notif_user ON notifications(user_id, read, created_at DESC);
+```
 
 ## Mapping với frontend types.ts
 
@@ -224,12 +292,17 @@ CREATE INDEX idx_templates_phase ON phase_task_templates(phase_type, kind);
 | `ChecklistItem` | `phase_items` | thêm `kind`, `position` |
 | `Attachment` | `attachments` | `fileName` → `file_name` |
 | `Comment` | `comments` | |
-| `ActivityItem` | `activity_log` | |
+| `ActivityItem` | `activity_log` | nay có `project_id` → dùng cho cả changelog dự án |
 | `PHASE_ROLE_TASKS/OUTCOMES` | `phase_task_templates` | từ hằng số → data |
+| *(mới)* permission | `users.is_superuser` + `organization_members.role` | tách khỏi `UserRole` |
+| *(mới)* approval queue | `change_requests` | member sửa/xóa dự án chờ owner duyệt |
+| *(mới)* notifications | `notifications` | in-app, FE poll |
 
 ## Ghi chú thiết kế
 
 - **UUID** làm PK toàn bộ (FE đang dùng id chuỗi `pb-123` → thay bằng UUID khi tích hợp).
 - **ON DELETE CASCADE** cho quan hệ cha-con (xóa phase block kéo theo items/comments/attachments); **SET NULL** cho tham chiếu người dùng để không mất lịch sử khi xóa user.
 - `updated_at` cập nhật qua trigger hoặc ORM `onupdate` (backend hiện dùng ORM).
-- File upload thực tế lưu object storage (S3/MinIO); bảng `attachments.url` chỉ lưu URL.
+- File upload thực tế lưu **MinIO** (S3-compatible): bucket `attachments` cho document,
+  `avatars` cho ảnh đại diện. `attachments.url` / `users.avatar_url` lưu public URL.
+  Bucket tạo sẵn bởi service `minio-setup` trong `docker-compose.yml`.
