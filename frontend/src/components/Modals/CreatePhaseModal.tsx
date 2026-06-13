@@ -4,8 +4,9 @@ import { useApp } from '../../context/AppContext';
 import { PHASE_META, DEV_PHASES, PHASE_TAG_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
 import type { DevPhase, PhaseBlock, PhaseTag, UserRole } from '../../types';
 import { ROLE_LABELS } from '../../data/mockData';
-import { X, Plus, Calendar, Users, Trash2, ChevronDown, Target, CheckSquare } from 'lucide-react';
+import { X, Plus, Calendar, Users, Trash2, Target, CheckSquare } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+import Dropdown from '../common/Dropdown';
 
 const TAG_OPTIONS: PhaseTag[] = ['Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled'];
 
@@ -39,7 +40,6 @@ export default function CreatePhaseModal() {
   const [assignee, setAssignee] = useState('u1');
   const [participants, setParticipants] = useState<string[]>(['u1']);
   const [showParticipants, setShowParticipants] = useState(false);
-  const [phaseDropdownOpen, setPhaseDropdownOpen] = useState(false);
   const [checklistItems, setChecklistItems] = useState<DraftItem[]>(defaultChecklist('PA'));
   const [outcomeItems, setOutcomeItems] = useState<DraftItem[]>(defaultOutcomes('PA'));
   const [newCheckText, setNewCheckText] = useState('');
@@ -58,7 +58,6 @@ export default function CreatePhaseModal() {
     setAssignee('u1');
     setParticipants(['u1']);
     setShowParticipants(false);
-    setPhaseDropdownOpen(false);
     setChecklistItems(defaultChecklist('PA'));
     setOutcomeItems(defaultOutcomes('PA'));
     setNewCheckText('');
@@ -70,7 +69,6 @@ export default function CreatePhaseModal() {
     setPhaseType(phase);
     setChecklistItems(defaultChecklist(phase));
     setOutcomeItems(defaultOutcomes(phase));
-    setPhaseDropdownOpen(false);
   };
 
   const toggleParticipant = (uid: string) => {
@@ -195,53 +193,32 @@ export default function CreatePhaseModal() {
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Dự án</label>
               {lockedProject ? (
-                <div className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-700 font-medium">
+                <div className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-700 font-medium">
                   {lockedProject.name}
                 </div>
               ) : (
-                <select value={projectId} onChange={e => setProjectId(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink">
-                  {orgProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <Dropdown
+                  value={projectId}
+                  onChange={setProjectId}
+                  options={orgProjects.map(p => ({ value: p.id, label: p.name }))}
+                />
               )}
             </div>
 
             {/* Phase Type */}
-            <div className="relative">
+            <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Loại Phase</label>
-              <button
-                type="button"
-                onClick={() => setPhaseDropdownOpen(!phaseDropdownOpen)}
-                className={`w-full flex items-center justify-between px-3 py-2 border rounded-lg text-sm transition-all
-                  ${phaseDropdownOpen ? 'ring-2 ring-ink/15 border-ink' : 'border-stone-200 hover:border-stone-300'}`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${PHASE_META[phaseType].bg} border ${PHASE_META[phaseType].border}`} />
-                  <span className={`font-medium ${PHASE_META[phaseType].color}`}>{PHASE_META[phaseType].fullLabel}</span>
-                  <span className="text-stone-400 text-xs">({phaseType})</span>
-                </span>
-                <ChevronDown className={`w-4 h-4 text-stone-400 transition-transform ${phaseDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {phaseDropdownOpen && (
-                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-stone-200 rounded-lg shadow-lg overflow-hidden">
-                  {DEV_PHASES.map(phase => {
-                    const meta = PHASE_META[phase];
-                    const isSelected = phaseType === phase;
-                    return (
-                      <button
-                        key={phase} type="button"
-                        onClick={() => changePhaseType(phase)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors
-                          ${isSelected ? `${meta.bg}` : 'hover:bg-stone-50'}`}
-                      >
-                        <span className={`w-2.5 h-2.5 rounded-full ${meta.bg} border ${meta.border} flex-shrink-0`} />
-                        <span className={`font-medium ${isSelected ? meta.color : 'text-stone-700'}`}>{meta.fullLabel}</span>
-                        <span className="text-stone-400 text-xs ml-auto">{phase}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <Dropdown
+                value={phaseType}
+                onChange={v => changePhaseType(v as DevPhase)}
+                options={DEV_PHASES.map(phase => ({
+                  value: phase,
+                  label: PHASE_META[phase].fullLabel,
+                  hint: phase,
+                  dotClass: `${PHASE_META[phase].bg} border ${PHASE_META[phase].border}`,
+                  labelClass: `font-medium ${PHASE_META[phase].color}`,
+                }))}
+              />
             </div>
 
             {/* Tag */}
@@ -304,12 +281,16 @@ export default function CreatePhaseModal() {
             {/* Assignee */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Assignee</label>
-              <select value={assignee} onChange={e => setAssignee(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink">
-                {orgMembers.map(m => (
-                  <option key={m.id} value={m.id}>{m.name} — {ROLE_LABELS[m.role] ?? m.role}</option>
-                ))}
-              </select>
+              <Dropdown
+                value={assignee}
+                onChange={setAssignee}
+                options={orgMembers.map(m => ({
+                  value: m.id,
+                  label: m.name,
+                  hint: ROLE_LABELS[m.role] ?? m.role,
+                  avatar: m.avatar,
+                }))}
+              />
             </div>
 
             {/* Participants */}

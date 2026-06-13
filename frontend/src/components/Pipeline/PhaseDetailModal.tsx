@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById, ROLE_LABELS } from '../../data/mockData';
+import Dropdown from '../common/Dropdown';
 import { PHASE_META, PHASE_TAG_META } from '../../types';
 import type { PhaseTag, ChecklistItem, UserRole } from '../../types';
 import {
@@ -54,10 +55,6 @@ export default function PhaseDetailModal() {
   const [linkName, setLinkName] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
 
-  // Assignee dropdown
-  const [assigneeOpen, setAssigneeOpen] = useState(false);
-  const assigneeRef = useRef<HTMLDivElement>(null);
-
   // Collapsible sections — mặc định thu gọn
   const [expandChecklist, setExpandChecklist] = useState(false);
   const [expandOutcomes, setExpandOutcomes] = useState(false);
@@ -78,7 +75,6 @@ export default function PhaseDetailModal() {
       setShowLinkForm(false);
       setLinkName('');
       setLinkUrl('');
-      setAssigneeOpen(false);
       setExpandChecklist(false);
       setExpandOutcomes(false);
       setExpandDocs(false);
@@ -97,15 +93,6 @@ export default function PhaseDetailModal() {
     };
   }, [phaseDetailOpen, closePhaseDetail]);
 
-  // Close assignee dropdown on outside click
-  useEffect(() => {
-    if (!assigneeOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (assigneeRef.current && !assigneeRef.current.contains(e.target as Node)) setAssigneeOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [assigneeOpen]);
 
   const checklistGroups = useMemo(() => groupByRole(checklist), [checklist]);
   const outcomeGroups = useMemo(() => groupByRole(outcomes), [outcomes]);
@@ -271,7 +258,6 @@ export default function PhaseDetailModal() {
 
   const meta = PHASE_META[selectedPhaseBlock.phaseType];
   const creator = getUserById(selectedPhaseBlock.createdBy);
-  const assignee = getUserById(selectedPhaseBlock.assignee || selectedPhaseBlock.createdBy);
   const project = orgProjects.find(p => p.id === selectedPhaseBlock.projectId);
   const completedChecks = checklist.filter(c => c.done).length;
   const progressPct = checklist.length > 0 ? Math.round((completedChecks / checklist.length) * 100) : 0;
@@ -425,40 +411,21 @@ export default function PhaseDetailModal() {
 
             {/* Assignee, Creator & Participants */}
             <div className="px-6 pb-4 space-y-3">
-              <div className="flex items-center gap-2" ref={assigneeRef}>
+              <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400 flex items-center gap-1 w-24 shrink-0">
                   <UserCircle2 className="w-3.5 h-3.5" /> Assignee:
                 </span>
-                <div className="relative">
-                  <button
-                    onClick={() => setAssigneeOpen(!assigneeOpen)}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-gray-200 hover:border-gray-300 bg-white transition-colors">
-                    {assignee && <img src={assignee.avatar} className="w-5 h-5 rounded-full" alt="" />}
-                    <span className="text-xs font-medium text-slate-700">{assignee?.name ?? 'Chưa gán'}</span>
-                    <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${assigneeOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {assigneeOpen && (
-                    <div className="absolute z-30 top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto">
-                      {orgMembers.map(member => {
-                        const isSelected = (selectedPhaseBlock.assignee || selectedPhaseBlock.createdBy) === member.id;
-                        return (
-                          <button key={member.id}
-                            onClick={() => {
-                              updatePhaseBlock(selectedPhaseBlock.id, { assignee: member.id });
-                              setAssigneeOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors
-                              ${isSelected ? 'bg-slate-50' : 'hover:bg-gray-50'}`}>
-                            <img src={member.avatar} className="w-5 h-5 rounded-full" alt="" />
-                            <span className="text-xs font-medium text-slate-700 flex-1 truncate">{member.name}</span>
-                            <span className="text-[10px] text-gray-400">{ROLE_LABELS[member.role] ?? member.role}</span>
-                            {isSelected && <Check className="w-3 h-3 text-slate-700" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <Dropdown
+                  className="w-56"
+                  value={selectedPhaseBlock.assignee || selectedPhaseBlock.createdBy}
+                  onChange={v => updatePhaseBlock(selectedPhaseBlock.id, { assignee: v })}
+                  options={orgMembers.map(m => ({
+                    value: m.id,
+                    label: m.name,
+                    hint: ROLE_LABELS[m.role] ?? m.role,
+                    avatar: m.avatar,
+                  }))}
+                />
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">

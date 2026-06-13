@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { Organization, Project, PhaseBlock, WorkspaceView, DevPhase, ProjectStatus, ZoomLevel } from '../types';
-import { organizations as seedOrgs, projects, phaseBlocks } from '../data/mockData';
+import type { Organization, Project, PhaseBlock, WorkspaceView, DevPhase, ProjectStatus, ZoomLevel, User, UserRole } from '../types';
+import { organizations as seedOrgs, projects, phaseBlocks, users as allUsers } from '../data/mockData';
 
 export interface PhaseBlockUI extends PhaseBlock {
   // runtime UI only
@@ -54,8 +54,10 @@ interface AppContextType extends AppState {
   setWorkspaceView: (view: WorkspaceView) => void;
 
   // Auth
-  login: (email: string) => void;
+  login: (email: string, profile?: { name?: string; role?: UserRole }) => void;
   logout: () => void;
+  currentUser: User | null;
+  updateCurrentUser: (updates: Partial<User>) => void;
 
   // Filters
   setSearchQuery: (query: string) => void;
@@ -91,6 +93,10 @@ interface AppContextType extends AppState {
   updatePhaseBlock: (id: string, updates: Partial<PhaseBlockUI>) => void;
   deletePhaseBlock: (id: string) => void;
   addOrganization: (org: Organization) => void;
+  updateOrganization: (id: string, updates: Partial<Organization>) => void;
+  deleteOrganization: (id: string) => void;
+  addOrgMember: (orgId: string, user: User) => void;
+  removeOrgMember: (orgId: string, userId: string) => void;
 
   // Derived
   selectedOrg: Organization | null;
@@ -107,6 +113,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pbState, setPbState] = useState<PhaseBlockUI[]>(phaseBlocks as PhaseBlockUI[]);
   const [projectsState, setProjectsState] = useState<Project[]>([...projects]);
   const [orgsState, setOrgsState] = useState<Organization[]>([...seedOrgs]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [state, setState] = useState<AppState>({
     currentView: 'landing',
     selectedOrgId: null,
@@ -175,11 +182,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Auth
-  const login = useCallback((email: string) => {
+  // Mock: khớp email với user mẫu (dạng ten.ho@...); không khớp thì tạo user mới
+  // với role chọn lúc đăng ký (BE thật: POST /auth/register có field role)
+  const login = useCallback((email: string, profile?: { name?: string; role?: UserRole }) => {
+    const matched = allUsers.find(u => email.toLowerCase().includes(u.name.toLowerCase().replace(' ', '.')));
+    const user: User = matched ?? {
+      id: `u-${Date.now()}`,
+      name: profile?.name || email.split('@')[0],
+      avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(email)}`,
+      role: profile?.role || 'PM',
+    };
+    setCurrentUser(user);
     setState(prev => ({ ...prev, currentUserEmail: email, currentView: 'workspace-selector' }));
   }, []);
 
   const logout = useCallback(() => {
+    setCurrentUser(null);
     setState(prev => ({
       ...prev,
       currentView: 'login',
@@ -187,6 +205,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentUserEmail: null,
     }));
   }, []);
+
+  const updateCurrentUser = useCallback((updates: Partial<User>) => {
+    if (!currentUser) return;
+    const userId = currentUser.id;
+    setCurrentUser(prev => prev ? { ...prev, ...updates } : prev);
+    // Đồng bộ vào member list của các workspace đang chứa user này
+    setOrgsState(prev => prev.map(org => ({
+      ...org,
+      members: org.members.map(m => m.id === userId ? { ...m, ...updates } : m),
+    })));
+  }, [currentUser]);
 
   // Filters
   const setSearchQuery = useCallback((query: string) => {
@@ -311,6 +340,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOrgsState(prev => [...prev, org]);
   }, []);
 
+  const updateOrganization = useCallback((id: string, updates: Partial<Organization>) => {
+    setOrgsState(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+  }, []);
+
+  // Xóa workspace kéo theo toàn bộ dự án + phase blocks thuộc nó
+  const deleteOrganization = useCallback((id: string) => {
+    setProjectsState(prev => {
+      const removedProjectIds = prev.filter(p => p.orgId === id).map(p => p.id);
+      setPbState(pbs => pbs.filter(pb => !removedProjectIds.includes(pb.projectId)));
+      return prev.filter(p => p.orgId !== id);
+    });
+    setOrgsState(prev => prev.filter(o => o.id !== id));
+  }, []);
+
+  const addOrgMember = useCallback((orgId: string, user: User) => {
+    setOrgsState(prev => prev.map(o =>
+      o.id === orgId && !o.members.some(m => m.id === user.id)
+        ? { ...o, members: [...o.members, user] }
+        : o
+    ));
+  }, []);
+
+  const removeOrgMember = useCallback((orgId: string, userId: string) => {
+    setOrgsState(prev => prev.map(o =>
+      o.id === orgId ? { ...o, members: o.members.filter(m => m.id !== userId) } : o
+    ));
+  }, []);
+
   // Derived
   const selectedOrg = state.selectedOrgId
     ? orgsState.find(o => o.id === state.selectedOrgId) ?? null
@@ -344,6 +401,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setWorkspaceView,
       login,
       logout,
+      currentUser,
+      updateCurrentUser,
       setSearchQuery,
       setPhaseFilter,
       setStatusFilter,
@@ -369,6 +428,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updatePhaseBlock,
       deletePhaseBlock,
       addOrganization,
+      updateOrganization,
+      deleteOrganization,
+      addOrgMember,
+      removeOrgMember,
       selectedOrg,
       organizations: orgsState,
       orgProjects,

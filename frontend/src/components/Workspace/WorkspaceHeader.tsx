@@ -5,8 +5,8 @@ import { Bell, ChevronRight, LogOut, Settings, User, CheckCircle2 } from 'lucide
 
 export default function WorkspaceHeader() {
   const {
-    selectedOrg, workspaceView, currentUserEmail,
-    logout, goToWorkspaceSelector, organizations,
+    selectedOrg, workspaceView, currentUserEmail, currentUser,
+    logout, goToWorkspaceSelector, setWorkspaceView,
   } = useApp();
 
   const [showNotif, setShowNotif] = useState(false);
@@ -24,7 +24,10 @@ export default function WorkspaceHeader() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const viewLabel: Record<string, string> = { dashboard: 'Dashboard', pipeline: 'Pipeline', team: 'Nhóm' };
+  const viewLabel: Record<string, string> = {
+    dashboard: 'Dashboard', pipeline: 'Pipeline', team: 'Nhóm',
+    profile: 'Hồ sơ', settings: 'Cài đặt Workspace',
+  };
 
   // Generate mock notifications
   const notifications = [
@@ -34,11 +37,8 @@ export default function WorkspaceHeader() {
   ];
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // Find current user from organizations
-  const currentUserName = currentUserEmail
-    ? organizations.flatMap(o => o.members).find(m => currentUserEmail.includes(m.name.toLowerCase().replace(' ', '.')))?.name || currentUserEmail.split('@')[0]
-    : 'User';
-  const currentUserAvatar = organizations.flatMap(o => o.members).find(m => currentUserEmail?.includes(m.name.toLowerCase().replace(' ', '.')))?.avatar;
+  const currentUserName = currentUser?.name || currentUserEmail?.split('@')[0] || 'User';
+  const currentUserAvatar = currentUser?.avatar;
 
   return (
     <header className="h-14 bg-white border-b border-hairline flex items-center justify-between px-6 flex-shrink-0">
@@ -140,13 +140,15 @@ export default function WorkspaceHeader() {
                   <p className="text-[11px] text-muted-soft mt-0.5 truncate">{currentUserEmail}</p>
                 </div>
                 <div className="p-1.5">
-                  <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
-                                     hover:bg-surface-soft hover:text-ink transition-colors">
+                  <button onClick={() => { setShowProfile(false); setWorkspaceView('profile'); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
+                               hover:bg-surface-soft hover:text-ink transition-colors">
                     <User className="w-4 h-4" /> Hồ sơ
                   </button>
-                  <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
-                                     hover:bg-surface-soft hover:text-ink transition-colors">
-                    <Settings className="w-4 h-4" /> Cài đặt
+                  <button onClick={() => { setShowProfile(false); setWorkspaceView('settings'); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
+                               hover:bg-surface-soft hover:text-ink transition-colors">
+                    <Settings className="w-4 h-4" /> Cài đặt Workspace
                   </button>
                   <button onClick={goToWorkspaceSelector}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body

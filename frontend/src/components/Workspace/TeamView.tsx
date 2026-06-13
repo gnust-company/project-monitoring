@@ -1,6 +1,6 @@
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
-import { Mail, Shield, FolderKanban } from 'lucide-react';
+import { Mail, Shield, FolderKanban, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { PHASE_META } from '../../types';
@@ -12,6 +12,13 @@ const fadeUp = {
     transition: { delay: i * 0.05, duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
+
+// ─── Workload ─────────────────────────────────────────────────────────
+// Workload = số checklist item CHƯA XONG trong các phase ĐANG HOẠT ĐỘNG
+// (Backlog / Todo / Inprogress) mà member là assignee hoặc participant.
+// Quy đổi: WORKLOAD_CAPACITY item đang mở = 100% (quá tải).
+const WORKLOAD_CAPACITY = 15;
+const ACTIVE_TAGS = ['Backlog', 'Todo', 'Inprogress'];
 
 const roleColors: Record<string, { bg: string; text: string; dot: string }> = {
   PM: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' },
@@ -58,21 +65,18 @@ export default function TeamView() {
     return map;
   }, [selectedOrg, phaseBlocks, orgProjects]);
 
-  // Workload calculation
   const memberWorkload = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { openTasks: number; pct: number }>();
     if (!selectedOrg) return map;
 
     selectedOrg.members.forEach(member => {
-      const totalTasks = phaseBlocks
-        .filter(pb => pb.participants.includes(member.id))
-        .reduce((sum, pb) => sum + pb.checklist.length, 0);
-      const doneTasks = phaseBlocks
-        .filter(pb => pb.participants.includes(member.id))
-        .reduce((sum, pb) => sum + pb.checklist.filter(c => c.done).length, 0);
+      const openTasks = phaseBlocks
+        .filter(pb => ACTIVE_TAGS.includes(pb.tag)
+          && (pb.participants.includes(member.id) || pb.assignee === member.id))
+        .reduce((sum, pb) => sum + pb.checklist.filter(c => !c.done).length, 0);
 
-      const load = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
-      map.set(member.id, load);
+      const pct = Math.min(100, Math.round((openTasks / WORKLOAD_CAPACITY) * 100));
+      map.set(member.id, { openTasks, pct });
     });
 
     return map;
@@ -134,12 +138,17 @@ export default function TeamView() {
         </div>
 
         {/* Member Cards */}
-        <h2 className="text-sm font-semibold text-ink mb-4">Tất cả thành viên</h2>
+        <div className="flex items-baseline justify-between mb-4 flex-wrap gap-1">
+          <h2 className="text-sm font-semibold text-ink">Tất cả thành viên</h2>
+          <span className="text-[10px] text-stone-400 font-light">
+            Workload = task chưa xong trong phase đang hoạt động ({WORKLOAD_CAPACITY} task mở ≈ 100%)
+          </span>
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {members.map((member, i) => {
             const colors = roleColors[member.role] || { bg: 'bg-stone-50', text: 'text-stone-700', dot: 'bg-stone-400' };
             const assignments = memberAssignments.get(member.id) || [];
-            const workload = memberWorkload.get(member.id) || 0;
+            const workload = memberWorkload.get(member.id) || { openTasks: 0, pct: 0 };
 
             return (
               <motion.div key={member.id} custom={i} variants={fadeUp} initial="hidden" animate="visible"
@@ -191,14 +200,19 @@ export default function TeamView() {
                 {/* Workload bar */}
                 <div className="mb-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] text-stone-400 font-medium">Workload</span>
-                    <span className="text-[10px] font-semibold text-ink">{workload}%</span>
+                    <span className="text-[10px] text-stone-400 font-medium flex items-center gap-1"
+                      title={`Workload = số task chưa xong trong các phase đang hoạt động (Backlog/Todo/In progress) mà thành viên tham gia hoặc được giao. ${WORKLOAD_CAPACITY} task đang mở ≈ 100%.`}>
+                      Workload <Info className="w-2.5 h-2.5" />
+                    </span>
+                    <span className="text-[10px] font-semibold text-ink">
+                      {workload.openTasks} task mở · {workload.pct}%
+                    </span>
                   </div>
                   <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all"
                       style={{
-                        width: `${workload}%`,
-                        background: workload > 80 ? '#ef4444' : workload > 50 ? '#f59e0b' : '#10b981',
+                        width: `${workload.pct}%`,
+                        background: workload.pct > 80 ? '#ef4444' : workload.pct > 50 ? '#f59e0b' : '#10b981',
                       }} />
                   </div>
                 </div>

@@ -254,6 +254,6 @@ export interface ActivityItem {
   timestamp: string;
 }
 
-export type WorkspaceView = 'dashboard' | 'pipeline' | 'team';
+export type WorkspaceView = 'dashboard' | 'pipeline' | 'team' | 'profile' | 'settings';
 
 export type ZoomLevel = 'week' | 'month' | 'quarter';

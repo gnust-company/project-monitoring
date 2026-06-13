@@ -2,10 +2,15 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { DEV_PHASES, PHASE_META } from '../../types';
+import type { UserRole } from '../../types';
+import { ROLE_LABELS } from '../../data/mockData';
 import {
   Layers, Eye, EyeOff, ArrowRight, Mail, Lock, User,
-  ChevronRight, Sparkles
+  ChevronRight, Sparkles, Shield
 } from 'lucide-react';
+import Dropdown from '../common/Dropdown';
+
+const ROLE_OPTIONS: UserRole[] = ['PM', 'BA', 'SW_Architect', 'SysOps', 'UI_Designer', 'GUI', 'SW_Developer', 'SW_Tester'];
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -28,6 +33,7 @@ export default function LoginPage() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
+  const [regRole, setRegRole] = useState<UserRole>('SW_Developer');
 
   const [loading, setLoading] = useState(false);
 
@@ -41,7 +47,8 @@ export default function LoginPage() {
     e.preventDefault();
     if (regPassword !== regConfirm) return;
     setLoading(true);
-    setTimeout(() => { login(regEmail); setLoading(false); }, 600);
+    // BE thật: POST /auth/register { email, password, name, role }
+    setTimeout(() => { login(regEmail, { name: regName, role: regRole }); setLoading(false); }, 600);
   };
 
   const inputClass = `w-full pl-10 pr-4 py-3 bg-white border border-hairline rounded-lg text-sm
@@ -225,6 +232,20 @@ export default function LoginPage() {
                       <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)}
                         placeholder="you@company.com" required className={inputClass} />
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-body mb-1.5 block">Vai trò</label>
+                    <Dropdown
+                      value={regRole}
+                      onChange={v => setRegRole(v as UserRole)}
+                      options={ROLE_OPTIONS.map(r => ({ value: r, label: ROLE_LABELS[r] ?? r }))}
+                      renderTrigger={sel => (
+                        <>
+                          <Shield className="w-4 h-4 text-muted flex-shrink-0" />
+                          <span className="flex-1 text-left text-ink">{sel?.label}</span>
+                        </>
+                      )}
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-body mb-1.5 block">Mật khẩu</label>

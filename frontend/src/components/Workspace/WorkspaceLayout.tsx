@@ -3,6 +3,8 @@ import WorkspaceSidebar from './WorkspaceSidebar';
 import WorkspaceHeader from './WorkspaceHeader';
 import DashboardView from './DashboardView';
 import TeamView from './TeamView';
+import ProfileView from './ProfileView';
+import WorkspaceSettingsView from './WorkspaceSettingsView';
 import PipelineTimeline from '../Pipeline/PipelineTimeline';
 import CreateProjectModal from '../Modals/CreateProjectModal';
 import CreateWorkspaceModal from '../Modals/CreateWorkspaceModal';
@@ -37,6 +39,16 @@ export default function WorkspaceLayout() {
           {workspaceView === 'team' && (
             <motion.div key="team" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="flex-1 flex flex-col overflow-hidden">
               <TeamView />
+            </motion.div>
+          )}
+          {workspaceView === 'profile' && (
+            <motion.div key="profile" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="flex-1 flex flex-col overflow-hidden">
+              <ProfileView />
+            </motion.div>
+          )}
+          {workspaceView === 'settings' && (
+            <motion.div key="settings" variants={pageVariants} initial="initial" animate="animate" exit="exit" className="flex-1 flex flex-col overflow-hidden">
+              <WorkspaceSettingsView />
             </motion.div>
           )}
         </AnimatePresence>

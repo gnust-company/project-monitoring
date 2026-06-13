@@ -77,22 +77,33 @@ PA → SA → SD → SI → ST → DEP → OM
 ### 4.3. Workspace & Organization
 - **Multi-workspace** — Mỗi workspace là 1 tổ chức/công ty
 - **Multi-project** — Mỗi workspace có nhiều dự án
-- **Team management** — Xem thành viên, vai trò, assignment
-- **Role-based** — PM, BA, Developer, Tester, Designer, SysOps
+- **Team management** — Xem thành viên, vai trò, assignment, workload
+- **Role-based** — PM, BA, Developer, Tester, Designer, SysOps (chọn vai trò ngay khi đăng ký account)
+- **Workspace Settings** — View riêng (mở từ sidebar): đổi tên workspace, mời/xóa thành viên, xóa workspace (cascade projects + phase blocks)
 
-### 4.4. Project Dashboard
-- **Overview metrics** — Tổng dự án, trạng thái, deadline sắp tới
-- **Status distribution** — On Track / At Risk / Delayed
-- **Phase distribution** — Phase nào đang active nhiều nhất
-- **Quick actions** — Tạo dự án, tạo phase, navigate nhanh
+### 4.4. Project Dashboard (Tổng quan cho quản lý)
+Thiết kế để sếp/PM nhìn 5 giây nắm tình hình:
+- **KPI cards** — Tổng dự án · On Track · At Risk · Delayed; số chạy count-up; click card lọc thẳng sang Pipeline theo trạng thái
+- **Sức khỏe workspace** — Vòng tiến độ (progress ring) tiến độ trung bình + phân bổ trạng thái có thanh tỷ trọng
+- **Deadline sắp tới** — Phase chưa hoàn thành, sắp theo độ gấp, color-code đỏ/vàng
+- **Phân bổ Phase** — Bar chart phát hiện bottleneck (phase nào dồn nhiều block)
+- **Quick stats** — Thành viên, phase đang In progress, % task toàn workspace
+- **Hoạt động gần đây + Dự án gần đây**
+- Animation: stagger fade-up, count-up số, ring/bar animate khi vào view
 
-### 4.5. Project Detail Modal
+### 4.5. User Profile
+- View riêng (mở từ avatar ở header hoặc sidebar)
+- **Sửa inline**: tên; **đổi vai trò** (role); avatar
+- **Stats cá nhân**: số workspace, dự án tham gia, phase được giao, task đang mở
+- **Danh sách phase được giao** — click nhảy thẳng tới phase trong Pipeline
+
+### 4.7. Project Detail Modal
 - Click vào dự án (panel trái của Pipeline hoặc card trên Dashboard) → modal giữa màn hình
 - **Sửa inline**: tên, mô tả, trạng thái, ngày bắt đầu/mục tiêu, tiến độ (slider)
 - **Stats nhanh**: số phase, phase hoàn thành, ngày còn lại tới deadline, phân bố phase theo loại
 - **Xóa dự án** — xác nhận 2 bước, xóa kèm toàn bộ phase blocks
 
-### 4.6. Collaboration
+### 4.8. Collaboration
 - **Checklist** — Task breakdown trong mỗi phase
 - **Comments** — Thảo luận trực tiếp trên phase
 - **Attachments** — Đính kèm tài liệu

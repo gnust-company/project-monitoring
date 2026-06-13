@@ -31,7 +31,7 @@ Schema database tương ứng: [SCHEMA.md](./SCHEMA.md).
 
 | Method | Path | Mô tả |
 |---|---|---|
-| POST | `/auth/register` | Đăng ký. Body: `{ email, password, name, role }` |
+| POST | `/auth/register` | Đăng ký. Body: `{ email, password, name, role }` — `role` **bắt buộc**, chọn lúc tạo account (form đăng ký FE có dropdown vai trò) |
 | POST | `/auth/login` | Body: `{ email, password }` → `{ accessToken, user }` |
 | GET | `/auth/me` | User hiện tại từ token |
 
@@ -43,15 +43,38 @@ Schema database tương ứng: [SCHEMA.md](./SCHEMA.md).
 
 `role` ∈ `PM | BA | SW_Architect | SysOps | UI_Designer | GUI | SW_Developer | SW_Tester`
 
+### Users / Profile
+
+Nguồn cho **Profile view** (FE: trang Hồ sơ mở từ avatar/sidebar).
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/users/me` | = `/auth/me` |
+| PATCH | `/users/me` | Cập nhật hồ sơ. Body (partial): `{ name?, role?, avatar? }` |
+| GET | `/users/me/assigned-phase-blocks` | Phase block mà user là `assignee` (cho mục "Phase được giao" ở Profile) |
+
+**Profile stats** — FE có thể tự tổng hợp từ `/organizations` + `/organizations/{orgId}/phase-blocks`, hoặc BE cấp endpoint gộp:
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/users/me/stats` | `{ workspaces, projects, assignedPhases, openTasks }` — số liệu tổng quan cá nhân |
+
+`openTasks` = số checklist item `done=false` trong các phase block đang hoạt động (`tag ∈ Backlog/Todo/Inprogress`) mà user là assignee hoặc participant.
+
 ### Organizations (Workspace)
+
+Nguồn cho **Workspace Settings view** (FE: trang Cài đặt mở từ sidebar).
 
 | Method | Path | Mô tả |
 |---|---|---|
 | GET | `/organizations` | Workspace mà user hiện tại là thành viên |
 | POST | `/organizations` | Tạo workspace. Body: `{ name }`. Người tạo tự thành member |
 | GET | `/organizations/{orgId}` | Chi tiết + members |
+| PATCH | `/organizations/{orgId}` | Đổi tên workspace. Body: `{ name }` |
+| DELETE | `/organizations/{orgId}` | Xóa workspace → 204. **Cascade**: xóa toàn bộ projects + phase blocks bên trong (xem SCHEMA.md) |
 | GET | `/organizations/{orgId}/members` | Danh sách thành viên |
-| POST | `/organizations/{orgId}/members` | Mời thành viên. Body: `{ email }` |
+| POST | `/organizations/{orgId}/members` | Mời thành viên. Body: `{ email }` (BE tạo/ghép user rồi thêm vào) |
+| DELETE | `/organizations/{orgId}/members/{userId}` | Xóa thành viên khỏi workspace → 204 |
 
 ```json
 {
@@ -204,9 +227,15 @@ Lộ trình thay mock data trong `frontend/src/context/AppContext.tsx`:
 
 | FE hiện tại | Thay bằng |
 |---|---|
-| `login(email)` | `POST /auth/login` |
+| `login(email, { name, role })` | `POST /auth/login` (login) / `POST /auth/register` (đăng ký có role) |
+| `currentUser` | `GET /auth/me` |
+| `updateCurrentUser(updates)` (Profile view) | `PATCH /users/me` |
 | `organizations` (seed) | `GET /organizations` |
 | `addOrganization` | `POST /organizations` |
+| `updateOrganization(id, { name })` (Settings view) | `PATCH /organizations/{id}` |
+| `deleteOrganization(id)` — FE xóa kèm projects+phase blocks | `DELETE /organizations/{id}` (BE cascade theo SCHEMA.md) |
+| `addOrgMember(orgId, user)` (Settings view) | `POST /organizations/{orgId}/members` |
+| `removeOrgMember(orgId, userId)` (Settings view) | `DELETE /organizations/{orgId}/members/{userId}` |
 | `orgProjects` (filter local) | `GET /organizations/{orgId}/projects` |
 | `addProject` | `POST /organizations/{orgId}/projects` |
 | `updateProject(id, updates)` (Project Detail Modal) | `PATCH /projects/{id}` |
@@ -216,6 +245,17 @@ Lộ trình thay mock data trong `frontend/src/context/AppContext.tsx`:
 | `updatePhaseBlock(id, updates)` | `PATCH /phase-blocks/{id}` hoặc endpoint con tương ứng (items/comments/attachments) |
 | `deletePhaseBlock` | `DELETE /phase-blocks/{id}` |
 | `buildDefaultChecklist/Outcomes` (types.ts) | `GET /templates/phase-tasks?phase=...` |
+| Workload (Team view) | Tính ở FE từ phase blocks; hoặc BE cấp `GET /organizations/{orgId}/members/workload` |
+
+## Công thức derived (FE và BE phải khớp)
+
+Các số liệu này không lưu DB, tính khi đọc. Định nghĩa thống nhất:
+
+- **Tiến độ phase block** (`progressPct`) = `done / total` của checklist items (`kind=checklist`), làm tròn %. Phase không có checklist → 0%.
+- **Tiến độ dự án** (`projects.progress`) = hiện do người dùng đặt thủ công (slider trong Project Detail). BE giữ là cột lưu trực tiếp, không auto-tính.
+- **Workload thành viên** (Team view) = số checklist item `done=false` trong các phase block **đang hoạt động** (`tag ∈ {Backlog, Todo, Inprogress}`) mà user là `assignee` **hoặc** có trong `participantIds`. Quy đổi %: `min(100, openTasks / CAPACITY * 100)` với `CAPACITY = 15` task mở ≈ 100%.
+- **Phân bổ phase** (Dashboard) = đếm phase block theo `phaseType` trong workspace.
+- **Deadline sắp tới** (Dashboard) = phase block có `tag ∉ {Complete, Canceled}`, sắp theo `endDate` tăng dần, lọc còn ≥ -5 ngày so với hôm nay.
 
 ## Versioning & mở rộng
 
