@@ -6,12 +6,48 @@ export interface User {
   name: string;
   avatar: string;
   role: UserRole;
+  email?: string;        // có khi đăng nhập thật
+  isSuperuser?: boolean; // admin toàn cục (first-run setup)
 }
+
+// Cấp quyền trong workspace — độc lập với UserRole (vai trò công việc)
+export type WorkspaceRole = 'owner' | 'member';
 
 export interface Organization {
   id: string;
   name: string;
   members: User[];
+  myRole?: WorkspaceRole; // cấp quyền của user hiện tại trong workspace
+}
+
+// ─── Notifications & Change Requests (khớp backend) ───────────────
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  orgId?: string | null;
+  projectId?: string | null;
+  phaseBlockId?: string | null;
+  changeRequestId?: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export type ChangeRequestAction = 'update_project' | 'delete_project';
+export type ChangeRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ChangeRequest {
+  id: string;
+  orgId: string;
+  projectId: string;
+  requestedBy: string | null;
+  action: ChangeRequestAction;
+  payload: Record<string, unknown>;
+  status: ChangeRequestStatus;
+  reviewedBy: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
 }
 
 // ─── 7 Development Process Phases ─────────────────────────────────
@@ -229,6 +265,8 @@ export interface PhaseBlock {
   comments: Comment[];
   attachments: Attachment[];
   activityLog: ActivityItem[];
+  displayRow?: number;   // hàng hiển thị trên timeline (BE lưu, FE có thể tự layout)
+  progressPct?: number;  // BE tính sẵn từ checklist
 }
 
 export interface Comment {

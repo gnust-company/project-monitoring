@@ -21,11 +21,11 @@ const fadeUp = {
 };
 
 export default function LoginPage() {
-  const { login, goToLanding } = useApp();
+  const { login, register, goToLanding } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
-  const [email, setEmail] = useState('sarah.chen@projecthub.io');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
 
@@ -36,19 +36,31 @@ export default function LoginPage() {
   const [regRole, setRegRole] = useState<UserRole>('SW_Developer');
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => { login(email); setLoading(false); }, 600);
+    setError(null);
+    try {
+      await login(email, password);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
+      setLoading(false);
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regPassword !== regConfirm) return;
     setLoading(true);
-    // BE thật: POST /auth/register { email, password, name, role }
-    setTimeout(() => { login(regEmail, { name: regName, role: regRole }); setLoading(false); }, 600);
+    setError(null);
+    try {
+      await register(regEmail, regPassword, regName, regRole);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đăng ký thất bại');
+      setLoading(false);
+    }
   };
 
   const inputClass = `w-full pl-10 pr-4 py-3 bg-white border border-hairline rounded-lg text-sm
@@ -299,14 +311,17 @@ export default function LoginPage() {
             )}
           </AnimatePresence>
 
+          {error && (
+            <p className="text-[12px] text-error text-center mt-4 bg-error/5 border border-error/20 rounded-lg py-2 px-3">
+              {error}
+            </p>
+          )}
+
           <button onClick={goToLanding}
             className="w-full mt-5 py-2 text-xs text-muted hover:text-ink transition-colors flex items-center justify-center gap-1">
             <ChevronRight className="w-3 h-3 rotate-180" />
             Về trang chủ
           </button>
-          <p className="text-[11px] text-muted-soft text-center mt-4">
-            Đây là ứng dụng demo — mọi dữ liệu đều là mock data.
-          </p>
         </motion.div>
       </div>
     </div>

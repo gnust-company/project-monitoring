@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById } from '../../data/mockData';
+import { projectsApi } from '../../api';
 import { PHASE_META } from '../../types';
-import type { ProjectStatus } from '../../types';
+import type { ProjectStatus, ActivityItem } from '../../types';
 import {
   X, Calendar, Trash2, Pencil, Check, FolderKanban,
-  GitBranch, AlertTriangle,
+  GitBranch, AlertTriangle, Clock, Hourglass,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
@@ -28,14 +29,33 @@ export default function ProjectDetailModal() {
   const [nameDraft, setNameDraft] = useState('');
   const [descDraft, setDescDraft] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [pendingMsg, setPendingMsg] = useState<string | null>(null);
+
+  const projectId = selectedProjectDetail?.id;
+
+  const loadActivity = useCallback(async () => {
+    if (!projectId) return;
+    try { setActivity(await projectsApi.activity(projectId)); } catch { /* ignore */ }
+  }, [projectId]);
 
   useEffect(() => {
     if (selectedProjectDetail) {
       setEditingName(false);
       setEditingDesc(false);
       setConfirmDelete(false);
+      setPendingMsg(null);
+      loadActivity();
     }
-  }, [selectedProjectDetail?.id]);
+  }, [selectedProjectDetail?.id, loadActivity]);
+
+  // Member sửa → 202 pending; bọc updateProject để hiện thông báo
+  const doUpdate = useCallback(async (updates: Record<string, unknown>) => {
+    if (!projectId) return;
+    const res = await updateProject(projectId, updates);
+    if (res.pending) setPendingMsg('Thay đổi đã gửi cho chủ workspace duyệt.');
+    loadActivity();
+  }, [projectId, updateProject, loadActivity]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') closeProjectDetail(); };
@@ -59,19 +79,24 @@ export default function ProjectDetailModal() {
 
   const saveName = () => {
     if (!nameDraft.trim()) return;
-    updateProject(project.id, { name: nameDraft.trim() });
+    doUpdate({ name: nameDraft.trim() });
     setEditingName(false);
   };
 
   const saveDesc = () => {
-    updateProject(project.id, { description: descDraft.trim() });
+    doUpdate({ description: descDraft.trim() });
     setEditingDesc(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
-    deleteProject(project.id);
-    closeProjectDetail();
+    const res = await deleteProject(project.id);
+    if (res.pending) {
+      setPendingMsg('Yêu cầu xóa đã gửi cho chủ workspace duyệt.');
+      setConfirmDelete(false);
+    } else {
+      closeProjectDetail();
+    }
   };
 
   return (
@@ -110,6 +135,11 @@ export default function ProjectDetailModal() {
 
           {/* Content */}
           <div className="p-5 space-y-4 overflow-y-auto">
+            {pendingMsg && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                <Hourglass className="w-3.5 h-3.5 shrink-0" /> {pendingMsg}
+              </div>
+            )}
             {/* Name (editable) */}
             {editingName ? (
               <div className="flex items-center gap-2">
@@ -162,7 +192,7 @@ export default function ProjectDetailModal() {
               <div className="flex gap-1.5">
                 {STATUS_OPTIONS.map(opt => (
                   <button key={opt.value}
-                    onClick={() => updateProject(project.id, { status: opt.value })}
+                    onClick={() => doUpdate({ status: opt.value })}
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all
                       ${project.status === opt.value
                         ? `${opt.bg} ${opt.color} ${opt.border}`
@@ -180,7 +210,7 @@ export default function ProjectDetailModal() {
                   <Calendar className="w-3 h-3" /> Bắt đầu
                 </label>
                 <input type="date" value={project.startDate}
-                  onChange={e => updateProject(project.id, { startDate: e.target.value })}
+                  onChange={e => doUpdate({ startDate: e.target.value })}
                   className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
                              focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
               </div>
@@ -189,7 +219,7 @@ export default function ProjectDetailModal() {
                   <Calendar className="w-3 h-3" /> Ngày mục tiêu
                 </label>
                 <input type="date" value={project.targetDate}
-                  onChange={e => updateProject(project.id, { targetDate: e.target.value })}
+                  onChange={e => doUpdate({ targetDate: e.target.value })}
                   className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
                              focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
               </div>
@@ -202,7 +232,7 @@ export default function ProjectDetailModal() {
                 <span className="text-xs font-bold text-ink">{project.progress}%</span>
               </div>
               <input type="range" min={0} max={100} value={project.progress}
-                onChange={e => updateProject(project.id, { progress: Number(e.target.value) })}
+                onChange={e => doUpdate({ progress: Number(e.target.value) })}
                 className="w-full accent-ink" />
             </div>
 
@@ -258,6 +288,34 @@ export default function ProjectDetailModal() {
               <span className="text-[10px] text-stone-400 pt-2">
                 {format(parseISO(project.startDate), 'dd/MM/yyyy')} – {format(parseISO(project.targetDate), 'dd/MM/yyyy')}
               </span>
+            </div>
+
+            {/* Changelog dự án — ai đã làm gì với phase */}
+            <div className="pt-2 border-t border-hairline">
+              <label className="text-xs font-semibold text-stone-700 mb-2 mt-2 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" /> Lịch sử thay đổi ({activity.length})
+              </label>
+              {activity.length === 0 ? (
+                <p className="text-xs text-stone-400 py-2">Chưa có hoạt động nào.</p>
+              ) : (
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {activity.map(a => {
+                    const user = getUserById(a.userId);
+                    return (
+                      <div key={a.id} className="flex gap-2.5 items-start">
+                        <img src={user?.avatar} className="w-5 h-5 rounded-full bg-stone-200 mt-0.5 shrink-0" alt="" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-stone-700">
+                            <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {a.action}
+                            {a.target && <span className="text-stone-500"> — {a.target}</span>}
+                          </p>
+                          <p className="text-[10px] text-stone-400">{format(parseISO(a.timestamp), 'dd/MM/yyyy HH:mm')}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

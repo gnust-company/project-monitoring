@@ -190,8 +190,16 @@ export function getProjectById(projectId: string): Project | undefined {
   return projects.find(p => p.id === projectId);
 }
 
+// Registry user thật (do AppContext nạp khi đăng nhập). getUserById tra cứu đây
+// trước, fallback về mock users — nhờ vậy các component cũ không phải đổi import.
+const userRegistry = new Map<string, User>();
+
+export function registerUsers(list: User[]): void {
+  for (const u of list) userRegistry.set(u.id, u);
+}
+
 export function getUserById(userId: string): User | undefined {
-  return users.find(u => u.id === userId);
+  return userRegistry.get(userId) ?? users.find(u => u.id === userId);
 }
 
 export function getPhaseBlocksByProjectId(projectId: string): PhaseBlock[] {

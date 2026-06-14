@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById, ROLE_LABELS } from '../../data/mockData';
@@ -29,8 +29,11 @@ function groupByRole(items: ChecklistItem[]): Array<{ role: UserRole | null; ite
 export default function PhaseDetailModal() {
   const {
     selectedPhaseBlock, phaseDetailOpen, closePhaseDetail,
-    updatePhaseBlock, deletePhaseBlock, orgProjects, selectedOrg
+    updatePhaseBlock, deletePhaseBlock, orgProjects, selectedOrg,
+    addPhaseItem, updatePhaseItem, deletePhaseItem,
+    addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,
   } = useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [commentText, setCommentText] = useState('');
   const [newCheckText, setNewCheckText] = useState('');
@@ -99,60 +102,40 @@ export default function PhaseDetailModal() {
 
   const toggleCheckItem = (itemId: string) => {
     if (!selectedPhaseBlock) return;
-    const updated = checklist.map(item =>
-      item.id === itemId ? { ...item, done: !item.done } : item
-    );
-    setChecklist(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { checklist: updated });
+    const item = checklist.find(i => i.id === itemId);
+    setChecklist(checklist.map(i => i.id === itemId ? { ...i, done: !i.done } : i));
+    updatePhaseItem(selectedPhaseBlock.id, itemId, { done: !item?.done });
   };
 
   const toggleOutcomeItem = (itemId: string) => {
     if (!selectedPhaseBlock) return;
-    const updated = outcomes.map(item =>
-      item.id === itemId ? { ...item, done: !item.done } : item
-    );
-    setOutcomes(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { outcomes: updated });
+    const item = outcomes.find(i => i.id === itemId);
+    setOutcomes(outcomes.map(i => i.id === itemId ? { ...i, done: !i.done } : i));
+    updatePhaseItem(selectedPhaseBlock.id, itemId, { done: !item?.done });
   };
 
   const handleAddChecklistItem = () => {
     if (!newCheckText.trim() || !selectedPhaseBlock) return;
-    const newItem: ChecklistItem = {
-      id: `chk-${Date.now()}`,
-      text: newCheckText.trim(),
-      done: false,
-    };
-    const updated = [...checklist, newItem];
-    setChecklist(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { checklist: updated });
+    addPhaseItem(selectedPhaseBlock.id, 'checklist', newCheckText.trim());
     setNewCheckText('');
   };
 
   const handleAddOutcomeItem = () => {
     if (!newOutcomeText.trim() || !selectedPhaseBlock) return;
-    const newItem: ChecklistItem = {
-      id: `out-${Date.now()}`,
-      text: newOutcomeText.trim(),
-      done: false,
-    };
-    const updated = [...outcomes, newItem];
-    setOutcomes(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { outcomes: updated });
+    addPhaseItem(selectedPhaseBlock.id, 'outcome', newOutcomeText.trim());
     setNewOutcomeText('');
   };
 
   const handleDeleteChecklistItem = (itemId: string) => {
     if (!selectedPhaseBlock) return;
-    const updated = checklist.filter(item => item.id !== itemId);
-    setChecklist(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { checklist: updated });
+    setChecklist(checklist.filter(i => i.id !== itemId));
+    deletePhaseItem(selectedPhaseBlock.id, itemId);
   };
 
   const handleDeleteOutcomeItem = (itemId: string) => {
     if (!selectedPhaseBlock) return;
-    const updated = outcomes.filter(item => item.id !== itemId);
-    setOutcomes(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { outcomes: updated });
+    setOutcomes(outcomes.filter(i => i.id !== itemId));
+    deletePhaseItem(selectedPhaseBlock.id, itemId);
   };
 
   const startEditCheckItem = (itemId: string, text: string) => {
@@ -162,56 +145,28 @@ export default function PhaseDetailModal() {
 
   const saveEditCheckItem = () => {
     if (!selectedPhaseBlock || !editingCheckId || !editingCheckText.trim()) return;
-    const updated = checklist.map(item =>
-      item.id === editingCheckId ? { ...item, text: editingCheckText.trim() } : item
-    );
-    setChecklist(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { checklist: updated });
+    updatePhaseItem(selectedPhaseBlock.id, editingCheckId, { text: editingCheckText.trim() });
     setEditingCheckId(null);
   };
 
   const handleAddComment = () => {
     if (!commentText.trim() || !selectedPhaseBlock) return;
-    const newComment = {
-      id: `cm-${Date.now()}`,
-      authorId: 'u1',
-      content: commentText.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [...comments, newComment];
-    setComments(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { comments: updated });
+    addPhaseComment(selectedPhaseBlock.id, commentText.trim());
     setCommentText('');
   };
 
-  const handleAttachFile = () => {
-    if (!selectedPhaseBlock) return;
-    const newAtt = {
-      id: `a-${Date.now()}`,
-      kind: 'file' as const,
-      fileName: `document-${Date.now()}.pdf`,
-      url: '#',
-      uploadedAt: new Date().toISOString(),
-    };
-    const updated = [...attachments, newAtt];
-    setAttachments(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { attachments: updated });
+  const handleAttachFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedPhaseBlock) return;
+    uploadPhaseFile(selectedPhaseBlock.id, file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleAttachLink = () => {
     if (!selectedPhaseBlock || !linkUrl.trim()) return;
     let url = linkUrl.trim();
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-    const newAtt = {
-      id: `a-${Date.now()}`,
-      kind: 'link' as const,
-      fileName: linkName.trim() || url,
-      url,
-      uploadedAt: new Date().toISOString(),
-    };
-    const updated = [...attachments, newAtt];
-    setAttachments(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { attachments: updated });
+    addPhaseLink(selectedPhaseBlock.id, linkName.trim() || url, url);
     setLinkName('');
     setLinkUrl('');
     setShowLinkForm(false);
@@ -219,9 +174,8 @@ export default function PhaseDetailModal() {
 
   const handleDeleteAttachment = (attId: string) => {
     if (!selectedPhaseBlock) return;
-    const updated = attachments.filter(a => a.id !== attId);
-    setAttachments(updated);
-    updatePhaseBlock(selectedPhaseBlock.id, { attachments: updated });
+    setAttachments(attachments.filter(a => a.id !== attId));
+    deletePhaseAttachment(selectedPhaseBlock.id, attId);
   };
 
   const handleDelete = () => {
@@ -685,7 +639,8 @@ export default function PhaseDetailModal() {
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={handleAttachFile}
+                <input ref={fileInputRef} type="file" onChange={handleAttachFile} className="hidden" />
+                <button onClick={() => fileInputRef.current?.click()}
                   className="py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-500
                              hover:border-gray-300 transition-colors flex items-center justify-center gap-1.5">
                   <Paperclip className="w-3.5 h-3.5" /> Upload tệp

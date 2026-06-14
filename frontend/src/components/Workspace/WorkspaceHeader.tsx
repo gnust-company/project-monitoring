@@ -7,6 +7,7 @@ export default function WorkspaceHeader() {
   const {
     selectedOrg, workspaceView, currentUserEmail, currentUser,
     logout, goToWorkspaceSelector, setWorkspaceView,
+    notifications, unreadCount, markNotificationRead, markAllNotificationsRead,
   } = useApp();
 
   const [showNotif, setShowNotif] = useState(false);
@@ -29,13 +30,15 @@ export default function WorkspaceHeader() {
     profile: 'Hồ sơ', settings: 'Cài đặt Workspace',
   };
 
-  // Generate mock notifications
-  const notifications = [
-    { id: 1, text: 'Cloud Migration vừa chuyển sang phase SI', time: '5 phút trước', read: false },
-    { id: 2, text: 'Deadline phase ST của Payment Gateway còn 2 ngày', time: '1 giờ trước', read: false },
-    { id: 3, text: 'Nguyễn Văn A đã comment trên Phase SD', time: '3 giờ trước', read: true },
-  ];
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const relTime = (iso: string): string => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'vừa xong';
+    if (m < 60) return `${m} phút trước`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} giờ trước`;
+    return `${Math.floor(h / 24)} ngày trước`;
+  };
 
   const currentUserName = currentUser?.name || currentUserEmail?.split('@')[0] || 'User';
   const currentUserAvatar = currentUser?.avatar;
@@ -89,25 +92,32 @@ export default function WorkspaceHeader() {
                   )}
                 </div>
                 <div className="max-h-64 overflow-y-auto">
-                  {notifications.map(n => (
-                    <div key={n.id}
-                      className={`px-4 py-3 border-b border-hairline-soft last:border-0 transition-colors
-                        ${n.read ? 'bg-white' : 'bg-ink/[0.02]'}`}>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-xs text-muted-soft">Chưa có thông báo</div>
+                  ) : notifications.map(n => (
+                    <button key={n.id}
+                      onClick={() => { if (!n.read) markNotificationRead(n.id); }}
+                      className={`w-full text-left px-4 py-3 border-b border-hairline-soft last:border-0 transition-colors
+                        ${n.read ? 'bg-white hover:bg-surface-soft' : 'bg-ink/[0.02] hover:bg-ink/[0.04]'}`}>
                       <div className="flex items-start gap-2.5">
                         {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-ink flex-shrink-0 mt-1.5" />}
-                        <div className="flex-1">
-                          <p className="text-xs text-body leading-relaxed">{n.text}</p>
-                          <p className="text-[10px] text-muted-soft mt-0.5">{n.time}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-body leading-relaxed">{n.title}</p>
+                          {n.body && <p className="text-[11px] text-muted mt-0.5">{n.body}</p>}
+                          <p className="text-[10px] text-muted-soft mt-0.5">{relTime(n.createdAt)}</p>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
-                <div className="px-4 py-2.5 border-t border-hairline-soft">
-                  <button className="text-xs text-ink hover:text-[#242424] font-medium transition-colors w-full text-center">
-                    Xem tất cả thông báo
-                  </button>
-                </div>
+                {unreadCount > 0 && (
+                  <div className="px-4 py-2.5 border-t border-hairline-soft">
+                    <button onClick={() => markAllNotificationsRead()}
+                      className="text-xs text-ink hover:text-[#242424] font-medium transition-colors w-full text-center">
+                      Đánh dấu tất cả đã đọc
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
