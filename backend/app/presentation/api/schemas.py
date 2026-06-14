@@ -73,6 +73,7 @@ class OrganizationOut(CamelModel):
     id: UUID
     name: str
     members: list[UserOut] = []
+    my_role: str | None = None  # cấp quyền của user hiện tại trong workspace (owner|member)
 
 
 class OrgCreate(CamelModel):

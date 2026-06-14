@@ -42,9 +42,15 @@ from app.presentation.api.schemas import (
 router = APIRouter(prefix="/api/v1/organizations", tags=["organizations"])
 
 
-async def _to_out(orgs: OrgRepoDep, org_id: UUID, name: str) -> OrganizationOut:
+async def _to_out(
+    orgs: OrgRepoDep, org_id: UUID, name: str, current: CurrentUser
+) -> OrganizationOut:
     members = await orgs.list_members(org_id)
-    return OrganizationOut(id=org_id, name=name, members=[UserOut.from_entity(u) for u in members])
+    membership = await orgs.get_membership(org_id, current.id)
+    my_role = membership.role.value if membership else ("owner" if current.is_superuser else None)
+    return OrganizationOut(
+        id=org_id, name=name, members=[UserOut.from_entity(u) for u in members], my_role=my_role
+    )
 
 
 @router.get("", response_model=list[OrganizationOut])
@@ -54,7 +60,7 @@ async def list_organizations(
     uc: Annotated[ListOrganizations, Depends(list_orgs_uc)],
 ) -> list[OrganizationOut]:
     result = await uc.execute(current.id)
-    return [await _to_out(orgs, o.id, o.name) for o in result]
+    return [await _to_out(orgs, o.id, o.name, current) for o in result]
 
 
 @router.post("", response_model=OrganizationOut, status_code=status.HTTP_201_CREATED)
@@ -65,7 +71,7 @@ async def create_organization(
     uc: Annotated[CreateOrganization, Depends(create_org_uc)],
 ) -> OrganizationOut:
     org = await uc.execute(body.name, current.id)
-    return await _to_out(orgs, org.id, org.name)
+    return await _to_out(orgs, org.id, org.name, current)
 
 
 @router.get("/{org_id}", response_model=OrganizationOut)
@@ -79,7 +85,7 @@ async def get_organization(
         org = await uc.execute(org_id)
     except OrgNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Organization not found")
-    return await _to_out(orgs, org.id, org.name)
+    return await _to_out(orgs, org.id, org.name, access.user)
 
 
 @router.patch("/{org_id}", response_model=OrganizationOut)
@@ -94,7 +100,7 @@ async def rename_organization(
         org = await uc.execute(org_id, body.name)
     except OrgNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Organization not found")
-    return await _to_out(orgs, org.id, org.name)
+    return await _to_out(orgs, org.id, org.name, access.user)
 
 
 @router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT)
