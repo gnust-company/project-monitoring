@@ -17,18 +17,95 @@ function defaultChecklist(phase: DevPhase): DraftItem[] {
     tasks.map(text => ({ text, done: false, role }))
   );
 }
-
 function defaultOutcomes(phase: DevPhase): DraftItem[] {
   return PHASE_ROLE_OUTCOMES[phase].flatMap(({ role, outcomes }) =>
     outcomes.map(text => ({ text, done: false, role }))
   );
 }
 
+// Section checklist/outcome — gom theo role, mỗi role có sẵn ô thêm riêng
+function DraftSection({ items, setItems, roles, icon, label }: {
+  items: DraftItem[];
+  setItems: React.Dispatch<React.SetStateAction<DraftItem[]>>;
+  roles: UserRole[];
+  icon: React.ReactNode;
+  label: string;
+}) {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const keyOf = (r: UserRole | undefined) => r ?? '__general__';
+
+  // thứ tự: role của template trước, role lạ trong items sau, cuối cùng là "Chung"
+  const ordered: (UserRole | undefined)[] = [...roles];
+  for (const it of items) if (it.role && !ordered.includes(it.role)) ordered.push(it.role);
+  ordered.push(undefined);
+
+  const addItem = (role: UserRole | undefined) => {
+    const k = keyOf(role);
+    const text = (drafts[k] ?? '').trim();
+    if (!text) return;
+    setItems(prev => [...prev, { text, done: false, role }]);
+    setDrafts(d => ({ ...d, [k]: '' }));
+  };
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-stone-700 mb-1.5 block flex items-center gap-1.5">
+        {icon} {label} ({items.length})
+      </label>
+      <div className="space-y-2">
+        {ordered.map(role => {
+          const entries = items.map((item, idx) => ({ item, idx })).filter(e => e.item.role === role);
+          const k = keyOf(role);
+          return (
+            <div key={k}>
+              <div className="flex items-center gap-2 px-0.5 mb-1">
+                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wide">
+                  {role ? (ROLE_LABELS[role] ?? role) : 'Chung'}
+                </span>
+                <div className="flex-1 h-px bg-stone-100" />
+              </div>
+              <div className="space-y-1">
+                {entries.map(({ item, idx }) => (
+                  <div key={idx} className="flex items-center gap-1.5 group">
+                    <input type="text" value={item.text}
+                      onChange={e => { const next = [...items]; next[idx] = { ...next[idx], text: e.target.value }; setItems(next); }}
+                      className="flex-1 px-2.5 py-1 bg-white border border-stone-200 rounded-md text-xs text-stone-700
+                                 focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
+                    <button type="button" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-stone-100 rounded">
+                      <Trash2 className="w-3 h-3 text-stone-400" />
+                    </button>
+                  </div>
+                ))}
+                {/* ô thêm riêng cho role này */}
+                <div className="flex items-center gap-1.5">
+                  <input type="text" value={drafts[k] ?? ''}
+                    onChange={e => setDrafts(d => ({ ...d, [k]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(role); } }}
+                    placeholder={role ? `Thêm mục cho ${ROLE_LABELS[role] ?? role}...` : 'Thêm mục chung...'}
+                    className="flex-1 px-2.5 py-1 bg-stone-50/60 border border-dashed border-stone-200 rounded-md text-xs
+                               focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink focus:bg-white" />
+                  <button type="button" onClick={() => addItem(role)}
+                    className="p-1 hover:bg-stone-100 rounded flex-shrink-0">
+                    <Plus className="w-3.5 h-3.5 text-stone-400" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function CreatePhaseModal() {
   const {
     createPhaseOpen, closeCreatePhase, createPhaseProjectId, createPhaseDates,
-    orgProjects, addPhaseBlock, selectedOrg
+    orgProjects, addPhaseBlock, selectedOrg, currentUser,
   } = useApp();
+
+  const meId = currentUser?.id ?? '';
 
   const [projectId, setProjectId] = useState(createPhaseProjectId || (orgProjects[0]?.id ?? ''));
   const [phaseType, setPhaseType] = useState<DevPhase>('PA');
@@ -37,15 +114,14 @@ export default function CreatePhaseModal() {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(addDays(new Date(), 14), 'yyyy-MM-dd'));
-  const [assignee, setAssignee] = useState('u1');
-  const [participants, setParticipants] = useState<string[]>(['u1']);
+  const [assignee, setAssignee] = useState(meId);
+  const [participants, setParticipants] = useState<string[]>(meId ? [meId] : []);
   const [showParticipants, setShowParticipants] = useState(false);
   const [checklistItems, setChecklistItems] = useState<DraftItem[]>(defaultChecklist('PA'));
   const [outcomeItems, setOutcomeItems] = useState<DraftItem[]>(defaultOutcomes('PA'));
-  const [newCheckText, setNewCheckText] = useState('');
-  const [newOutcomeText, setNewOutcomeText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Đồng bộ form mỗi khi mở modal (prefill từ kéo-thả trên timeline)
   useEffect(() => {
     if (!createPhaseOpen) return;
     setProjectId(createPhaseProjectId || (orgProjects[0]?.id ?? ''));
@@ -55,16 +131,14 @@ export default function CreatePhaseModal() {
     setDescription('');
     setStartDate(createPhaseDates?.startDate ?? format(new Date(), 'yyyy-MM-dd'));
     setEndDate(createPhaseDates?.endDate ?? format(addDays(new Date(), 14), 'yyyy-MM-dd'));
-    setAssignee('u1');
-    setParticipants(['u1']);
+    setAssignee(meId);
+    setParticipants(meId ? [meId] : []);
     setShowParticipants(false);
     setChecklistItems(defaultChecklist('PA'));
     setOutcomeItems(defaultOutcomes('PA'));
-    setNewCheckText('');
-    setNewOutcomeText('');
-  }, [createPhaseOpen, createPhaseProjectId, createPhaseDates]);
+    setError(null);
+  }, [createPhaseOpen, createPhaseProjectId, createPhaseDates, meId]);
 
-  // Đổi loại phase → sinh lại checklist & outcome từ nguồn theo role
   const changePhaseType = (phase: DevPhase) => {
     setPhaseType(phase);
     setChecklistItems(defaultChecklist(phase));
@@ -72,101 +146,40 @@ export default function CreatePhaseModal() {
   };
 
   const toggleParticipant = (uid: string) => {
-    setParticipants(prev =>
-      prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
-    );
+    setParticipants(prev => prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !projectId) return;
+    setSubmitting(true);
+    setError(null);
     const pb: PhaseBlock = {
-      id: `pb-${Date.now()}`,
-      projectId,
-      phaseType,
-      tag,
+      id: '', projectId, phaseType, tag,
       title: title.trim(),
       description: description.trim() || `${title} phase block.`,
-      startDate,
-      endDate,
-      createdBy: 'u1',
-      assignee,
-      participants,
-      checklist: checklistItems.map((item, i) => ({
-        id: `chk-${Date.now()}-${i}`,
-        text: item.text,
-        done: item.done,
-        role: item.role,
-      })),
-      outcomes: outcomeItems.map((item, i) => ({
-        id: `out-${Date.now()}-${i}`,
-        text: item.text,
-        done: item.done,
-        role: item.role,
-      })),
-      comments: [],
-      attachments: [],
-      activityLog: [
-        { id: `act-${Date.now()}`, userId: 'u1', action: 'created phase block', target: title, timestamp: new Date().toISOString() }
-      ],
+      startDate, endDate,
+      createdBy: meId, assignee: assignee || meId, participants,
+      checklist: checklistItems.map(item => ({ id: '', text: item.text, done: item.done, role: item.role })),
+      outcomes: outcomeItems.map(item => ({ id: '', text: item.text, done: item.done, role: item.role })),
+      comments: [], attachments: [], activityLog: [],
     };
-    addPhaseBlock(pb);
-    closeCreatePhase();
+    try {
+      await addPhaseBlock(pb);
+      closeCreatePhase();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Tạo phase thất bại');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!createPhaseOpen) return null;
 
   const orgMembers = selectedOrg?.members || [];
-  const lockedProject = createPhaseProjectId
-    ? orgProjects.find(p => p.id === createPhaseProjectId)
-    : null;
-
-  const renderDraftList = (
-    items: DraftItem[],
-    setItems: React.Dispatch<React.SetStateAction<DraftItem[]>>,
-  ) => {
-    // Gom theo role, giữ thứ tự — index gốc để sửa/xóa đúng item
-    const groups: Array<{ role: UserRole | undefined; entries: Array<{ item: DraftItem; idx: number }> }> = [];
-    items.forEach((item, idx) => {
-      let g = groups.find(x => x.role === item.role);
-      if (!g) { g = { role: item.role, entries: [] }; groups.push(g); }
-      g.entries.push({ item, idx });
-    });
-    return groups.map(group => (
-      <div key={group.role ?? 'general'} className="mb-1.5">
-        <div className="flex items-center gap-2 px-0.5 mb-1">
-          <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wide">
-            {group.role ? (ROLE_LABELS[group.role] ?? group.role) : 'Chung'}
-          </span>
-          <div className="flex-1 h-px bg-stone-100" />
-        </div>
-        <div className="space-y-1">
-          {group.entries.map(({ item, idx }) => (
-            <div key={idx} className="flex items-center gap-1.5 group">
-              <input
-                type="text"
-                value={item.text}
-                onChange={e => {
-                  const next = [...items];
-                  next[idx] = { ...next[idx], text: e.target.value };
-                  setItems(next);
-                }}
-                className="flex-1 px-2.5 py-1 bg-white border border-stone-200 rounded-md text-xs text-stone-700
-                           focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink"
-              />
-              <button
-                type="button"
-                onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-stone-100 rounded"
-              >
-                <Trash2 className="w-3 h-3 text-stone-400" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    ));
-  };
+  const lockedProject = createPhaseProjectId ? orgProjects.find(p => p.id === createPhaseProjectId) : null;
+  const checklistRoles = PHASE_ROLE_TASKS[phaseType].map(x => x.role);
+  const outcomeRoles = PHASE_ROLE_OUTCOMES[phaseType].map(x => x.role);
 
   return (
     <AnimatePresence>
@@ -189,7 +202,6 @@ export default function CreatePhaseModal() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
-            {/* Project — khóa cứng khi tạo bằng kéo-thả trên timeline */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Dự án</label>
               {lockedProject ? (
@@ -197,39 +209,28 @@ export default function CreatePhaseModal() {
                   {lockedProject.name}
                 </div>
               ) : (
-                <Dropdown
-                  value={projectId}
-                  onChange={setProjectId}
-                  options={orgProjects.map(p => ({ value: p.id, label: p.name }))}
-                />
+                <Dropdown value={projectId} onChange={setProjectId}
+                  options={orgProjects.map(p => ({ value: p.id, label: p.name }))} />
               )}
             </div>
 
-            {/* Phase Type */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Loại Phase</label>
-              <Dropdown
-                value={phaseType}
-                onChange={v => changePhaseType(v as DevPhase)}
+              <Dropdown value={phaseType} onChange={v => changePhaseType(v as DevPhase)}
                 options={DEV_PHASES.map(phase => ({
-                  value: phase,
-                  label: PHASE_META[phase].fullLabel,
-                  hint: phase,
+                  value: phase, label: PHASE_META[phase].fullLabel, hint: phase,
                   dotClass: `${PHASE_META[phase].bg} border ${PHASE_META[phase].border}`,
                   labelClass: `font-medium ${PHASE_META[phase].color}`,
-                }))}
-              />
+                }))} />
             </div>
 
-            {/* Tag */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Trạng thái</label>
               <div className="flex flex-wrap gap-1.5">
                 {TAG_OPTIONS.map(t => {
                   const tm = PHASE_TAG_META[t];
                   return (
-                    <button key={t} type="button"
-                      onClick={() => setTag(t)}
+                    <button key={t} type="button" onClick={() => setTag(t)}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all
                         ${tag === t ? `${tm.bg} ${tm.color} ${tm.border}` : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300'}`}>
                       {tm.label}
@@ -239,17 +240,14 @@ export default function CreatePhaseModal() {
               </div>
             </div>
 
-            {/* Title */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Tiêu đề</label>
               <input type="text" value={title} onChange={e => setTitle(e.target.value)}
                 placeholder="VD: Core Feature Development"
                 className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
-                           focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink"
-                required />
+                           focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" required />
             </div>
 
-            {/* Description */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Mô tả</label>
               <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
@@ -258,7 +256,6 @@ export default function CreatePhaseModal() {
                            focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink resize-none" />
             </div>
 
-            {/* Dates */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
@@ -278,31 +275,17 @@ export default function CreatePhaseModal() {
               </div>
             </div>
 
-            {/* Assignee */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Assignee</label>
-              <Dropdown
-                value={assignee}
-                onChange={setAssignee}
-                options={orgMembers.map(m => ({
-                  value: m.id,
-                  label: m.name,
-                  hint: ROLE_LABELS[m.role] ?? m.role,
-                  avatar: m.avatar,
-                }))}
-              />
+              <Dropdown value={assignee} onChange={setAssignee}
+                options={orgMembers.map(m => ({ value: m.id, label: m.name, hint: ROLE_LABELS[m.role] ?? m.role, avatar: m.avatar }))} />
             </div>
 
-            {/* Participants */}
             <div>
-              <button
-                type="button"
-                onClick={() => setShowParticipants(!showParticipants)}
-                className="w-full flex items-center justify-between text-xs font-semibold text-stone-700 mb-1"
-              >
+              <button type="button" onClick={() => setShowParticipants(!showParticipants)}
+                className="w-full flex items-center justify-between text-xs font-semibold text-stone-700 mb-1">
                 <span className="flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5" />
-                  Người tham gia ({participants.length})
+                  <Users className="w-3.5 h-3.5" /> Người tham gia ({participants.length})
                 </span>
                 <span className="text-stone-400">{showParticipants ? '▲' : '▼'}</span>
               </button>
@@ -311,17 +294,13 @@ export default function CreatePhaseModal() {
                   {orgMembers.map(member => {
                     const isSelected = participants.includes(member.id);
                     return (
-                      <button
-                        key={member.id} type="button"
-                        onClick={() => toggleParticipant(member.id)}
+                      <button key={member.id} type="button" onClick={() => toggleParticipant(member.id)}
                         className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left transition-colors
-                          ${isSelected ? 'bg-stone-100 text-ink' : 'hover:bg-stone-50 text-stone-600'}`}
-                      >
+                          ${isSelected ? 'bg-stone-100 text-ink' : 'hover:bg-stone-50 text-stone-600'}`}>
                         <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0
                           ${isSelected ? 'bg-ink border-ink' : 'border-stone-300'}`}>
                           {isSelected && <span className="text-white text-[10px]">✓</span>}
                         </div>
-                        <img src={member.avatar} className="w-5 h-5 rounded-full" alt="" />
                         <span className="text-xs font-medium">{member.name}</span>
                         <span className="text-[10px] text-stone-400 ml-auto">{member.role}</span>
                       </button>
@@ -331,84 +310,17 @@ export default function CreatePhaseModal() {
               )}
             </div>
 
-            {/* Checklist — tự sinh theo role từ nguồn, có thể chỉnh sửa */}
-            <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1.5 block flex items-center gap-1.5">
-                <CheckSquare className="w-3.5 h-3.5" /> Checklist theo role ({checklistItems.length})
-              </label>
-              {renderDraftList(checklistItems, setChecklistItems)}
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={newCheckText}
-                  onChange={e => setNewCheckText(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && newCheckText.trim()) {
-                      e.preventDefault();
-                      setChecklistItems(prev => [...prev, { text: newCheckText.trim(), done: false }]);
-                      setNewCheckText('');
-                    }
-                  }}
-                  placeholder="Thêm mục checklist..."
-                  className="flex-1 px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-xs
-                             focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (newCheckText.trim()) {
-                      setChecklistItems(prev => [...prev, { text: newCheckText.trim(), done: false }]);
-                      setNewCheckText('');
-                    }
-                  }}
-                  className="px-2.5 py-1.5 bg-stone-100 text-stone-600 rounded-lg hover:bg-stone-200 transition-colors flex-shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
+            <DraftSection items={checklistItems} setItems={setChecklistItems} roles={checklistRoles}
+              icon={<CheckSquare className="w-3.5 h-3.5" />} label="Checklist theo role" />
 
-            {/* Outcomes — tự sinh theo role từ nguồn, có thể chỉnh sửa */}
-            <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1.5 block flex items-center gap-1.5">
-                <Target className="w-3.5 h-3.5" /> Outcomes theo role ({outcomeItems.length})
-              </label>
-              {renderDraftList(outcomeItems, setOutcomeItems)}
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={newOutcomeText}
-                  onChange={e => setNewOutcomeText(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && newOutcomeText.trim()) {
-                      e.preventDefault();
-                      setOutcomeItems(prev => [...prev, { text: newOutcomeText.trim(), done: false }]);
-                      setNewOutcomeText('');
-                    }
-                  }}
-                  placeholder="Thêm outcome..."
-                  className="flex-1 px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-xs
-                             focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (newOutcomeText.trim()) {
-                      setOutcomeItems(prev => [...prev, { text: newOutcomeText.trim(), done: false }]);
-                      setNewOutcomeText('');
-                    }
-                  }}
-                  className="px-2.5 py-1.5 bg-stone-100 text-stone-600 rounded-lg hover:bg-stone-200 transition-colors flex-shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
+            <DraftSection items={outcomeItems} setItems={setOutcomeItems} roles={outcomeRoles}
+              icon={<Target className="w-3.5 h-3.5" />} label="Outcomes theo role" />
 
-            {/* Submit */}
-            <button type="submit"
+            {error && <p className="text-[11px] text-error">{error}</p>}
+
+            <button type="submit" disabled={submitting}
               className="w-full py-2.5 bg-ink text-white text-sm font-semibold rounded-lg
-                         hover:bg-[#242424] transition-colors flex items-center justify-center gap-2">
+                         hover:bg-[#242424] transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
               <Plus className="w-4 h-4" /> Tạo Phase Block
             </button>
           </form>

@@ -22,7 +22,7 @@ interface ActivityDTO { id: string; projectId: string; phaseBlockId: string | nu
 
 // ─── Mappers ─────────────────────────────────────────────────────────
 export function mapUser(d: UserDTO): User {
-  return { id: d.id, name: d.name, avatar: d.avatar || `https://i.pravatar.cc/150?u=${d.id}`, role: d.role, email: d.email, isSuperuser: d.isSuperuser };
+  return { id: d.id, name: d.name, avatar: d.avatar || '', role: d.role, email: d.email, isSuperuser: d.isSuperuser };
 }
 function mapOrg(d: OrgDTO): Organization {
   return { id: d.id, name: d.name, members: (d.members ?? []).map(mapUser), myRole: d.myRole ?? undefined };
@@ -37,7 +37,7 @@ function mapAttachment(d: AttachmentDTO): Attachment {
   return { id: d.id, kind: d.kind, fileName: d.fileName, url: d.url, uploadedAt: d.uploadedAt };
 }
 export function mapActivity(d: ActivityDTO): ActivityItem {
-  return { id: d.id, userId: d.userId ?? '', action: d.action, target: d.target, timestamp: d.createdAt };
+  return { id: d.id, userId: d.userId ?? '', action: d.action, target: d.target, timestamp: d.createdAt, phaseBlockId: d.phaseBlockId };
 }
 export function mapPhaseBlock(d: PhaseBlockDTO): PhaseBlock {
   return {

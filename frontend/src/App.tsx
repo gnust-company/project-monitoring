@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { useUrlSync } from './hooks/useUrlSync';
 import LandingPage from './components/Landing/LandingPage';
 import LoginPage from './components/Landing/LoginPage';
 import SetupPage from './components/Landing/SetupPage';
@@ -8,6 +9,7 @@ import WorkspaceLayout from './components/Workspace/WorkspaceLayout';
 
 function AppContent() {
   const { currentView, authReady, needsSetup } = useApp();
+  useUrlSync();
 
   useEffect(() => {
     document.title = 'ProjectHub — Development Process Pipeline';

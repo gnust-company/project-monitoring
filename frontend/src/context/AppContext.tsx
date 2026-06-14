@@ -184,7 +184,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setCurrentUser(me);
           setOrgsState(orgs);
           syncRegistry(orgs, me);
-          setState(prev => ({ ...prev, currentView: 'workspace-selector', currentUserEmail: me.email ?? null }));
+          setState(prev => ({ ...prev, currentView: 'landing', currentUserEmail: me.email ?? null }));
           setAuthReady(true);
           return;
         } catch {
@@ -204,7 +204,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCurrentUser(me);
     setOrgsState(orgs);
     syncRegistry(orgs, me);
-    setState(prev => ({ ...prev, currentView: 'workspace-selector', currentUserEmail: me.email ?? null }));
+    // Sau đăng nhập về trang chủ (đã đăng nhập, hiện avatar góc phải)
+    setState(prev => ({ ...prev, currentView: 'landing', currentUserEmail: me.email ?? null }));
   }, [syncRegistry]);
 
   // ─── Navigation ──────────────────────────────────────────────────
@@ -393,25 +394,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   }, []);
 
+  const patchBlock = useCallback((blockId: string, fn: (pb: PhaseBlockUI) => PhaseBlockUI) => {
+    setPbState(prev => prev.map(pb => pb.id === blockId ? fn(pb) : pb));
+  }, []);
+
+  const updatePhaseItem = useCallback(async (blockId: string, itemId: string, updates: { text?: string; done?: boolean }) => {
+    // optimistic: cập nhật item ngay trong state
+    patchBlock(blockId, pb => ({
+      ...pb,
+      checklist: pb.checklist.map(i => i.id === itemId ? { ...i, ...updates } : i),
+      outcomes: pb.outcomes.map(i => i.id === itemId ? { ...i, ...updates } : i),
+    }));
+    await phaseBlocksApi.updateItem(blockId, itemId, updates);
+    await refetchBlock(blockId);
+  }, [refetchBlock, patchBlock]);
+
+  const deletePhaseItem = useCallback(async (blockId: string, itemId: string) => {
+    patchBlock(blockId, pb => ({
+      ...pb,
+      checklist: pb.checklist.filter(i => i.id !== itemId),
+      outcomes: pb.outcomes.filter(i => i.id !== itemId),
+    }));
+    await phaseBlocksApi.deleteItem(blockId, itemId);
+    await refetchBlock(blockId);
+  }, [refetchBlock, patchBlock]);
+
   const addPhaseItem = useCallback(async (blockId: string, kind: 'checklist' | 'outcome', text: string, role?: UserRole) => {
     await phaseBlocksApi.addItem(blockId, kind, text, role);
     await refetchBlock(blockId);
   }, [refetchBlock]);
 
-  const updatePhaseItem = useCallback(async (blockId: string, itemId: string, updates: { text?: string; done?: boolean }) => {
-    await phaseBlocksApi.updateItem(blockId, itemId, updates);
-    await refetchBlock(blockId);
-  }, [refetchBlock]);
-
-  const deletePhaseItem = useCallback(async (blockId: string, itemId: string) => {
-    await phaseBlocksApi.deleteItem(blockId, itemId);
-    await refetchBlock(blockId);
-  }, [refetchBlock]);
-
   const addPhaseComment = useCallback(async (blockId: string, content: string) => {
+    // optimistic: thêm comment tạm để hiện ngay
+    const temp = { id: `tmp-${Date.now()}`, authorId: currentUser?.id ?? '', content, createdAt: new Date().toISOString() };
+    patchBlock(blockId, pb => ({ ...pb, comments: [...pb.comments, temp] }));
     await phaseBlocksApi.addComment(blockId, content);
     await refetchBlock(blockId);
-  }, [refetchBlock]);
+  }, [refetchBlock, patchBlock, currentUser]);
 
   const addPhaseLink = useCallback(async (blockId: string, fileName: string, url: string) => {
     await phaseBlocksApi.addLink(blockId, fileName, url);

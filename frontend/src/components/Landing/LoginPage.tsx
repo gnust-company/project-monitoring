@@ -22,7 +22,13 @@ const fadeUp = {
 
 export default function LoginPage() {
   const { login, register, goToLanding } = useApp();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>(
+    typeof window !== 'undefined' && window.location.pathname === '/register' ? 'register' : 'login'
+  );
+  const switchMode = (m: 'login' | 'register') => {
+    setMode(m);
+    window.history.pushState({}, '', m === 'register' ? '/register' : '/login');
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -214,7 +220,7 @@ export default function LoginPage() {
                   <div className="flex-1 h-px bg-hairline" />
                 </div>
 
-                <button onClick={() => setMode('register')}
+                <button onClick={() => switchMode('register')}
                   className="w-full py-3 bg-white text-body text-sm font-semibold rounded-lg
                              border border-hairline hover:bg-surface-soft hover:border-gray-300
                              transition-all flex items-center justify-center gap-2">
@@ -301,7 +307,7 @@ export default function LoginPage() {
                   <div className="flex-1 h-px bg-hairline" />
                 </div>
 
-                <button onClick={() => setMode('login')}
+                <button onClick={() => switchMode('login')}
                   className="w-full py-3 bg-white text-body text-sm font-semibold rounded-lg
                              border border-hairline hover:bg-surface-soft hover:border-gray-300
                              transition-all flex items-center justify-center gap-2">

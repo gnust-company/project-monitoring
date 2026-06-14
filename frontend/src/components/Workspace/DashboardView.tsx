@@ -8,6 +8,7 @@ import {
 import { parseISO, differenceInDays, format } from 'date-fns';
 import { motion } from 'framer-motion';
 import { useMemo, useState, useEffect } from 'react';
+import Avatar from '../common/Avatar';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -380,7 +381,7 @@ export default function DashboardView() {
                   return (
                     <div key={act.id} className="flex items-start gap-3">
                       {user ? (
-                        <img src={user.avatar} alt="" className="w-7 h-7 rounded-full bg-surface-card flex-shrink-0 mt-0.5" />
+                        <Avatar name={user.name} src={user.avatar} className="w-7 h-7 flex-shrink-0 mt-0.5" />
                       ) : (
                         <div className="w-7 h-7 rounded-full bg-surface-card flex items-center justify-center flex-shrink-0 mt-0.5">
                           <span className="text-[10px] font-semibold text-muted">{act.userId.charAt(0).toUpperCase()}</span>

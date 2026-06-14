@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
@@ -6,7 +6,7 @@ import { PHASE_META, PHASE_TAG_META } from '../../types';
 import type { UserRole } from '../../types';
 import {
   Mail, Shield, FolderKanban, GitBranch, CheckSquare, Layers,
-  Pencil, Check, ChevronRight,
+  Pencil, Check, ChevronRight, Camera,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Dropdown from '../common/Dropdown';
@@ -23,10 +23,17 @@ const fadeUp = {
 
 export default function ProfileView() {
   const {
-    currentUser, currentUserEmail, updateCurrentUser,
+    currentUser, currentUserEmail, updateCurrentUser, uploadAvatar,
     organizations, phaseBlocks, orgProjects,
     setWorkspaceView, openPhaseDetail,
   } = useApp();
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const onPickAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadAvatar(file);
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+  };
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -78,8 +85,21 @@ export default function ProfileView() {
         <motion.div custom={0} variants={fadeUp} initial="hidden" animate="visible"
           className="bg-surface-card rounded-2xl border border-hairline p-6 mb-6">
           <div className="flex items-center gap-5 flex-wrap">
-            <img src={currentUser.avatar} alt=""
-              className="w-20 h-20 rounded-2xl bg-stone-200 object-cover" />
+            <button type="button" onClick={() => avatarInputRef.current?.click()}
+              title="Đổi ảnh đại diện"
+              className="relative w-20 h-20 rounded-2xl overflow-hidden group/avatar flex-shrink-0">
+              {currentUser.avatar ? (
+                <img src={currentUser.avatar} alt="" className="w-20 h-20 rounded-2xl bg-stone-200 object-cover" />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl bg-stone-200 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-stone-500">{currentUser.name.charAt(0).toUpperCase()}</span>
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
+                <Camera className="w-5 h-5 text-white" />
+              </div>
+            </button>
+            <input ref={avatarInputRef} type="file" accept="image/*" onChange={onPickAvatar} className="hidden" />
             <div className="flex-1 min-w-[220px]">
               {editingName ? (
                 <div className="flex items-center gap-2 mb-1">

@@ -3,26 +3,25 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById, ROLE_LABELS } from '../../data/mockData';
 import Dropdown from '../common/Dropdown';
-import { PHASE_META, PHASE_TAG_META } from '../../types';
+import { PHASE_META, PHASE_TAG_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
 import type { PhaseTag, ChecklistItem, UserRole } from '../../types';
 import {
   X, CheckSquare, Square, MessageSquare, Paperclip, Clock,
   Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check,
-  Link2, ExternalLink, FileText, ChevronDown, Target, UserCircle2
+  Link2, ExternalLink, FileText, ChevronDown, Target, UserCircle2, Download
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import Avatar from '../common/Avatar';
 
 const ALL_TAGS: PhaseTag[] = ['Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled'];
 
-// Gom checklist/outcome items theo role, giữ thứ tự xuất hiện
-function groupByRole(items: ChecklistItem[]): Array<{ role: UserRole | null; items: ChecklistItem[] }> {
-  const groups: Array<{ role: UserRole | null; items: ChecklistItem[] }> = [];
-  for (const item of items) {
-    const role = item.role ?? null;
-    let group = groups.find(g => g.role === role);
-    if (!group) { group = { role, items: [] }; groups.push(group); }
-    group.items.push(item);
-  }
+// Gom item theo role — luôn hiện đủ role chuẩn của phase (kèm ô thêm riêng),
+// thêm role lạ nếu có, cuối cùng là nhóm "Chung".
+function buildGroups(items: ChecklistItem[], roles: UserRole[]): Array<{ role: UserRole | null; items: ChecklistItem[] }> {
+  const ordered: UserRole[] = [...roles];
+  for (const it of items) if (it.role && !ordered.includes(it.role)) ordered.push(it.role);
+  const groups = ordered.map(role => ({ role: role as UserRole | null, items: items.filter(i => i.role === role) }));
+  groups.push({ role: null, items: items.filter(i => !i.role) });
   return groups;
 }
 
@@ -36,8 +35,8 @@ export default function PhaseDetailModal() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [commentText, setCommentText] = useState('');
-  const [newCheckText, setNewCheckText] = useState('');
-  const [newOutcomeText, setNewOutcomeText] = useState('');
+  const [checkDrafts, setCheckDrafts] = useState<Record<string, string>>({});
+  const [outcomeDrafts, setOutcomeDrafts] = useState<Record<string, string>>({});
   const [checklist, setChecklist] = useState(selectedPhaseBlock?.checklist || []);
   const [outcomes, setOutcomes] = useState(selectedPhaseBlock?.outcomes || []);
   const [comments, setComments] = useState(selectedPhaseBlock?.comments || []);
@@ -70,8 +69,8 @@ export default function PhaseDetailModal() {
       setComments(selectedPhaseBlock.comments);
       setAttachments(selectedPhaseBlock.attachments);
       setCommentText('');
-      setNewCheckText('');
-      setNewOutcomeText('');
+      setCheckDrafts({});
+      setOutcomeDrafts({});
       setEditingTitle(false);
       setEditingDesc(false);
       setEditingCheckId(null);
@@ -83,6 +82,16 @@ export default function PhaseDetailModal() {
       setExpandDocs(false);
     }
   }, [selectedPhaseBlock?.id]);
+
+  // Đồng bộ dữ liệu mỗi khi block thay đổi (sau refetch từ API) — cập nhật ngay,
+  // không phải đóng/mở lại modal.
+  useEffect(() => {
+    if (!selectedPhaseBlock) return;
+    setChecklist(selectedPhaseBlock.checklist);
+    setOutcomes(selectedPhaseBlock.outcomes || []);
+    setComments(selectedPhaseBlock.comments);
+    setAttachments(selectedPhaseBlock.attachments);
+  }, [selectedPhaseBlock]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') closePhaseDetail(); };
@@ -97,8 +106,26 @@ export default function PhaseDetailModal() {
   }, [phaseDetailOpen, closePhaseDetail]);
 
 
-  const checklistGroups = useMemo(() => groupByRole(checklist), [checklist]);
-  const outcomeGroups = useMemo(() => groupByRole(outcomes), [outcomes]);
+  const checklistRoles = selectedPhaseBlock ? PHASE_ROLE_TASKS[selectedPhaseBlock.phaseType].map(x => x.role) : [];
+  const outcomeRoles = selectedPhaseBlock ? PHASE_ROLE_OUTCOMES[selectedPhaseBlock.phaseType].map(x => x.role) : [];
+  const checklistGroups = useMemo(() => buildGroups(checklist, checklistRoles), [checklist, checklistRoles]);
+  const outcomeGroups = useMemo(() => buildGroups(outcomes, outcomeRoles), [outcomes, outcomeRoles]);
+
+  const groupKey = (role: UserRole | null) => role ?? '__general__';
+  const addCheckItem = (role: UserRole | null) => {
+    const key = groupKey(role);
+    const text = (checkDrafts[key] ?? '').trim();
+    if (!text || !selectedPhaseBlock) return;
+    addPhaseItem(selectedPhaseBlock.id, 'checklist', text, role ?? undefined);
+    setCheckDrafts(d => ({ ...d, [key]: '' }));
+  };
+  const addOutcomeItemFor = (role: UserRole | null) => {
+    const key = groupKey(role);
+    const text = (outcomeDrafts[key] ?? '').trim();
+    if (!text || !selectedPhaseBlock) return;
+    addPhaseItem(selectedPhaseBlock.id, 'outcome', text, role ?? undefined);
+    setOutcomeDrafts(d => ({ ...d, [key]: '' }));
+  };
 
   const toggleCheckItem = (itemId: string) => {
     if (!selectedPhaseBlock) return;
@@ -112,18 +139,6 @@ export default function PhaseDetailModal() {
     const item = outcomes.find(i => i.id === itemId);
     setOutcomes(outcomes.map(i => i.id === itemId ? { ...i, done: !i.done } : i));
     updatePhaseItem(selectedPhaseBlock.id, itemId, { done: !item?.done });
-  };
-
-  const handleAddChecklistItem = () => {
-    if (!newCheckText.trim() || !selectedPhaseBlock) return;
-    addPhaseItem(selectedPhaseBlock.id, 'checklist', newCheckText.trim());
-    setNewCheckText('');
-  };
-
-  const handleAddOutcomeItem = () => {
-    if (!newOutcomeText.trim() || !selectedPhaseBlock) return;
-    addPhaseItem(selectedPhaseBlock.id, 'outcome', newOutcomeText.trim());
-    setNewOutcomeText('');
   };
 
   const handleDeleteChecklistItem = (itemId: string) => {
@@ -386,7 +401,7 @@ export default function PhaseDetailModal() {
                   <span className="text-xs text-gray-400">Người tạo:</span>
                   {creator && (
                     <div className="flex items-center gap-1.5">
-                      <img src={creator.avatar} className="w-5 h-5 rounded-full" alt="" />
+                      <Avatar name={creator.name} src={creator.avatar} className="w-5 h-5" />
                       <span className="text-xs font-medium text-slate-700">{creator.name}</span>
                     </div>
                   )}
@@ -396,7 +411,7 @@ export default function PhaseDetailModal() {
                   <div className="flex -space-x-1">
                     {selectedPhaseBlock.participants.map(uid => {
                       const u = getUserById(uid);
-                      return <img key={uid} src={u?.avatar} className="w-4 h-4 rounded-full border border-white" alt="" />;
+                      return <Avatar key={uid} name={u?.name} src={u?.avatar} className="w-4 h-4 border border-white" />;
                     })}
                   </div>
                 </div>
@@ -420,12 +435,13 @@ export default function PhaseDetailModal() {
                 <div className="h-full bg-emerald-500 rounded-full transition-all"
                   style={{ width: `${progressPct}%` }} />
               </div>
-              {expandChecklist && (<>
+              {expandChecklist && (
               <div className="space-y-2">
                 {checklistGroups.map(group => {
                   const groupDone = group.items.filter(i => i.done).length;
+                  const key = group.role ?? '__general__';
                   return (
-                    <div key={group.role ?? 'general'}>
+                    <div key={key}>
                       <div className="flex items-center gap-2 px-1 mb-0.5">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                           {group.role ? (ROLE_LABELS[group.role] ?? group.role) : 'Chung'}
@@ -480,32 +496,24 @@ export default function PhaseDetailModal() {
                             )}
                           </div>
                         ))}
+                        {/* Ô thêm cho riêng role này */}
+                        <div className="flex items-center gap-1.5 pl-2 pt-0.5">
+                          <input type="text" value={checkDrafts[key] ?? ''}
+                            onChange={e => setCheckDrafts(d => ({ ...d, [key]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') addCheckItem(group.role); }}
+                            placeholder={group.role ? `Thêm cho ${ROLE_LABELS[group.role] ?? group.role}…` : 'Thêm mục chung…'}
+                            className="flex-1 px-2.5 py-1 bg-gray-50/70 border border-dashed border-gray-200 rounded-md text-xs
+                                       text-gray-700 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:bg-white" />
+                          <button onClick={() => addCheckItem(group.role)} className="p-1 hover:bg-gray-100 rounded shrink-0">
+                            <Plus className="w-3.5 h-3.5 text-gray-400" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              {/* Add checklist item */}
-              <div className="flex gap-2 mt-2">
-                <input
-                  type="text"
-                  value={newCheckText}
-                  onChange={e => setNewCheckText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddChecklistItem(); }}
-                  placeholder="Thêm mục mới..."
-                  className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs
-                             text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                />
-                <button
-                  onClick={handleAddChecklistItem}
-                  disabled={!newCheckText.trim()}
-                  className="px-2.5 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800
-                             transition-colors disabled:opacity-40 flex items-center gap-1 text-xs"
-                >
-                  <Plus className="w-3 h-3" /> Thêm
-                </button>
-              </div>
-              </>)}
+              )}
             </div>
 
             {/* Outcomes — grouped by role */}
@@ -518,10 +526,12 @@ export default function PhaseDetailModal() {
                 </h3>
                 <ChevronDown className={`w-3.5 h-3.5 text-gray-400 group-hover/sec:text-gray-600 transition-transform ${expandOutcomes ? 'rotate-180' : ''}`} />
               </button>
-              {expandOutcomes && (<>
+              {expandOutcomes && (
               <div className="space-y-2">
-                {outcomeGroups.map(group => (
-                  <div key={group.role ?? 'general'}>
+                {outcomeGroups.map(group => {
+                  const key = group.role ?? '__general__';
+                  return (
+                  <div key={key}>
                     <div className="flex items-center gap-2 px-1 mb-0.5">
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                         {group.role ? (ROLE_LABELS[group.role] ?? group.role) : 'Chung'}
@@ -551,30 +561,23 @@ export default function PhaseDetailModal() {
                           </button>
                         </div>
                       ))}
+                      <div className="flex items-center gap-1.5 pl-2 pt-0.5">
+                        <input type="text" value={outcomeDrafts[key] ?? ''}
+                          onChange={e => setOutcomeDrafts(d => ({ ...d, [key]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') addOutcomeItemFor(group.role); }}
+                          placeholder={group.role ? `Thêm cho ${ROLE_LABELS[group.role] ?? group.role}…` : 'Thêm outcome chung…'}
+                          className="flex-1 px-2.5 py-1 bg-gray-50/70 border border-dashed border-gray-200 rounded-md text-xs
+                                     text-gray-700 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:bg-white" />
+                        <button onClick={() => addOutcomeItemFor(group.role)} className="p-1 hover:bg-gray-100 rounded shrink-0">
+                          <Plus className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
-              <div className="flex gap-2 mt-2">
-                <input
-                  type="text"
-                  value={newOutcomeText}
-                  onChange={e => setNewOutcomeText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddOutcomeItem(); }}
-                  placeholder="Thêm outcome..."
-                  className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs
-                             text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                />
-                <button
-                  onClick={handleAddOutcomeItem}
-                  disabled={!newOutcomeText.trim()}
-                  className="px-2.5 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800
-                             transition-colors disabled:opacity-40 flex items-center gap-1 text-xs"
-                >
-                  <Plus className="w-3 h-3" /> Thêm
-                </button>
-              </div>
-              </>)}
+              )}
             </div>
 
             {/* Document — files & links */}
@@ -603,12 +606,21 @@ export default function PhaseDetailModal() {
                           {att.fileName} <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                         </a>
                       ) : (
-                        <p className="text-xs font-medium text-slate-900 truncate">{att.fileName}</p>
+                        <a href={att.url} target="_blank" rel="noopener noreferrer" download
+                          className="text-xs font-medium text-slate-900 hover:underline truncate block">
+                          {att.fileName}
+                        </a>
                       )}
                       <p className="text-[10px] text-gray-400">
                         {att.kind === 'link' ? att.url : format(parseISO(att.uploadedAt), 'dd/MM/yyyy')}
                       </p>
                     </div>
+                    {att.kind === 'file' && (
+                      <a href={att.url} target="_blank" rel="noopener noreferrer" download title="Tải xuống"
+                        className="p-1 hover:bg-slate-100 rounded transition-all">
+                        <Download className="w-3.5 h-3.5 text-slate-500" />
+                      </a>
+                    )}
                     <button onClick={() => handleDeleteAttachment(att.id)}
                       className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all" title="Xóa">
                       <Trash2 className="w-3 h-3 text-red-400" />
@@ -665,7 +677,7 @@ export default function PhaseDetailModal() {
                   const author = getUserById(c.authorId);
                   return (
                     <div key={c.id} className="flex gap-2.5">
-                      <img src={author?.avatar} className="w-6 h-6 rounded-full bg-gray-200 self-start" alt="" />
+                      <Avatar name={author?.name} src={author?.avatar} className="w-6 h-6 self-start" />
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-slate-900">{author?.name}</span>
@@ -691,30 +703,33 @@ export default function PhaseDetailModal() {
               </div>
             </div>
 
-            {/* Activity Log */}
+            {/* Activity Log — cuộn được, ~10 dòng */}
             <div className="px-6 pb-6">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3
                              flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" /> Lịch sử hoạt động
+                <Clock className="w-3.5 h-3.5" /> Lịch sử hoạt động ({selectedPhaseBlock.activityLog.length})
               </h3>
-              <div className="space-y-2">
-                {selectedPhaseBlock.activityLog.map(a => {
-                  const user = getUserById(a.userId);
-                  return (
-                    <div key={a.id} className="flex gap-2.5 items-start">
-                      <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
-                        <Clock className="w-3 h-3 text-gray-400" />
+              {selectedPhaseBlock.activityLog.length === 0 ? (
+                <p className="text-xs text-gray-400 py-2">Chưa có hoạt động nào.</p>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {selectedPhaseBlock.activityLog.map(a => {
+                    const user = getUserById(a.userId);
+                    return (
+                      <div key={a.id} className="flex gap-2.5 items-start">
+                        <Avatar name={user?.name} src={user?.avatar} className="w-6 h-6 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-700">
+                            <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {a.action}
+                            {a.target && <span className="text-gray-500"> — {a.target}</span>}
+                          </p>
+                          <p className="text-[10px] text-gray-400">{format(parseISO(a.timestamp), 'dd/MM/yyyy HH:mm')}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-700">
-                          <span className="font-medium">{user?.name}</span> {a.action}
-                        </p>
-                        <p className="text-[10px] text-gray-400">{format(parseISO(a.timestamp), 'dd/MM/yyyy')}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

@@ -5,6 +5,7 @@ import { ROLE_LABELS } from '../../data/mockData';
 import {
   Settings, Users, Trash2, Check, AlertTriangle, UserPlus, X, Mail, Inbox,
 } from 'lucide-react';
+import Avatar from '../common/Avatar';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -35,6 +36,17 @@ export default function WorkspaceSettingsView() {
   }, [selectedOrg?.id, isOwner, loadChangeRequests]);
 
   if (!selectedOrg) return null;
+
+  if (!isOwner) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Settings className="w-8 h-8 text-stone-300 mx-auto mb-3" />
+          <p className="text-sm text-stone-500">Chỉ chủ workspace mới truy cập được Cài đặt.</p>
+        </div>
+      </div>
+    );
+  }
 
   const nameDirty = nameDraft.trim() !== selectedOrg.name && nameDraft.trim().length > 0;
 
@@ -175,7 +187,7 @@ export default function WorkspaceSettingsView() {
               return (
                 <div key={m.id}
                   className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white border border-hairline group">
-                  <img src={m.avatar} className="w-7 h-7 rounded-full" alt="" />
+                  <Avatar name={m.name} src={m.avatar} className="w-7 h-7" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-ink truncate">
                       {m.name} {isSelf && <span className="text-[10px] text-stone-400 font-normal">(bạn)</span>}

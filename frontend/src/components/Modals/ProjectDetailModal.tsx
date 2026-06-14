@@ -10,6 +10,7 @@ import {
   GitBranch, AlertTriangle, Clock, Hourglass,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
+import Avatar from '../common/Avatar';
 
 const STATUS_OPTIONS: { value: ProjectStatus; color: string; bg: string; border: string }[] = [
   { value: 'On Track', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
@@ -280,7 +281,7 @@ export default function ProjectDetailModal() {
                 <span className="text-xs text-stone-400">Người tạo:</span>
                 {creator && (
                   <div className="flex items-center gap-1.5">
-                    <img src={creator.avatar} className="w-5 h-5 rounded-full" alt="" />
+                    <Avatar name={creator.name} src={creator.avatar} className="w-5 h-5" />
                     <span className="text-xs font-medium text-stone-700">{creator.name}</span>
                   </div>
                 )}
@@ -298,15 +299,20 @@ export default function ProjectDetailModal() {
               {activity.length === 0 ? (
                 <p className="text-xs text-stone-400 py-2">Chưa có hoạt động nào.</p>
               ) : (
-                <div className="space-y-2 max-h-52 overflow-y-auto">
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {activity.map(a => {
                     const user = getUserById(a.userId);
+                    const block = a.phaseBlockId ? phaseBlocks.find(b => b.id === a.phaseBlockId) : null;
+                    // 'created/deleted/renamed phase' đã có tên ở target → không lặp lại
+                    const isPhaseNameAction = /\bphase$/.test(a.action);
+                    const phaseName = !isPhaseNameAction ? block?.title : null;
                     return (
                       <div key={a.id} className="flex gap-2.5 items-start">
-                        <img src={user?.avatar} className="w-5 h-5 rounded-full bg-stone-200 mt-0.5 shrink-0" alt="" />
+                        <Avatar name={user?.name} src={user?.avatar} className="w-5 h-5 mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-stone-700">
                             <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {a.action}
+                            {phaseName && <span className="text-stone-700"> · phase “{phaseName}”</span>}
                             {a.target && <span className="text-stone-500"> — {a.target}</span>}
                           </p>
                           <p className="text-[10px] text-stone-400">{format(parseISO(a.timestamp), 'dd/MM/yyyy HH:mm')}</p>

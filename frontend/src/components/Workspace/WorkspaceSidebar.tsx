@@ -5,6 +5,7 @@ import {
   Check, ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, Settings,
 } from 'lucide-react';
 import type { WorkspaceView } from '../../types';
+import Avatar from '../common/Avatar';
 
 const navItems: { view: WorkspaceView; label: string; icon: typeof LayoutDashboard }[] = [
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -25,7 +26,7 @@ export default function WorkspaceSidebar() {
     orgProjects, phaseBlocks, currentUserEmail, currentUser, organizations,
     selectedProjectIds,
     selectAllProjects, toggleProjectSelection,
-    sidebarCollapsed, toggleSidebar,
+    sidebarCollapsed, toggleSidebar, isOwner,
   } = useApp();
 
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
@@ -81,15 +82,17 @@ export default function WorkspaceSidebar() {
               <item.icon className="w-4 h-4" />
             </button>
           ))}
-          <button title="Cài đặt Workspace"
-            onClick={() => setWorkspaceView('settings')}
-            className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all
-                       ${workspaceView === 'settings'
-                         ? 'bg-white/[0.08] text-white'
-                         : 'text-white/30 hover:text-white hover:bg-white/[0.04]'
-                       }`}>
-            <Settings className="w-4 h-4" />
-          </button>
+          {isOwner && (
+            <button title="Cài đặt Workspace"
+              onClick={() => setWorkspaceView('settings')}
+              className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all
+                         ${workspaceView === 'settings'
+                           ? 'bg-white/[0.08] text-white'
+                           : 'text-white/30 hover:text-white hover:bg-white/[0.04]'
+                         }`}>
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
         </nav>
 
         <div className="flex-1" />
@@ -97,7 +100,7 @@ export default function WorkspaceSidebar() {
         <div className="p-2 border-t border-white/[0.06] flex flex-col items-center gap-2">
           {currentUser && (
             <button onClick={() => setWorkspaceView('profile')} title={`${currentUser.name} — Hồ sơ`}>
-              <img src={currentUser.avatar} alt="" className="w-7 h-7 rounded-full bg-white/10 hover:ring-2 hover:ring-white/30 transition-all" />
+              <Avatar name={currentUser.name} src={currentUser.avatar} className="w-7 h-7 hover:ring-2 hover:ring-white/30 transition-all" />
             </button>
           )}
           <button onClick={toggleSidebar} title="Mở rộng sidebar"
@@ -236,19 +239,21 @@ export default function WorkspaceSidebar() {
 
       {/* Footer: Settings + user info + collapse */}
       <div className="p-3 border-t border-white/[0.06]">
-        <button onClick={() => setWorkspaceView('settings')}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all
-            ${workspaceView === 'settings'
-              ? 'bg-white/[0.08] text-white'
-              : 'text-on-dark-soft hover:text-white hover:bg-white/[0.04]'}`}>
-          <Settings className="w-3.5 h-3.5" /> Cài đặt Workspace
-        </button>
+        {isOwner && (
+          <button onClick={() => setWorkspaceView('settings')}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all
+              ${workspaceView === 'settings'
+                ? 'bg-white/[0.08] text-white'
+                : 'text-on-dark-soft hover:text-white hover:bg-white/[0.04]'}`}>
+            <Settings className="w-3.5 h-3.5" /> Cài đặt Workspace
+          </button>
+        )}
         {currentUser && (
           <button onClick={() => setWorkspaceView('profile')}
             title="Xem hồ sơ"
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left
               ${workspaceView === 'profile' ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'}`}>
-            <img src={currentUser.avatar} alt="" className="w-7 h-7 rounded-full bg-white/10" />
+            <Avatar name={currentUser.name} src={currentUser.avatar} className="w-7 h-7" />
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium text-white truncate">{currentUser.name}</div>
               <div className="text-[10px] text-on-dark-soft truncate">{currentUserEmail}</div>

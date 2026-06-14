@@ -290,6 +290,7 @@ export interface ActivityItem {
   action: string;
   target: string;
   timestamp: string;
+  phaseBlockId?: string | null; // phase liên quan (đổi ngày/người… của phase nào)
 }
 
 export type WorkspaceView = 'dashboard' | 'pipeline' | 'team' | 'profile' | 'settings';

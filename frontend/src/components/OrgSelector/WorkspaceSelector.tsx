@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { getUserById } from '../../data/mockData';
 import { Layers, Users, ArrowRight, ArrowLeft, Plus } from 'lucide-react';
 import CreateWorkspaceModal from '../Modals/CreateWorkspaceModal';
+import Avatar from '../common/Avatar';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -13,16 +13,16 @@ const fadeUp = {
 };
 
 export default function WorkspaceSelector() {
-  const { selectOrg, goToLogin, organizations, openCreateWorkspace } = useApp();
+  const { selectOrg, goToLanding, organizations, openCreateWorkspace, currentUser } = useApp();
 
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-white border-b border-hairline">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <button onClick={goToLogin}
+          <button onClick={goToLanding}
             className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Quay lại
+            <ArrowLeft className="w-4 h-4" /> Trang chủ
           </button>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-ink rounded-lg flex items-center justify-center">
@@ -30,7 +30,14 @@ export default function WorkspaceSelector() {
             </div>
             <span className="font-semibold text-sm text-ink">ProjectHub</span>
           </div>
-          <div className="w-16" />
+          {currentUser ? (
+            <div className="flex items-center gap-2.5">
+              <Avatar name={currentUser.name} src={currentUser.avatar} className="w-7 h-7" />
+              <span className="text-sm font-medium text-ink max-w-[120px] truncate hidden sm:block">{currentUser.name}</span>
+            </div>
+          ) : (
+            <div className="w-16" />
+          )}
         </div>
       </header>
 
@@ -74,13 +81,10 @@ export default function WorkspaceSelector() {
                 {/* Member Avatars */}
                 <div className="hidden sm:flex items-center">
                   <div className="flex -space-x-2 mr-4">
-                    {org.members.slice(0, 4).map(m => {
-                      const user = getUserById(m.id);
-                      return (
-                        <img key={m.id} src={user?.avatar} alt={user?.name}
-                          className="w-8 h-8 rounded-full border-2 border-white bg-surface-card" title={user?.name} />
-                      );
-                    })}
+                    {org.members.slice(0, 4).map(m => (
+                      <Avatar key={m.id} name={m.name} src={m.avatar}
+                        className="w-8 h-8 border-2 border-white" />
+                    ))}
                     {org.members.length > 4 && (
                       <div className="w-8 h-8 rounded-full border-2 border-white bg-surface-card
                                       flex items-center justify-center text-xs text-muted font-medium">

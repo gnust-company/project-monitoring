@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { PHASE_META, DEV_PHASES } from '../../types';
@@ -7,9 +7,10 @@ import {
   BarChart3, Layers, Users, Zap, ArrowRight,
   Shield, Clock, CheckCircle2,
   ChevronRight, AlertTriangle, FolderKanban,
-  FileText, Code2, TestTube, Rocket, Wrench,
+  FileText, Code2, TestTube, Rocket, Wrench, LogOut, ChevronDown,
 } from 'lucide-react';
 import LivePipelinePreview from './LivePipelinePreview';
+import Avatar from '../common/Avatar';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -156,8 +157,21 @@ const features = [
 ];
 
 export default function LandingPage() {
-  const { goToLogin, goToWorkspaceSelector } = useApp();
+  const { goToLogin, goToWorkspaceSelector, currentUser, currentUserEmail, logout } = useApp();
   const [activePhase, setActivePhase] = useState<DevPhase>('PA');
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // CTA: chưa đăng nhập → tới đăng nhập; đã đăng nhập → vào danh sách workspace
+  const goStart = currentUser ? goToWorkspaceSelector : goToLogin;
 
   return (
     <div className="min-h-screen bg-white">
@@ -177,15 +191,59 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={goToLogin}
-              className="text-sm text-muted hover:text-ink transition-colors font-medium px-4 py-2">
-              Đăng nhập
-            </button>
-            <button onClick={goToWorkspaceSelector}
-              className="px-5 py-2.5 bg-ink text-white text-sm font-semibold rounded-lg
-                         hover:bg-[#242424] transition-all">
-              Bắt đầu ngay
-            </button>
+            {currentUser ? (
+              <>
+                <button onClick={goToWorkspaceSelector}
+                  className="hidden sm:inline-flex px-5 py-2.5 bg-ink text-white text-sm font-semibold rounded-lg
+                             hover:bg-[#242424] transition-all items-center gap-2">
+                  <FolderKanban className="w-4 h-4" /> Vào Workspaces
+                </button>
+                <div ref={menuRef} className="relative">
+                  <button onClick={() => setShowMenu(v => !v)}
+                    className="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1.5 rounded-lg hover:bg-surface-soft transition-colors">
+                    <Avatar name={currentUser.name} src={currentUser.avatar} className="w-8 h-8" />
+                    <span className="text-sm font-medium text-ink max-w-[140px] truncate hidden sm:block">{currentUser.name}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-muted" />
+                  </button>
+                  <AnimatePresence>
+                    {showMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }} transition={{ duration: 0.18 }}
+                        className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-hairline shadow-xl shadow-black/[0.06] overflow-hidden z-50">
+                        <div className="px-4 py-3 border-b border-hairline-soft">
+                          <p className="text-sm font-semibold text-ink truncate">{currentUser.name}</p>
+                          <p className="text-[11px] text-muted-soft mt-0.5 truncate">{currentUserEmail}</p>
+                        </div>
+                        <div className="p-1.5">
+                          <button onClick={() => { setShowMenu(false); goToWorkspaceSelector(); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors">
+                            <FolderKanban className="w-4 h-4" /> Workspaces của tôi
+                          </button>
+                        </div>
+                        <div className="p-1.5 border-t border-hairline-soft">
+                          <button onClick={() => { setShowMenu(false); logout(); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/5 transition-colors">
+                            <LogOut className="w-4 h-4" /> Đăng xuất
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </>
+            ) : (
+              <>
+                <button onClick={goToLogin}
+                  className="text-sm text-muted hover:text-ink transition-colors font-medium px-4 py-2">
+                  Đăng nhập
+                </button>
+                <button onClick={goStart}
+                  className="px-5 py-2.5 bg-ink text-white text-sm font-semibold rounded-lg hover:bg-[#242424] transition-all">
+                  Bắt đầu ngay
+                </button>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -480,7 +538,7 @@ export default function LandingPage() {
           <p className="text-muted mb-10 max-w-md mx-auto text-lg">
             Trải nghiệm ngay pipeline 7 giai đoạn với dữ liệu mẫu. Không cần credit card.
           </p>
-          <button onClick={goToWorkspaceSelector}
+          <button onClick={goStart}
             className="px-10 py-4 bg-ink text-white font-semibold rounded-lg hover:bg-[#242424]
                        hover:shadow-xl hover:shadow-ink/10 transition-all inline-flex items-center gap-2.5 text-sm">
             Khởi chạy ProjectHub <ArrowRight className="w-4 h-4" />

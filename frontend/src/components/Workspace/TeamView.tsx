@@ -4,6 +4,7 @@ import { Mail, Shield, FolderKanban, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { PHASE_META } from '../../types';
+import Avatar from '../common/Avatar';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -105,8 +106,8 @@ export default function TeamView() {
           </div>
           <div className="flex -space-x-2">
             {members.slice(0, 5).map(m => (
-              <img key={m.id} src={m.avatar} alt={m.name}
-                className="w-8 h-8 rounded-full border-2 border-white bg-stone-200" title={m.name} />
+              <Avatar key={m.id} name={m.name} src={m.avatar}
+                className="w-8 h-8 border-2 border-white" />
             ))}
             {members.length > 5 && (
               <div className="w-8 h-8 rounded-full border-2 border-white bg-stone-100
@@ -155,8 +156,7 @@ export default function TeamView() {
                 className="bg-white rounded-2xl border border-hairline p-5 card-hover">
                 {/* Top: Avatar + info */}
                 <div className="flex items-center gap-3 mb-4">
-                  <img src={member.avatar} alt={member.name}
-                    className="w-12 h-12 rounded-full bg-stone-200" />
+                  <Avatar name={member.name} src={member.avatar} className="w-12 h-12" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-ink truncate">{member.name}</div>
                     <div className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-lg text-[10px] font-bold ${colors.bg} ${colors.text}`}>

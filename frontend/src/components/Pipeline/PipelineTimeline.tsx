@@ -10,6 +10,7 @@ import {
 } from 'date-fns';
 import PhaseDetailModal from './PhaseDetailModal';
 import CreatePhaseModal from '../Modals/CreatePhaseModal';
+import Avatar from '../common/Avatar';
 
 const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 52;
@@ -458,10 +459,14 @@ export default function PipelineTimeline() {
           const newEnd = addDays(newStart, duration);
 
           const rd = projectRowData.get(projectId);
-          const maxRow = rd?.rowCount ?? 1;
+          // Chỉ cho tạo hàng mới ngay dưới hàng cuối CÓ khối khác — tránh để hàng trên rỗng (spam).
+          const others = (rd?.pbs ?? []).filter(b => b.id !== pb.id);
+          let maxOtherRow = -1;
+          for (const b of others) maxOtherRow = Math.max(maxOtherRow, baseRowIndices.get(b.id) ?? 0);
+          const maxAllowedRow = maxOtherRow + 1;
           const rowDelta = Math.round(pos.dy / ROW_HEIGHT);
           let newRow = origRow + rowDelta;
-          newRow = Math.max(0, Math.min(maxRow, newRow));
+          newRow = Math.max(0, Math.min(maxAllowedRow, newRow));
 
           setDragPreview({
             blockId: pb.id,
@@ -792,8 +797,8 @@ export default function PipelineTimeline() {
                             <span className="text-[9px] font-bold text-stone-500/80 shrink-0">{pct}%</span>
                           )}
                           {width > 80 && assignee && (
-                            <img src={assignee.avatar} alt="" title={assignee.name}
-                              className="w-4 h-4 rounded-full border border-white/80 shrink-0" />
+                            <Avatar name={assignee.name} src={assignee.avatar}
+                              className="w-4 h-4 border border-white/80 shrink-0" />
                           )}
                         </div>
                         {/* Progress theo checklist */}
