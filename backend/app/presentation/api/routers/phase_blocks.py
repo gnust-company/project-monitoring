@@ -133,7 +133,7 @@ async def add_item(
     block_id: UUID, body: PhaseItemCreate, access: BlockAccessDep,
     uc: Annotated[AddPhaseItem, Depends(add_item_uc)],
 ) -> PhaseItemOut:
-    item = await uc.execute(block_id, body.kind, body.text, body.role)
+    item = await uc.execute(block_id, body.kind, body.text, body.role, access.user.id)
     return PhaseItemOut.model_validate(item)
 
 
@@ -143,7 +143,7 @@ async def update_item(
     uc: Annotated[UpdatePhaseItem, Depends(update_item_uc)],
 ) -> PhaseItemOut:
     try:
-        item = await uc.execute(item_id, body.model_dump(exclude_unset=True))
+        item = await uc.execute(block_id, item_id, body.model_dump(exclude_unset=True), access.user.id)
     except PhaseItemNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Item not found")
     return PhaseItemOut.model_validate(item)
@@ -154,7 +154,7 @@ async def delete_item(
     block_id: UUID, item_id: UUID, access: BlockAccessDep,
     uc: Annotated[DeletePhaseItem, Depends(delete_item_uc)],
 ) -> None:
-    await uc.execute(item_id)
+    await uc.execute(block_id, item_id, access.user.id)
 
 
 # ─── Comments ────────────────────────────────────────────────────────
@@ -229,6 +229,6 @@ async def delete_attachment(
     uc: Annotated[DeleteAttachment, Depends(delete_attachment_uc)],
 ) -> None:
     try:
-        await uc.execute(attachment_id)
+        await uc.execute(block_id, attachment_id, access.user.id)
     except AttachmentNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Attachment not found")

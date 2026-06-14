@@ -217,29 +217,47 @@ class DeletePhaseBlock:
         await self._blocks.delete(block_id)
 
 
+async def _log(activity: ActivityLogRepository, project_id: UUID, block_id: UUID | None,
+               actor_id: UUID, action: str, target: str = "") -> None:
+    await activity.add(ActivityEntry(
+        id=uuid4(), project_id=project_id, user_id=actor_id, action=action,
+        target=target, created_at=None, phase_block_id=block_id,
+    ))
+
+
 # ─── Items ───────────────────────────────────────────────────────────
 class AddPhaseItem:
-    def __init__(self, blocks: PhaseBlockRepository) -> None:
+    def __init__(self, blocks: PhaseBlockRepository, activity: ActivityLogRepository) -> None:
         self._blocks = blocks
+        self._activity = activity
 
-    async def execute(self, block_id: UUID, kind: PhaseItemKind, text: str, role: UserRole | None) -> PhaseItem:
+    async def execute(self, block_id: UUID, kind: PhaseItemKind, text: str,
+                      role: UserRole | None, actor_id: UUID) -> PhaseItem:
         existing = await self._blocks.get(block_id)
         if existing is None:
             raise PhaseBlockNotFoundError(str(block_id))
         pos = max((i.position for i in existing.items if i.kind == kind), default=-1) + 1
-        return await self._blocks.add_item(
+        item = await self._blocks.add_item(
             block_id, PhaseItem(id=uuid4(), kind=kind, text=text, done=False, role=role, position=pos)
         )
+        await _log(self._activity, existing.project_id, block_id, actor_id, f"added {kind.value}", text)
+        return item
 
 
 class UpdatePhaseItem:
-    def __init__(self, blocks: PhaseBlockRepository) -> None:
+    def __init__(self, blocks: PhaseBlockRepository, activity: ActivityLogRepository) -> None:
         self._blocks = blocks
+        self._activity = activity
 
-    async def execute(self, item_id: UUID, payload: dict[str, Any]) -> PhaseItem:
+    async def execute(self, block_id: UUID, item_id: UUID, payload: dict[str, Any], actor_id: UUID) -> PhaseItem:
         item = await self._blocks.get_item(item_id)
         if item is None:
             raise PhaseItemNotFoundError(str(item_id))
+        action: str | None = None
+        if "done" in payload and payload["done"] != item.done:
+            action = "completed item" if payload["done"] else "reopened item"
+        elif "text" in payload and payload["text"] != item.text:
+            action = "edited item"
         if "text" in payload:
             item.text = payload["text"]
         if "done" in payload:
@@ -248,22 +266,35 @@ class UpdatePhaseItem:
             item.role = _role(payload["role"])
         if "position" in payload and payload["position"] is not None:
             item.position = payload["position"]
-        return await self._blocks.update_item(item)
+        updated = await self._blocks.update_item(item)
+        if action:
+            project_id = await self._blocks.get_project_id(block_id)
+            if project_id:
+                await _log(self._activity, project_id, block_id, actor_id, action, item.text)
+        return updated
 
 
 class DeletePhaseItem:
-    def __init__(self, blocks: PhaseBlockRepository) -> None:
+    def __init__(self, blocks: PhaseBlockRepository, activity: ActivityLogRepository) -> None:
         self._blocks = blocks
+        self._activity = activity
 
-    async def execute(self, item_id: UUID) -> None:
+    async def execute(self, block_id: UUID, item_id: UUID, actor_id: UUID) -> None:
+        item = await self._blocks.get_item(item_id)
         await self._blocks.delete_item(item_id)
+        if item:
+            project_id = await self._blocks.get_project_id(block_id)
+            if project_id:
+                await _log(self._activity, project_id, block_id, actor_id, "removed item", item.text)
 
 
 # ─── Comments ────────────────────────────────────────────────────────
 class AddComment:
-    def __init__(self, blocks: PhaseBlockRepository, notifier: NotificationService) -> None:
+    def __init__(self, blocks: PhaseBlockRepository, notifier: NotificationService,
+                 activity: ActivityLogRepository) -> None:
         self._blocks = blocks
         self._notifier = notifier
+        self._activity = activity
 
     async def execute(self, block_id: UUID, content: str, author_id: UUID) -> Comment:
         block = await self._blocks.get(block_id)
@@ -277,6 +308,8 @@ class AddComment:
             list(recipients), "comment_added", f"Bình luận mới ở phase {block.title}",
             project_id=block.project_id, phase_block_id=block_id,
         )
+        await _log(self._activity, block.project_id, block_id, author_id, "commented",
+                   content[:80] + ("…" if len(content) > 80 else ""))
         return comment
 
 

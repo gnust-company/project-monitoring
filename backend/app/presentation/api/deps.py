@@ -321,20 +321,20 @@ def delete_block_uc(blocks: BlockRepoDep, activity: ActivityRepoDep) -> DeletePh
     return DeletePhaseBlock(blocks, activity)
 
 
-def add_item_uc(blocks: BlockRepoDep) -> AddPhaseItem:
-    return AddPhaseItem(blocks)
+def add_item_uc(blocks: BlockRepoDep, activity: ActivityRepoDep) -> AddPhaseItem:
+    return AddPhaseItem(blocks, activity)
 
 
-def update_item_uc(blocks: BlockRepoDep) -> UpdatePhaseItem:
-    return UpdatePhaseItem(blocks)
+def update_item_uc(blocks: BlockRepoDep, activity: ActivityRepoDep) -> UpdatePhaseItem:
+    return UpdatePhaseItem(blocks, activity)
 
 
-def delete_item_uc(blocks: BlockRepoDep) -> DeletePhaseItem:
-    return DeletePhaseItem(blocks)
+def delete_item_uc(blocks: BlockRepoDep, activity: ActivityRepoDep) -> DeletePhaseItem:
+    return DeletePhaseItem(blocks, activity)
 
 
-def add_comment_uc(blocks: BlockRepoDep, notifier: NotifierDep) -> AddComment:
-    return AddComment(blocks, notifier)
+def add_comment_uc(blocks: BlockRepoDep, notifier: NotifierDep, activity: ActivityRepoDep) -> AddComment:
+    return AddComment(blocks, notifier, activity)
 
 
 def list_comments_uc(blocks: BlockRepoDep) -> ListComments:
@@ -370,16 +370,16 @@ def list_attachments_uc(blocks: BlockRepoDep) -> ListAttachments:
     return ListAttachments(blocks)
 
 
-def add_link_uc(blocks: BlockRepoDep) -> AddLinkAttachment:
-    return AddLinkAttachment(blocks)
+def add_link_uc(blocks: BlockRepoDep, activity: ActivityRepoDep) -> AddLinkAttachment:
+    return AddLinkAttachment(blocks, activity)
 
 
-def add_file_uc(blocks: BlockRepoDep, storage: StorageDep) -> AddFileAttachment:
-    return AddFileAttachment(blocks, storage, _attachments_bucket())
+def add_file_uc(blocks: BlockRepoDep, storage: StorageDep, activity: ActivityRepoDep) -> AddFileAttachment:
+    return AddFileAttachment(blocks, storage, _attachments_bucket(), activity)
 
 
-def delete_attachment_uc(blocks: BlockRepoDep, storage: StorageDep) -> DeleteAttachment:
-    return DeleteAttachment(blocks, storage, _attachments_bucket())
+def delete_attachment_uc(blocks: BlockRepoDep, storage: StorageDep, activity: ActivityRepoDep) -> DeleteAttachment:
+    return DeleteAttachment(blocks, storage, _attachments_bucket(), activity)
 
 
 # ─── User profile use cases ──────────────────────────────────────────
