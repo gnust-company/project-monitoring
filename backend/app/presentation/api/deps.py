@@ -51,6 +51,7 @@ from app.application.use_cases.projects import (
     UpdateProjectOrRequest,
 )
 from app.application.use_cases.admin import (
+    DeleteUser,
     GetAdminStats,
     ListAllUsers,
     ListAllWorkspaces,
@@ -64,7 +65,12 @@ from app.application.use_cases.attachments import (
     ListAttachments,
 )
 from app.application.use_cases.templates import GetPhaseTasks
-from app.application.use_cases.users import SetAvatar, UpdateProfile
+from app.application.use_cases.users import (
+    ChangePassword,
+    DeleteAccount,
+    SetAvatar,
+    UpdateProfile,
+)
 from app.core.config import get_settings
 from app.core.security import decode_token, hash_password, verify_password
 from app.domain.entities import Membership, Project, User
@@ -431,3 +437,16 @@ def reset_password_uc(users: UserRepoDep) -> ResetUserPassword:
 
 def set_superuser_uc(users: UserRepoDep) -> SetSuperuser:
     return SetSuperuser(users)
+
+
+def delete_user_uc(users: UserRepoDep) -> DeleteUser:
+    return DeleteUser(users)
+
+
+# ─── Profile self-service (issue #3) ─────────────────────────────────
+def change_password_uc(repo: UserRepoDep) -> ChangePassword:
+    return ChangePassword(repo, verify_password, hash_password)
+
+
+def delete_account_uc(repo: UserRepoDep) -> DeleteAccount:
+    return DeleteAccount(repo)

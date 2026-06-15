@@ -7,6 +7,7 @@ import SetupPage from './components/Landing/SetupPage';
 import WorkspaceSelector from './components/OrgSelector/WorkspaceSelector';
 import WorkspaceLayout from './components/Workspace/WorkspaceLayout';
 import AdminLayout from './components/Admin/AdminLayout';
+import ProfileModal from './components/Modals/ProfileModal';
 
 function AppContent() {
   const { currentView, authReady, needsSetup } = useApp();
@@ -38,6 +39,7 @@ function AppContent() {
       {currentView === 'workspace-selector' && <WorkspaceSelector />}
       {currentView === 'workspace' && <WorkspaceLayout />}
       {currentView === 'admin' && <AdminLayout />}
+      <ProfileModal />
     </>
   );
 }

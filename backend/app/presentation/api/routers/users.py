@@ -1,11 +1,24 @@
-"""Users / Profile — xem & cập nhật hồ sơ, đổi avatar (MinIO)."""
+"""Users / Profile — xem & cập nhật hồ sơ, đổi avatar (MinIO),
+đổi mật khẩu, xóa tài khoản của chính mình."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-from app.application.use_cases.users import SetAvatar, UpdateProfile
-from app.presentation.api.deps import CurrentUser, set_avatar_uc, update_profile_uc
-from app.presentation.api.schemas import ProfileUpdate, UserOut
+from app.application.use_cases.users import (
+    ChangePassword,
+    DeleteAccount,
+    InvalidPasswordError,
+    SetAvatar,
+    UpdateProfile,
+)
+from app.presentation.api.deps import (
+    CurrentUser,
+    change_password_uc,
+    delete_account_uc,
+    set_avatar_uc,
+    update_profile_uc,
+)
+from app.presentation.api.schemas import PasswordChange, ProfileUpdate, UserOut
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -23,6 +36,26 @@ async def update_me(
 ) -> UserOut:
     user = await uc.execute(current, name=body.name, role=body.role)
     return UserOut.from_entity(user)
+
+
+@router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    body: PasswordChange,
+    current: CurrentUser,
+    uc: Annotated[ChangePassword, Depends(change_password_uc)],
+) -> None:
+    try:
+        await uc.execute(current, body.current_password, body.new_password)
+    except InvalidPasswordError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_me(
+    current: CurrentUser,
+    uc: Annotated[DeleteAccount, Depends(delete_account_uc)],
+) -> None:
+    await uc.execute(current)
 
 
 @router.post("/me/avatar", response_model=UserOut)

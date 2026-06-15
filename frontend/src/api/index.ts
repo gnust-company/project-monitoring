@@ -90,6 +90,12 @@ export const usersApi = {
   async uploadAvatar(file: File): Promise<User> {
     return mapUser(await api.upload<UserDTO>('/users/me/avatar', file));
   },
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await api.patch<void>('/users/me/password', { currentPassword, newPassword });
+  },
+  async deleteAccount(): Promise<void> {
+    await api.del('/users/me');
+  },
 };
 
 // ─── Organizations ───────────────────────────────────────────────────
@@ -253,6 +259,9 @@ export const adminApi = {
   },
   async setSuperuser(userId: string, isSuperuser: boolean): Promise<void> {
     await api.post(`/admin/users/${userId}/superuser`, { isSuperuser });
+  },
+  async deleteUser(userId: string): Promise<void> {
+    await api.del(`/admin/users/${userId}`);
   },
 };
 

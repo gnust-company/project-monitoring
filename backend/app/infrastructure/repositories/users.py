@@ -62,12 +62,25 @@ class SqlAlchemyUserRepository(UserRepository):
         await self._session.flush()
         return _to_entity(m)
 
-    async def count(self) -> int:
-        return await self._session.scalar(select(func.count()).select_from(UserModel)) or 0
+    async def update_password(self, user_id: UUID, password_hash: str) -> None:
+        m = await self._session.get(UserModel, user_id)
+        if m is None:
+            raise LookupError(f"User {user_id} not found")
+        m.password_hash = password_hash
+        await self._session.flush()
+
+    async def delete(self, user_id: UUID) -> None:
+        m = await self._session.get(UserModel, user_id)
+        if m is not None:
+            await self._session.delete(m)
+            await self._session.flush()
 
     async def list_all(self) -> list[User]:
         rows = await self._session.scalars(select(UserModel).order_by(UserModel.created_at))
         return [_to_entity(m) for m in rows]
+
+    async def count(self) -> int:
+        return await self._session.scalar(select(func.count()).select_from(UserModel)) or 0
 
     async def set_password(self, user_id: UUID, password_hash: str) -> bool:
         m = await self._session.get(UserModel, user_id)

@@ -144,3 +144,21 @@ class SetSuperuser:
             raise CannotModifySelfError()
         if not await self._users.set_superuser(target_user_id, value):
             raise UserNotFoundError(str(target_user_id))
+
+
+class DeleteUser:
+    """Xóa 1 user khỏi toàn hệ thống (issue #3.5).
+
+    Chặn tự xóa chính mình. Các quan hệ (membership, phase block...) tự dọn
+    qua FK CASCADE / SET NULL đã định nghĩa trong schema.
+    """
+
+    def __init__(self, users: UserRepository) -> None:
+        self._users = users
+
+    async def execute(self, acting_user_id: UUID, target_user_id: UUID) -> None:
+        if acting_user_id == target_user_id:
+            raise CannotModifySelfError()
+        if await self._users.get(target_user_id) is None:
+            raise UserNotFoundError(str(target_user_id))
+        await self._users.delete(target_user_id)

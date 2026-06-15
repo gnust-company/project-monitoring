@@ -13,7 +13,7 @@ const fadeUp = {
 };
 
 export default function WorkspaceSelector() {
-  const { selectOrg, goToLanding, organizations, openCreateWorkspace, currentUser } = useApp();
+  const { selectOrg, goToLanding, organizations, openCreateWorkspace, currentUser, openProfileModal } = useApp();
 
   return (
     <div className="min-h-screen bg-white">
@@ -31,10 +31,12 @@ export default function WorkspaceSelector() {
             <span className="font-semibold text-sm text-ink">ProjectHub</span>
           </div>
           {currentUser ? (
-            <div className="flex items-center gap-2.5">
+            <button onClick={openProfileModal}
+              title="Tài khoản của tôi"
+              className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-lg hover:bg-surface-soft transition-colors">
               <Avatar name={currentUser.name} src={currentUser.avatar} className="w-7 h-7" />
               <span className="text-sm font-medium text-ink max-w-[120px] truncate hidden sm:block">{currentUser.name}</span>
-            </div>
+            </button>
           ) : (
             <div className="w-16" />
           )}

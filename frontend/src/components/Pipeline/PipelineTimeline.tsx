@@ -11,6 +11,7 @@ import {
 import PhaseDetailModal from './PhaseDetailModal';
 import CreatePhaseModal from '../Modals/CreatePhaseModal';
 import Avatar from '../common/Avatar';
+import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
 
 const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 52;
@@ -112,15 +113,29 @@ export default function PipelineTimeline() {
   // Left panel content ref for transform-based scroll sync
   const leftContentRef = useRef<HTMLDivElement>(null);
 
+  // ─── Trạng thái & tiến độ auto (derived) ──────────────────────────
+  const statusOf = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof computeProjectStatus>>();
+    orgProjects.forEach(p => m.set(p.id, computeProjectStatus(p, phaseBlocks)));
+    return m;
+  }, [orgProjects, phaseBlocks]);
+
+  const progressOf = useMemo(() => {
+    const m = new Map<string, number>();
+    orgProjects.forEach(p => m.set(p.id,
+      Math.round(projectPhaseProgress(phaseBlocks.filter(b => b.projectId === p.id)) * 100)));
+    return m;
+  }, [orgProjects, phaseBlocks]);
+
   // ─── Filtered projects ────────────────────────────────────────────
   const filteredProjects = useMemo(() => {
     return orgProjects.filter(p => {
       const ms = !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const mst = statusFilter === 'All' || p.status === statusFilter;
+      const mst = statusFilter === 'All' || (statusOf.get(p.id) ?? p.status) === statusFilter;
       const mproj = selectedProjectIds === null || selectedProjectIds.includes(p.id);
       return ms && mst && mproj;
     });
-  }, [orgProjects, searchQuery, statusFilter, selectedProjectIds]);
+  }, [orgProjects, searchQuery, statusFilter, selectedProjectIds, statusOf]);
 
   // ─── Timeline range ───────────────────────────────────────────────
   const today = useMemo(() => new Date(), []);
@@ -677,14 +692,14 @@ export default function PipelineTimeline() {
                   <div className="w-full">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        project.status === 'On Track' ? 'bg-emerald-400' :
-                        project.status === 'At Risk' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                        (statusOf.get(project.id) ?? project.status) === 'On Track' ? 'bg-emerald-400' :
+                        (statusOf.get(project.id) ?? project.status) === 'At Risk' ? 'bg-amber-400' : 'bg-red-400'}`} />
                       <span className="text-sm font-semibold text-ink truncate">{project.name}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] text-stone-400 font-light">{pbCount} phase</span>
                       <span className="text-[10px] text-stone-300">·</span>
-                      <span className="text-[10px] text-stone-400 font-light">{project.progress}%</span>
+                      <span className="text-[10px] text-stone-400 font-light">{progressOf.get(project.id) ?? project.progress}%</span>
                     </div>
                   </div>
                 </div>

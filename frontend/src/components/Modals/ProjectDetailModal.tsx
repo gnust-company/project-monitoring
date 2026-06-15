@@ -11,12 +11,13 @@ import {
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import Avatar from '../common/Avatar';
+import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
 
-const STATUS_OPTIONS: { value: ProjectStatus; color: string; bg: string; border: string }[] = [
-  { value: 'On Track', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-  { value: 'At Risk',  color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200' },
-  { value: 'Delayed',  color: 'text-red-500',     bg: 'bg-red-50',     border: 'border-red-200' },
-];
+const STATUS_META: Record<ProjectStatus, { color: string; bg: string; border: string; bar: string }> = {
+  'On Track': { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: '#10b981' },
+  'At Risk':  { color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200',   bar: '#f59e0b' },
+  'Delayed':  { color: 'text-red-500',     bg: 'bg-red-50',     border: 'border-red-200',     bar: '#ef4444' },
+};
 
 export default function ProjectDetailModal() {
   const {
@@ -71,6 +72,11 @@ export default function ProjectDetailModal() {
   const projectPbs = phaseBlocks.filter(pb => pb.projectId === project.id);
   const completePbs = projectPbs.filter(pb => pb.tag === 'Complete').length;
   const daysLeft = differenceInDays(parseISO(project.targetDate), new Date());
+
+  // Trạng thái & tiến độ auto (derived) — không chỉnh tay
+  const autoStatus = computeProjectStatus(project, phaseBlocks);
+  const autoProgress = Math.round(projectPhaseProgress(projectPbs) * 100);
+  const statusMeta = STATUS_META[autoStatus];
 
   // Phân bố phase theo loại — để nhìn nhanh dự án đang nặng ở giai đoạn nào
   const phaseCounts = projectPbs.reduce<Record<string, number>>((acc, pb) => {
@@ -187,21 +193,14 @@ export default function ProjectDetailModal() {
               </div>
             )}
 
-            {/* Status */}
+            {/* Status (auto — tính từ tiến độ ngày & phase) */}
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1.5 block">Trạng thái</label>
-              <div className="flex gap-1.5">
-                {STATUS_OPTIONS.map(opt => (
-                  <button key={opt.value}
-                    onClick={() => doUpdate({ status: opt.value })}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all
-                      ${project.status === opt.value
-                        ? `${opt.bg} ${opt.color} ${opt.border}`
-                        : 'bg-white text-stone-400 border-stone-200 hover:border-stone-300'}`}>
-                    {opt.value}
-                  </button>
-                ))}
-              </div>
+              <label className="text-xs font-semibold text-stone-700 mb-1.5 block">Trạng thái (tự động)</label>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border
+                ${statusMeta.bg} ${statusMeta.color} ${statusMeta.border}`}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusMeta.bar }} />
+                {autoStatus}
+              </span>
             </div>
 
             {/* Dates */}
@@ -226,15 +225,16 @@ export default function ProjectDetailModal() {
               </div>
             </div>
 
-            {/* Progress (editable) */}
+            {/* Progress (auto — trung bình % các phase) */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-stone-700">Tiến độ</label>
-                <span className="text-xs font-bold text-ink">{project.progress}%</span>
+                <label className="text-xs font-semibold text-stone-700">Tiến độ (theo phase)</label>
+                <span className="text-xs font-bold text-ink">{autoProgress}%</span>
               </div>
-              <input type="range" min={0} max={100} value={project.progress}
-                onChange={e => doUpdate({ progress: Number(e.target.value) })}
-                className="w-full accent-ink" />
+              <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all"
+                  style={{ width: `${autoProgress}%`, background: statusMeta.bar }} />
+              </div>
             </div>
 
             {/* Stats */}

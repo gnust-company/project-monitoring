@@ -9,6 +9,7 @@ import { parseISO, differenceInDays, format } from 'date-fns';
 import { motion } from 'framer-motion';
 import { useMemo, useState, useEffect } from 'react';
 import Avatar from '../common/Avatar';
+import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -73,12 +74,28 @@ export default function DashboardView() {
     setWorkspaceView, openProjectDetail, setStatusFilter,
   } = useApp();
 
+  // Trạng thái & tiến độ auto (derived) cho từng dự án
+  const statusOf = useMemo(() => {
+    const m = new Map<string, ProjectStatus>();
+    orgProjects.forEach(p => m.set(p.id, computeProjectStatus(p, phaseBlocks)));
+    return m;
+  }, [orgProjects, phaseBlocks]);
+
+  const progressOf = useMemo(() => {
+    const m = new Map<string, number>();
+    orgProjects.forEach(p => {
+      const pct = Math.round(projectPhaseProgress(phaseBlocks.filter(b => b.projectId === p.id)) * 100);
+      m.set(p.id, pct);
+    });
+    return m;
+  }, [orgProjects, phaseBlocks]);
+
   const stats = useMemo(() => {
     const total = orgProjects.length;
-    const onTrack = orgProjects.filter(p => p.status === 'On Track').length;
-    const atRisk = orgProjects.filter(p => p.status === 'At Risk').length;
-    const delayed = orgProjects.filter(p => p.status === 'Delayed').length;
-    const avgProgress = total > 0 ? Math.round(orgProjects.reduce((s, p) => s + p.progress, 0) / total) : 0;
+    const onTrack = orgProjects.filter(p => statusOf.get(p.id) === 'On Track').length;
+    const atRisk = orgProjects.filter(p => statusOf.get(p.id) === 'At Risk').length;
+    const delayed = orgProjects.filter(p => statusOf.get(p.id) === 'Delayed').length;
+    const avgProgress = total > 0 ? Math.round(orgProjects.reduce((s, p) => s + (progressOf.get(p.id) ?? 0), 0) / total) : 0;
     const inProgressPhases = phaseBlocks.filter(pb => pb.tag === 'Inprogress').length;
     const allTasks = phaseBlocks.reduce((s, pb) => s + pb.checklist.length, 0);
     const doneTasks = phaseBlocks.reduce((s, pb) => s + pb.checklist.filter(c => c.done).length, 0);
@@ -87,7 +104,7 @@ export default function DashboardView() {
       return d >= 0 && d <= 7;
     }).length;
     return { total, onTrack, atRisk, delayed, avgProgress, inProgressPhases, allTasks, doneTasks, dueIn7 };
-  }, [orgProjects, phaseBlocks]);
+  }, [orgProjects, phaseBlocks, statusOf, progressOf]);
 
   const phaseDistribution = useMemo(() => {
     return DEV_PHASES.map(phase => ({
@@ -415,7 +432,9 @@ export default function DashboardView() {
             <div className="grid sm:grid-cols-2 gap-4">
               {recentProjects.map(project => {
                 const daysLeft = differenceInDays(parseISO(project.targetDate), new Date());
-                const cfg = statusConfig[project.status];
+                const status = statusOf.get(project.id) ?? project.status;
+                const progress = progressOf.get(project.id) ?? project.progress;
+                const cfg = statusConfig[status];
                 const pbCount = phaseBlocks.filter(pb => pb.projectId === project.id).length;
                 const latestPhase = phaseBlocks
                   .filter(pb => pb.projectId === project.id)
@@ -430,7 +449,7 @@ export default function DashboardView() {
                         <FolderKanban className="w-4 h-4 text-muted group-hover:text-ink transition-colors" />
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${cfg.color} ${cfg.bg}`}>
-                        {project.status}
+                        {status}
                       </span>
                     </div>
                     <h3 className="text-sm font-medium text-ink truncate mb-1">{project.name}</h3>
@@ -445,10 +464,10 @@ export default function DashboardView() {
                     <div className="mb-2">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] text-muted font-medium">Tiến độ</span>
-                        <span className="text-xs font-semibold text-ink">{project.progress}%</span>
+                        <span className="text-xs font-semibold text-ink">{progress}%</span>
                       </div>
                       <div className="w-full h-1.5 bg-surface-soft rounded-full overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${project.progress}%` }}
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }}
                           transition={{ duration: 0.8, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
                           className="h-full rounded-full"
                           style={{ background: cfg.bar }} />

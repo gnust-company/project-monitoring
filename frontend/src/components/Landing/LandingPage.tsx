@@ -7,7 +7,7 @@ import {
   BarChart3, Layers, Users, Zap, ArrowRight,
   Shield, Clock, CheckCircle2,
   ChevronRight, AlertTriangle, FolderKanban,
-  FileText, Code2, TestTube, Rocket, Wrench, LogOut, ChevronDown,
+  FileText, Code2, TestTube, Rocket, Wrench, LogOut, ChevronDown, UserCircle,
 } from 'lucide-react';
 import LivePipelinePreview from './LivePipelinePreview';
 import Avatar from '../common/Avatar';
@@ -157,7 +157,7 @@ const features = [
 ];
 
 export default function LandingPage() {
-  const { goToLogin, goToWorkspaceSelector, goToAdmin, currentUser, currentUserEmail, logout } = useApp();
+  const { goToLogin, goToWorkspaceSelector, goToAdmin, currentUser, currentUserEmail, logout, openProfileModal } = useApp();
   const [activePhase, setActivePhase] = useState<DevPhase>('PA');
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -216,6 +216,10 @@ export default function LandingPage() {
                           <p className="text-[11px] text-muted-soft mt-0.5 truncate">{currentUserEmail}</p>
                         </div>
                         <div className="p-1.5">
+                          <button onClick={() => { setShowMenu(false); openProfileModal(); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors">
+                            <UserCircle className="w-4 h-4" /> Tài khoản của tôi
+                          </button>
                           <button onClick={() => { setShowMenu(false); goToWorkspaceSelector(); }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors">
                             <FolderKanban className="w-4 h-4" /> Workspaces của tôi

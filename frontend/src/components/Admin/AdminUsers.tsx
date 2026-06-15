@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Crown, KeyRound, Mail, Briefcase, Building2, Calendar, ShieldPlus, ShieldMinus } from 'lucide-react';
+import { Search, Crown, KeyRound, Mail, Briefcase, Building2, Calendar, ShieldPlus, ShieldMinus, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { AdminUserInfo } from '../../types';
 import Avatar from '../common/Avatar';
@@ -11,6 +11,7 @@ interface Props {
   currentUserId: string;
   onReset: (user: AdminUserInfo) => void;
   onToggleAdmin: (user: AdminUserInfo) => void;
+  onDelete: (user: AdminUserInfo) => void;
 }
 
 function fmtDate(iso: string | null): string {
@@ -18,7 +19,7 @@ function fmtDate(iso: string | null): string {
   try { return format(parseISO(iso), 'dd/MM/yyyy'); } catch { return '—'; }
 }
 
-export default function AdminUsers({ users, loading, currentUserId, onReset, onToggleAdmin }: Props) {
+export default function AdminUsers({ users, loading, currentUserId, onReset, onToggleAdmin, onDelete }: Props) {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -125,6 +126,15 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
                                border border-hairline hover:border-ink/30 hover:bg-surface-soft transition-colors">
                     <KeyRound className="w-3.5 h-3.5" />
                   </button>
+                  {u.id !== currentUserId && (
+                    <button
+                      onClick={e => { e.stopPropagation(); onDelete(u); }}
+                      title="Xóa người dùng khỏi hệ thống"
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-500
+                                 border border-hairline hover:border-red-300 hover:bg-red-50 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
 

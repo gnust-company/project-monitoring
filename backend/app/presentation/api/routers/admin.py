@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.application.use_cases.admin import (
     CannotModifySelfError,
+    DeleteUser,
     GetAdminStats,
     ListAllUsers,
     ListAllWorkspaces,
@@ -18,6 +19,7 @@ from app.application.use_cases.admin import (
 from app.presentation.api.deps import (
     SuperuserDep,
     admin_stats_uc,
+    delete_user_uc,
     list_all_users_uc,
     list_all_workspaces_uc,
     reset_password_uc,
@@ -106,5 +108,19 @@ async def set_superuser(
         await uc.execute(current.id, user_id, body.is_superuser)
     except CannotModifySelfError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Cannot change your own admin status")
+    except UserNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: UUID,
+    current: SuperuserDep,
+    uc: Annotated[DeleteUser, Depends(delete_user_uc)],
+) -> None:
+    try:
+        await uc.execute(current.id, user_id)
+    except CannotModifySelfError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own account here")
     except UserNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")

@@ -33,6 +33,7 @@ interface AppState {
   createPhaseProjectId: string | null;
   createPhaseDates: { startDate: string; endDate: string } | null;
   createWorkspaceOpen: boolean;
+  profileModalOpen: boolean;
   sidebarCollapsed: boolean;
 }
 
@@ -59,6 +60,8 @@ interface AppContextType extends AppState {
   currentUser: User | null;
   updateCurrentUser: (updates: Partial<User>) => Promise<void>;
   uploadAvatar: (file: File) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 
   // Filters
   setSearchQuery: (q: string) => void;
@@ -80,6 +83,8 @@ interface AppContextType extends AppState {
   closeCreatePhase: () => void;
   openCreateWorkspace: () => void;
   closeCreateWorkspace: () => void;
+  openProfileModal: () => void;
+  closeProfileModal: () => void;
   toggleSidebar: () => void;
 
   // Project actions
@@ -152,6 +157,7 @@ const INITIAL_STATE: AppState = {
   createPhaseProjectId: null,
   createPhaseDates: null,
   createWorkspaceOpen: false,
+  profileModalOpen: false,
   sidebarCollapsed: false,
 };
 
@@ -280,6 +286,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOrgsState(prev => prev.map(org => ({ ...org, members: org.members.map(m => m.id === updated.id ? updated : m) })));
   }, []);
 
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    await usersApi.changePassword(currentPassword, newPassword);
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    await usersApi.deleteAccount();
+    auth.logout();
+    setCurrentUser(null);
+    setOrgsState([]);
+    setProjectsState([]);
+    setPbState([]);
+    setNotifications([]);
+    setUnreadCount(0);
+    setState({ ...INITIAL_STATE, currentView: 'landing' });
+  }, []);
+
   // ─── Filters / selection ─────────────────────────────────────────
   const setSearchQuery = useCallback((q: string) => setState(prev => ({ ...prev, searchQuery: q })), []);
   const setPhaseFilter = useCallback((p: DevPhase | 'All') => setState(prev => ({ ...prev, phaseFilter: p })), []);
@@ -323,6 +345,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toggleSidebar = useCallback(() => setState(prev => ({ ...prev, sidebarCollapsed: !prev.sidebarCollapsed })), []);
   const openCreateWorkspace = useCallback(() => setState(prev => ({ ...prev, createWorkspaceOpen: true })), []);
   const closeCreateWorkspace = useCallback(() => setState(prev => ({ ...prev, createWorkspaceOpen: false })), []);
+  const openProfileModal = useCallback(() => setState(prev => ({ ...prev, profileModalOpen: true })), []);
+  const closeProfileModal = useCallback(() => setState(prev => ({ ...prev, profileModalOpen: false })), []);
 
   // ─── Projects ─────────────────────────────────────────────────────
   const addProject = useCallback(async (project: Project) => {
@@ -385,17 +409,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPbState(prev => prev.filter(pb => pb.id !== id));
   }, []);
 
-  // refetch 1 block (đồng bộ items/comments/attachments sau mutation con)
-  const refetchBlock = useCallback(async (blockId: string) => {
-    try {
-      const [full, activity] = await Promise.all([
-        phaseBlocksApi.get(blockId), phaseBlocksApi.activity(blockId),
-      ]);
-      full.activityLog = activity;
-      setPbState(prev => prev.map(pb => pb.id === blockId ? full : pb));
-    } catch { /* ignore */ }
-  }, []);
-
   const patchBlock = useCallback((blockId: string, fn: (pb: PhaseBlockUI) => PhaseBlockUI) => {
     setPbState(prev => prev.map(pb => pb.id === blockId ? fn(pb) : pb));
   }, []);
@@ -408,8 +421,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       outcomes: pb.outcomes.map(i => i.id === itemId ? { ...i, ...updates } : i),
     }));
     await phaseBlocksApi.updateItem(blockId, itemId, updates);
-    await refetchBlock(blockId);
-  }, [refetchBlock, patchBlock]);
+  }, [patchBlock]);
 
   const deletePhaseItem = useCallback(async (blockId: string, itemId: string) => {
     patchBlock(blockId, pb => ({
@@ -418,36 +430,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       outcomes: pb.outcomes.filter(i => i.id !== itemId),
     }));
     await phaseBlocksApi.deleteItem(blockId, itemId);
-    await refetchBlock(blockId);
-  }, [refetchBlock, patchBlock]);
+  }, [patchBlock]);
 
   const addPhaseItem = useCallback(async (blockId: string, kind: 'checklist' | 'outcome', text: string, role?: UserRole) => {
-    await phaseBlocksApi.addItem(blockId, kind, text, role);
-    await refetchBlock(blockId);
-  }, [refetchBlock]);
+    // Dùng item trả về trực tiếp (tránh race với commit-after-response của BE)
+    const item = await phaseBlocksApi.addItem(blockId, kind, text, role);
+    patchBlock(blockId, pb => kind === 'checklist'
+      ? { ...pb, checklist: [...pb.checklist, item] }
+      : { ...pb, outcomes: [...pb.outcomes, item] });
+  }, [patchBlock]);
 
   const addPhaseComment = useCallback(async (blockId: string, content: string) => {
     // optimistic: thêm comment tạm để hiện ngay
     const temp = { id: `tmp-${Date.now()}`, authorId: currentUser?.id ?? '', content, createdAt: new Date().toISOString() };
     patchBlock(blockId, pb => ({ ...pb, comments: [...pb.comments, temp] }));
-    await phaseBlocksApi.addComment(blockId, content);
-    await refetchBlock(blockId);
-  }, [refetchBlock, patchBlock, currentUser]);
+    const saved = await phaseBlocksApi.addComment(blockId, content);
+    // thay comment tạm bằng comment thật trả về
+    patchBlock(blockId, pb => ({ ...pb, comments: pb.comments.map(c => c.id === temp.id ? saved : c) }));
+  }, [patchBlock, currentUser]);
 
   const addPhaseLink = useCallback(async (blockId: string, fileName: string, url: string) => {
-    await phaseBlocksApi.addLink(blockId, fileName, url);
-    await refetchBlock(blockId);
-  }, [refetchBlock]);
+    const att = await phaseBlocksApi.addLink(blockId, fileName, url);
+    patchBlock(blockId, pb => ({ ...pb, attachments: [...pb.attachments, att] }));
+  }, [patchBlock]);
 
   const uploadPhaseFile = useCallback(async (blockId: string, file: File) => {
-    await phaseBlocksApi.uploadFile(blockId, file);
-    await refetchBlock(blockId);
-  }, [refetchBlock]);
+    const att = await phaseBlocksApi.uploadFile(blockId, file);
+    patchBlock(blockId, pb => ({ ...pb, attachments: [...pb.attachments, att] }));
+  }, [patchBlock]);
 
   const deletePhaseAttachment = useCallback(async (blockId: string, attachmentId: string) => {
+    patchBlock(blockId, pb => ({ ...pb, attachments: pb.attachments.filter(a => a.id !== attachmentId) }));
     await phaseBlocksApi.deleteAttachment(blockId, attachmentId);
-    await refetchBlock(blockId);
-  }, [refetchBlock]);
+  }, [patchBlock]);
 
   // ─── Organizations ────────────────────────────────────────────────
   const reloadOrgs = useCallback(async (me: User | null) => {
@@ -458,9 +473,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [syncRegistry]);
 
   const addOrganization = useCallback(async (name: string) => {
-    await orgsApi.create(name);
-    await reloadOrgs(currentUser);
-  }, [reloadOrgs, currentUser]);
+    // Dùng org trả về trực tiếp (tránh race với commit-after-response của BE)
+    const created = await orgsApi.create(name);
+    setOrgsState(prev => {
+      const next = [...prev, created];
+      syncRegistry(next, currentUser);
+      return next;
+    });
+  }, [syncRegistry, currentUser]);
 
   const updateOrganization = useCallback(async (id: string, updates: Partial<Organization>) => {
     if (updates.name) {
@@ -475,14 +495,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addOrgMember = useCallback(async (orgId: string, email: string) => {
-    await orgsApi.addMember(orgId, email);
-    await reloadOrgs(currentUser);
-  }, [reloadOrgs, currentUser]);
+    // Dùng user trả về trực tiếp (tránh race với commit-after-response của BE)
+    const member = await orgsApi.addMember(orgId, email);
+    setOrgsState(prev => {
+      const next = prev.map(o => o.id === orgId
+        ? { ...o, members: o.members.some(m => m.id === member.id) ? o.members : [...o.members, member] }
+        : o);
+      syncRegistry(next, currentUser);
+      return next;
+    });
+  }, [syncRegistry, currentUser]);
 
   const removeOrgMember = useCallback(async (orgId: string, userId: string) => {
     await orgsApi.removeMember(orgId, userId);
-    await reloadOrgs(currentUser);
-  }, [reloadOrgs, currentUser]);
+    setOrgsState(prev => {
+      const next = prev.map(o => o.id === orgId
+        ? { ...o, members: o.members.filter(m => m.id !== userId) }
+        : o);
+      syncRegistry(next, currentUser);
+      return next;
+    });
+  }, [syncRegistry, currentUser]);
 
   // ─── Notifications ────────────────────────────────────────────────
   const loadNotifications = useCallback(async () => {
@@ -565,12 +598,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPhaseBlocks: setPbState,
       goToLanding, goToLogin, goToWorkspaceSelector, goToAdmin, selectOrg, setWorkspaceView,
       authReady, needsSetup, authError, login, register, setupSuperuser, logout,
-      currentUser, updateCurrentUser, uploadAvatar,
+      currentUser, updateCurrentUser, uploadAvatar, changePassword, deleteAccount,
       setSearchQuery, setPhaseFilter, setStatusFilter, setZoomLevel,
       setSelectedProjectIds, toggleProjectSelection, selectAllProjects,
       openPhaseDetail, closePhaseDetail, openProjectDetail, closeProjectDetail,
       openCreateProject, closeCreateProject, openCreatePhase, closeCreatePhase,
-      openCreateWorkspace, closeCreateWorkspace, toggleSidebar,
+      openCreateWorkspace, closeCreateWorkspace, openProfileModal, closeProfileModal, toggleSidebar,
       addProject, updateProject, deleteProject,
       addPhaseBlock, updatePhaseBlock, deletePhaseBlock,
       addPhaseItem, updatePhaseItem, deletePhaseItem,

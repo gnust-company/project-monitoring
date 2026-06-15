@@ -105,6 +105,12 @@ class SetSuperuserIn(CamelModel):
     is_superuser: bool
 
 
+class PasswordChange(CamelModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+
 # ─── Organizations / Workspace ───────────────────────────────────────
 class OrganizationOut(CamelModel):
     id: UUID
