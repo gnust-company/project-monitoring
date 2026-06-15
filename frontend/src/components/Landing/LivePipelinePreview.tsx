@@ -1,6 +1,7 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { PHASE_META } from '../../types';
 import { projects, phaseBlocks } from '../../data/mockData';
+import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
 import {
   format, parseISO, differenceInDays, addDays, addMonths,
   eachWeekOfInterval, eachMonthOfInterval, startOfQuarter, getQuarter,
@@ -105,14 +106,20 @@ export default function LivePipelinePreview() {
 
   // Timeline range
   const today = useMemo(() => new Date(), []);
+  // Neo biên vào hôm nay với cửa sổ cố định, chỉ nới khi phase nằm ngoài →
+  // kéo/thả quanh hôm nay không làm dịch lịch.
   const minDate = useMemo(() => {
-    if (demoPhaseBlocks.length === 0) return addDays(today, -30);
-    return addDays(new Date(Math.min(...demoPhaseBlocks.map(pb => parseISO(pb.startDate).getTime()))), -14);
+    const anchor = addDays(today, -30);
+    if (demoPhaseBlocks.length === 0) return anchor;
+    const earliest = Math.min(...demoPhaseBlocks.map(pb => parseISO(pb.startDate).getTime()));
+    return earliest < anchor.getTime() ? addDays(new Date(earliest), -14) : anchor;
   }, [demoPhaseBlocks, today]);
 
   const maxDate = useMemo(() => {
-    if (demoPhaseBlocks.length === 0) return addDays(today, 60);
-    return addDays(new Date(Math.max(...demoPhaseBlocks.map(pb => parseISO(pb.endDate).getTime()))), 30);
+    const anchor = addDays(today, 60);
+    if (demoPhaseBlocks.length === 0) return anchor;
+    const latest = Math.max(...demoPhaseBlocks.map(pb => parseISO(pb.endDate).getTime()));
+    return latest > anchor.getTime() ? addDays(new Date(latest), 30) : anchor;
   }, [demoPhaseBlocks, today]);
 
   const { columns, colWidth, totalWidth } = useMemo(() => {
@@ -237,6 +244,22 @@ export default function LivePipelinePreview() {
     }
     return data;
   }, [filteredProjects, getFilteredPbs, layoutMap]);
+
+  // Trạng thái & tiến độ auto (derived) — tính từ vị trí phase hiện tại (kéo/thả).
+  const liveStatus = useMemo(() => {
+    const live = demoPhaseBlocks.map(pb => {
+      const pos = blockPositions.get(pb.id);
+      return pos ? { ...pb, startDate: pos.startDate, endDate: pos.endDate } : pb;
+    });
+    const statusMap = new Map<string, ReturnType<typeof computeProjectStatus>>();
+    const progressMap = new Map<string, number>();
+    for (const project of filteredProjects) {
+      statusMap.set(project.id, computeProjectStatus(project, live));
+      progressMap.set(project.id,
+        Math.round(projectPhaseProgress(live.filter(b => b.projectId === project.id)) * 100));
+    }
+    return { statusMap, progressMap };
+  }, [filteredProjects, blockPositions]);
 
   // Auto scroll to today
   useEffect(() => {
@@ -405,7 +428,8 @@ export default function LivePipelinePreview() {
   const scrollToToday = useCallback(() => {
     const el = boardRef.current;
     if (!el) return;
-    const target = todayPos - (el.clientWidth / 2);
+    const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+    const target = Math.max(0, Math.min(todayPos - el.clientWidth / 2, maxScroll));
     const start = el.scrollLeft;
     const distance = target - start;
     if (Math.abs(distance) < 2) return;
@@ -468,11 +492,11 @@ export default function LivePipelinePreview() {
                   <div className="w-full min-w-0">
                     <div className="flex items-center gap-1.5">
                       <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                        project.status === 'On Track' ? 'bg-emerald-400' :
-                        project.status === 'At Risk' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                        (liveStatus.statusMap.get(project.id) ?? project.status) === 'On Track' ? 'bg-emerald-400' :
+                        (liveStatus.statusMap.get(project.id) ?? project.status) === 'At Risk' ? 'bg-amber-400' : 'bg-red-400'}`} />
                       <span className="text-[11px] font-semibold text-ink truncate">{project.name}</span>
                     </div>
-                    <div className="text-[9px] text-stone-400 font-light mt-0.5">{pbCount} phase · {project.progress}%</div>
+                    <div className="text-[9px] text-stone-400 font-light mt-0.5">{pbCount} phase · {liveStatus.progressMap.get(project.id) ?? project.progress}%</div>
                   </div>
                 </div>
               );

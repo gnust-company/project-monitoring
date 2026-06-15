@@ -11,12 +11,15 @@ import type { Project, PhaseBlock, ProjectStatus } from '../types';
 //  - At Risk: phaseProgress < dateProgress (tiến độ thực chậm hơn theo ngày).
 //  - On Track: còn lại.
 
-const ACTIVE_DONE_TAGS = new Set(['Complete', 'Canceled']);
+/** Phase được coi là HOÀN TẤT nếu tag Complete/Canceled, hoặc checklist tick hết. */
+export function isPhaseComplete(pb: PhaseBlock): boolean {
+  if (pb.tag === 'Complete' || pb.tag === 'Canceled') return true;
+  return pb.checklist.length > 0 && pb.checklist.every(c => c.done);
+}
 
-/** % hoàn thành của 1 phase block (0..1). Complete = 1 dù chưa tick hết. */
+/** % hoàn thành của 1 phase block (0..1). Hoàn tất = 1 dù chưa tick hết. */
 export function phaseBlockProgress(pb: PhaseBlock): number {
-  if (pb.tag === 'Complete') return 1;
-  if (pb.tag === 'Canceled') return 1; // không tính là việc tồn đọng
+  if (isPhaseComplete(pb)) return 1;
   const total = pb.checklist.length;
   if (total === 0) return pb.tag === 'Inprogress' ? 0.5 : 0;
   return pb.checklist.filter(c => c.done).length / total;
@@ -40,9 +43,9 @@ export function projectPhaseProgress(blocks: PhaseBlock[]): number {
   return sum / counted.length;
 }
 
-/** Một phase được coi là trễ nếu quá endDate mà chưa hoàn tất/hủy. */
+/** Một phase trễ nếu quá endDate mà CHƯA hoàn tất (tag xong hoặc checklist 100%). */
 export function isPhaseDelayed(pb: PhaseBlock, today = new Date()): boolean {
-  if (ACTIVE_DONE_TAGS.has(pb.tag)) return false;
+  if (isPhaseComplete(pb)) return false;
   return today > parseISO(pb.endDate);
 }
 

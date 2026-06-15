@@ -140,16 +140,21 @@ export default function PipelineTimeline() {
   // ─── Timeline range ───────────────────────────────────────────────
   const today = useMemo(() => new Date(), []);
 
+  // Neo biên lịch vào HÔM NAY với cửa sổ rộng cố định, chỉ nới ra khi phase
+  // nằm ngoài. Nhờ vậy kéo/thả phase quanh hôm nay không làm dịch columns[0]
+  // → lịch đứng im (muốn ra ngày xa thì tự cuộn lịch rồi kéo).
   const minDate = useMemo(() => {
-    if (phaseBlocks.length === 0) return addDays(today, -30);
-    const dates = phaseBlocks.map(pb => parseISO(pb.startDate));
-    return addDays(new Date(Math.min(...dates.map(d => d.getTime()))), -14);
+    const anchor = addDays(today, -30);
+    if (phaseBlocks.length === 0) return anchor;
+    const earliest = Math.min(...phaseBlocks.map(pb => parseISO(pb.startDate).getTime()));
+    return earliest < anchor.getTime() ? addDays(new Date(earliest), -14) : anchor;
   }, [phaseBlocks, today]);
 
   const maxDate = useMemo(() => {
-    if (phaseBlocks.length === 0) return addDays(today, 60);
-    const dates = phaseBlocks.map(pb => parseISO(pb.endDate));
-    return addDays(new Date(Math.max(...dates.map(d => d.getTime()))), 30);
+    const anchor = addDays(today, 60);
+    if (phaseBlocks.length === 0) return anchor;
+    const latest = Math.max(...phaseBlocks.map(pb => parseISO(pb.endDate).getTime()));
+    return latest > anchor.getTime() ? addDays(new Date(latest), 30) : anchor;
   }, [phaseBlocks, today]);
 
   // ─── Columns & widths ─────────────────────────────────────────────
@@ -651,8 +656,10 @@ export default function PipelineTimeline() {
             </div>
             <div className="flex items-center bg-stone-100 rounded-lg p-0.5">
               <button onClick={() => {
-                if (!boardRef.current) return;
-                const target = todayPos - (boardRef.current.clientWidth / 2);
+                const el = boardRef.current;
+                if (!el) return;
+                const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+                const target = Math.max(0, Math.min(todayPos - el.clientWidth / 2, maxScroll));
                 smoothScrollTo(target);
               }}
                 className="px-2.5 py-1 text-xs font-bold rounded-md text-ink hover:bg-ink/[0.06] transition-colors">

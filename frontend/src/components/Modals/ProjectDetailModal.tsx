@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import Avatar from '../common/Avatar';
-import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
+import { computeProjectStatus, projectPhaseProgress, projectDateProgress } from '../../lib/projectStatus';
 
 const STATUS_META: Record<ProjectStatus, { color: string; bg: string; border: string; bar: string }> = {
   'On Track': { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: '#10b981' },
@@ -76,6 +76,7 @@ export default function ProjectDetailModal() {
   // Trạng thái & tiến độ auto (derived) — không chỉnh tay
   const autoStatus = computeProjectStatus(project, phaseBlocks);
   const autoProgress = Math.round(projectPhaseProgress(projectPbs) * 100);
+  const dateProgress = Math.round(projectDateProgress(project) * 100);
   const statusMeta = STATUS_META[autoStatus];
 
   // Phân bố phase theo loại — để nhìn nhanh dự án đang nặng ở giai đoạn nào
@@ -235,6 +236,22 @@ export default function ProjectDetailModal() {
                 <div className="h-full rounded-full transition-all"
                   style={{ width: `${autoProgress}%`, background: statusMeta.bar }} />
               </div>
+            </div>
+
+            {/* Progress (auto — theo ngày: từ ngày bắt đầu → ngày mục tiêu) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-stone-700">Tiến độ (theo ngày)</label>
+                <span className="text-xs font-bold text-ink">{dateProgress}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full bg-stone-400 transition-all" style={{ width: `${dateProgress}%` }} />
+              </div>
+              <p className="text-[10px] text-stone-400 mt-1">
+                {dateProgress > autoProgress
+                  ? `Phase đang chậm hơn lịch ${dateProgress - autoProgress}%`
+                  : 'Phase đang bắt kịp hoặc vượt lịch'}
+              </p>
             </div>
 
             {/* Stats */}
