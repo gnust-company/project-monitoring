@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Layers, Users, ArrowRight, ArrowLeft, Plus } from 'lucide-react';
 import CreateWorkspaceModal from '../Modals/CreateWorkspaceModal';
 import Avatar from '../common/Avatar';
+import UserMenu from '../common/UserMenu';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -13,7 +14,7 @@ const fadeUp = {
 };
 
 export default function WorkspaceSelector() {
-  const { selectOrg, goToLanding, organizations, openCreateWorkspace, currentUser, openProfileModal } = useApp();
+  const { selectOrg, goToLanding, organizations, openCreateWorkspace, currentUser } = useApp();
 
   return (
     <div className="min-h-screen bg-white">
@@ -30,16 +31,7 @@ export default function WorkspaceSelector() {
             </div>
             <span className="font-semibold text-sm text-ink">ProjectHub</span>
           </div>
-          {currentUser ? (
-            <button onClick={openProfileModal}
-              title="Tài khoản của tôi"
-              className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-lg hover:bg-surface-soft transition-colors">
-              <Avatar name={currentUser.name} src={currentUser.avatar} className="w-7 h-7" />
-              <span className="text-sm font-medium text-ink max-w-[120px] truncate hidden sm:block">{currentUser.name}</span>
-            </button>
-          ) : (
-            <div className="w-16" />
-          )}
+          {currentUser ? <UserMenu /> : <div className="w-16" />}
         </div>
       </header>
 

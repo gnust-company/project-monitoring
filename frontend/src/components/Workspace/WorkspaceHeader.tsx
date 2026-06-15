@@ -1,25 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { Bell, ChevronRight, LogOut, Settings, User, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Bell, ChevronRight } from 'lucide-react';
+import UserMenu from '../common/UserMenu';
 
 export default function WorkspaceHeader() {
   const {
-    selectedOrg, workspaceView, currentUserEmail, currentUser,
-    logout, goToWorkspaceSelector, goToAdmin, setWorkspaceView,
+    selectedOrg, workspaceView, goToWorkspaceSelector,
     notifications, unreadCount, markNotificationRead, markAllNotificationsRead,
   } = useApp();
 
   const [showNotif, setShowNotif] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-  const profileRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotif(false);
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setShowProfile(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -39,9 +36,6 @@ export default function WorkspaceHeader() {
     if (h < 24) return `${h} giờ trước`;
     return `${Math.floor(h / 24)} ngày trước`;
   };
-
-  const currentUserName = currentUser?.name || currentUserEmail?.split('@')[0] || 'User';
-  const currentUserAvatar = currentUser?.avatar;
 
   return (
     <header className="h-14 bg-white border-b border-hairline flex items-center justify-between px-6 flex-shrink-0">
@@ -65,7 +59,7 @@ export default function WorkspaceHeader() {
       <div className="flex items-center gap-2">
         {/* Notification bell */}
         <div ref={notifRef} className="relative">
-          <button onClick={() => { setShowNotif(!showNotif); setShowProfile(false); }}
+          <button onClick={() => setShowNotif(!showNotif)}
             className="relative w-9 h-9 rounded-lg flex items-center justify-center
                        hover:bg-surface-soft transition-colors text-muted hover:text-ink">
             <Bell className="w-4.5 h-4.5" />
@@ -123,67 +117,8 @@ export default function WorkspaceHeader() {
           </AnimatePresence>
         </div>
 
-        {/* User avatar */}
-        <div ref={profileRef} className="relative">
-          <button onClick={() => { setShowProfile(!showProfile); setShowNotif(false); }}
-            className="flex items-center gap-2.5 pl-3 pr-2 py-1.5 rounded-lg hover:bg-surface-soft transition-colors">
-            {currentUserAvatar ? (
-              <img src={currentUserAvatar} alt="" className="w-7 h-7 rounded-full bg-surface-card" />
-            ) : (
-              <div className="w-7 h-7 rounded-full bg-surface-card flex items-center justify-center">
-                <span className="text-xs font-semibold text-ink">{currentUserName.charAt(0).toUpperCase()}</span>
-              </div>
-            )}
-            <span className="text-sm font-medium text-ink max-w-[120px] truncate hidden sm:block">{currentUserName}</span>
-          </button>
-          <AnimatePresence>
-            {showProfile && (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                transition={{ duration: 0.2 }}
-                className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-hairline
-                           shadow-xl shadow-black/[0.06] overflow-hidden z-50">
-                <div className="px-4 py-3 border-b border-hairline-soft">
-                  <p className="text-sm font-semibold text-ink">{currentUserName}</p>
-                  <p className="text-[11px] text-muted-soft mt-0.5 truncate">{currentUserEmail}</p>
-                </div>
-                <div className="p-1.5">
-                  <button onClick={() => { setShowProfile(false); setWorkspaceView('profile'); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
-                               hover:bg-surface-soft hover:text-ink transition-colors">
-                    <User className="w-4 h-4" /> Hồ sơ
-                  </button>
-                  <button onClick={() => { setShowProfile(false); setWorkspaceView('settings'); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
-                               hover:bg-surface-soft hover:text-ink transition-colors">
-                    <Settings className="w-4 h-4" /> Cài đặt Workspace
-                  </button>
-                  <button onClick={goToWorkspaceSelector}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
-                               hover:bg-surface-soft hover:text-ink transition-colors">
-                    <CheckCircle2 className="w-4 h-4" /> Chuyển Workspace
-                  </button>
-                  {currentUser?.isSuperuser && (
-                    <button onClick={() => { setShowProfile(false); goToAdmin(); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
-                                 hover:bg-surface-soft hover:text-ink transition-colors">
-                      <ShieldCheck className="w-4 h-4" /> Bảng quản trị
-                    </button>
-                  )}
-                </div>
-                <div className="p-1.5 border-t border-hairline-soft">
-                  <button onClick={logout}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-error
-                               hover:bg-error/5 transition-colors">
-                    <LogOut className="w-4 h-4" /> Đăng xuất
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* User menu (dùng chung mọi view) */}
+        <UserMenu />
       </div>
     </header>
   );
