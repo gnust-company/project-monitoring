@@ -465,13 +465,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [patchBlock]);
 
   // ─── Organizations ────────────────────────────────────────────────
-  const reloadOrgs = useCallback(async (me: User | null) => {
-    const orgs = await orgsApi.list();
-    setOrgsState(orgs);
-    syncRegistry(orgs, me);
-    return orgs;
-  }, [syncRegistry]);
-
   const addOrganization = useCallback(async (name: string) => {
     // Dùng org trả về trực tiếp (tránh race với commit-after-response của BE)
     const created = await orgsApi.create(name);

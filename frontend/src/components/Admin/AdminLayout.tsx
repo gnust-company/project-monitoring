@@ -39,20 +39,6 @@ export default function AdminLayout() {
   const [deleteTarget, setDeleteTarget] = useState<AdminUserInfo | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
-  const confirmDelete = useCallback(async () => {
-    if (!deleteTarget) return;
-    setDeleteBusy(true);
-    try {
-      await adminApi.deleteUser(deleteTarget.id);
-      setDeleteTarget(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không xóa được người dùng');
-    } finally {
-      setDeleteBusy(false);
-    }
-  }, [deleteTarget, load]);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -67,6 +53,20 @@ export default function AdminLayout() {
       setLoading(false);
     }
   }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await adminApi.deleteUser(deleteTarget.id);
+      setDeleteTarget(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không xóa được người dùng');
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [deleteTarget, load]);
 
   useEffect(() => { load(); }, [load]);
 
