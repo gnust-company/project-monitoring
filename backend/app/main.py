@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.presentation.api.routers import (
+    admin,
     auth,
     change_requests,
     health,
@@ -40,3 +41,4 @@ app.include_router(notifications.router)
 app.include_router(phase_blocks.router)
 app.include_router(templates.router)
 app.include_router(users.router)
+app.include_router(admin.router)

@@ -68,6 +68,43 @@ class ProfileUpdate(CamelModel):
     role: UserRole | None = None
 
 
+# ─── Admin (superuser-only) ──────────────────────────────────────────
+class AdminStatsOut(CamelModel):
+    user_count: int
+    superuser_count: int
+    workspace_count: int
+    project_count: int
+    phase_block_count: int
+
+
+class AdminUserOut(CamelModel):
+    id: UUID
+    email: str
+    name: str
+    role: UserRole
+    avatar: str | None = None
+    is_superuser: bool = False
+    created_at: datetime | None = None
+    workspace_count: int = 0
+
+
+class AdminWorkspaceOut(CamelModel):
+    id: UUID
+    name: str
+    created_at: datetime | None = None
+    member_count: int = 0
+    project_count: int = 0
+    owners: list[UserOut] = []
+
+
+class ResetPasswordIn(CamelModel):
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class SetSuperuserIn(CamelModel):
+    is_superuser: bool
+
+
 # ─── Organizations / Workspace ───────────────────────────────────────
 class OrganizationOut(CamelModel):
     id: UUID

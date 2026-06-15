@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-projecthub}
       POSTGRES_DB: ${POSTGRES_DB:-projecthub}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,8 +22,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # web console
+      - "${MINIO_API_PORT:-9000}:9000"       # S3 API
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"   # web console
     volumes:
       - miniodata:/data
     healthcheck:
@@ -50,21 +50,28 @@ services:
 
   backend:
     build: ./backend
+    image: projecthub-backend:latest   # tên cố định để save/load hoặc push registry
     depends_on:
       postgres:
         condition: service_healthy
       minio:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-projecthub}:${POSTGRES_PASSWORD:-projecthub}@postgres:5432/${POSTGRES_DB:-projecthub}
+      # Mặc định trỏ service `postgres` trong compose. Dùng DB ngoài (đã comment service
+      # postgres) thì đặt DATABASE_URL trong .env, vd:
+      #   DATABASE_URL=postgresql+asyncpg://projecthub:projecthub@192.168.1.10:5432/projecthub
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-projecthub}:${POSTGRES_PASSWORD:-projecthub}@postgres:5432/${POSTGRES_DB:-projecthub}}
       JWT_SECRET: ${JWT_SECRET:-change-me}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      MINIO_ENDPOINT: http://minio:9000
+      # phải khớp host:port mà trình duyệt mở frontend (đổi FRONTEND_PORT thì sửa luôn)
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173}}
+      # MinIO nội bộ container dùng để upload. Dùng MinIO ngoài thì đặt MINIO_ENDPOINT trong .env.
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      # URL trình duyệt tải file/avatar (đổi MINIO_API_PORT thì sửa luôn)
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:${MINIO_API_PORT:-9000}}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     command: >
       /bin/sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
@@ -72,11 +79,17 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000/api/v1}
+        # chỉ là fallback nướng vào bundle; URL thật đặt ở `environment` bên dưới
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:${BACKEND_PORT:-8000}/api/v1}
+    image: projecthub-frontend:latest   # tên cố định để save/load hoặc push registry
+    environment:
+      # Cấu hình lúc CHẠY — FE đọc qua /runtime-env.js. Đổi IP/port chỉ cần sửa
+      # biến này (vd trong .env) rồi `docker compose up -d frontend`, KHÔNG build lại.
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:${BACKEND_PORT:-8000}/api/v1}
     depends_on:
       - backend
     ports:
-      - "5173:80"
+      - "${FRONTEND_PORT:-5173}:80"
 
 volumes:
   pgdata:

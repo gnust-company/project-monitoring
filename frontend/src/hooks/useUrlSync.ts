@@ -9,7 +9,7 @@ const WS_VIEWS: WorkspaceView[] = ['dashboard', 'pipeline', 'team', 'profile', '
 export function useUrlSync() {
   const {
     currentView, selectedOrgId, workspaceView, authReady, currentUser,
-    goToLanding, goToLogin, goToWorkspaceSelector, selectOrg, setWorkspaceView,
+    goToLanding, goToLogin, goToWorkspaceSelector, goToAdmin, selectOrg, setWorkspaceView,
   } = useApp();
 
   const restoring = useRef(false);
@@ -23,6 +23,7 @@ export function useUrlSync() {
       case 'setup': return '/setup';
       case 'workspace-selector': return '/home';
       case 'workspace': return selectedOrgId ? `/workspace/${selectedOrgId}/${workspaceView}` : '/home';
+      case 'admin': return '/admin';
       default: return '/';
     }
   };
@@ -37,6 +38,8 @@ export function useUrlSync() {
       setWorkspaceView(view);
     } else if (parts[0] === 'home') {
       goToWorkspaceSelector();
+    } else if (parts[0] === 'admin') {
+      goToAdmin();
     } else if (parts[0] === 'login' || parts[0] === 'register') {
       goToLogin();
     } else {
@@ -72,6 +75,7 @@ export function useUrlSync() {
     if (currentUser) {
       if (parts[0] === 'workspace' && parts[1]) applyPath(path);
       else if (parts[0] === 'home') goToWorkspaceSelector();
+      else if (parts[0] === 'admin') goToAdmin();
       else goToLanding();
     } else if (parts[0] === 'login' || parts[0] === 'register') {
       goToLogin();

@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { Bell, ChevronRight, LogOut, Settings, User, CheckCircle2 } from 'lucide-react';
+import { Bell, ChevronRight, LogOut, Settings, User, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export default function WorkspaceHeader() {
   const {
     selectedOrg, workspaceView, currentUserEmail, currentUser,
-    logout, goToWorkspaceSelector, setWorkspaceView,
+    logout, goToWorkspaceSelector, goToAdmin, setWorkspaceView,
     notifications, unreadCount, markNotificationRead, markAllNotificationsRead,
   } = useApp();
 
@@ -165,6 +165,13 @@ export default function WorkspaceHeader() {
                                hover:bg-surface-soft hover:text-ink transition-colors">
                     <CheckCircle2 className="w-4 h-4" /> Chuyển Workspace
                   </button>
+                  {currentUser?.isSuperuser && (
+                    <button onClick={() => { setShowProfile(false); goToAdmin(); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body
+                                 hover:bg-surface-soft hover:text-ink transition-colors">
+                      <ShieldCheck className="w-4 h-4" /> Bảng quản trị
+                    </button>
+                  )}
                 </div>
                 <div className="p-1.5 border-t border-hairline-soft">
                   <button onClick={logout}

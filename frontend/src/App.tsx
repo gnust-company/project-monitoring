@@ -6,6 +6,7 @@ import LoginPage from './components/Landing/LoginPage';
 import SetupPage from './components/Landing/SetupPage';
 import WorkspaceSelector from './components/OrgSelector/WorkspaceSelector';
 import WorkspaceLayout from './components/Workspace/WorkspaceLayout';
+import AdminLayout from './components/Admin/AdminLayout';
 
 function AppContent() {
   const { currentView, authReady, needsSetup } = useApp();
@@ -36,6 +37,7 @@ function AppContent() {
       {currentView === 'setup' && <SetupPage />}
       {currentView === 'workspace-selector' && <WorkspaceSelector />}
       {currentView === 'workspace' && <WorkspaceLayout />}
+      {currentView === 'admin' && <AdminLayout />}
     </>
   );
 }

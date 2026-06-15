@@ -3,6 +3,7 @@ import { api, setToken, clearToken } from './client';
 import type {
   User, Organization, Project, PhaseBlock, ChecklistItem, Comment, Attachment,
   ActivityItem, Notification, ChangeRequest, UserRole, DevPhase, PhaseTag, ProjectStatus,
+  AdminStats, AdminUserInfo, AdminWorkspaceInfo,
 } from '../types';
 
 // ─── DTO shapes (chỉ field cần dùng) ─────────────────────────────────
@@ -223,6 +224,35 @@ export const changeRequestsApi = {
   },
   async reject(id: string): Promise<ChangeRequest> {
     return await api.post<ChangeRequest>(`/change-requests/${id}/reject`);
+  },
+};
+
+// ─── Admin (superuser) ───────────────────────────────────────────────
+interface AdminWorkspaceDTO {
+  id: string; name: string; createdAt: string | null;
+  memberCount: number; projectCount: number; owners: UserDTO[];
+}
+
+export const adminApi = {
+  async stats(): Promise<AdminStats> {
+    return await api.get<AdminStats>('/admin/stats');
+  },
+  async users(): Promise<AdminUserInfo[]> {
+    // DTO camelCase khớp AdminUserInfo 1-1
+    return await api.get<AdminUserInfo[]>('/admin/users');
+  },
+  async workspaces(): Promise<AdminWorkspaceInfo[]> {
+    return (await api.get<AdminWorkspaceDTO[]>('/admin/workspaces')).map(d => ({
+      id: d.id, name: d.name, createdAt: d.createdAt,
+      memberCount: d.memberCount, projectCount: d.projectCount,
+      owners: (d.owners ?? []).map(mapUser),
+    }));
+  },
+  async resetPassword(userId: string, newPassword: string): Promise<void> {
+    await api.post(`/admin/users/${userId}/reset-password`, { newPassword });
+  },
+  async setSuperuser(userId: string, isSuperuser: boolean): Promise<void> {
+    await api.post(`/admin/users/${userId}/superuser`, { isSuperuser });
   },
 };
 

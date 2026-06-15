@@ -20,6 +20,35 @@ export interface Organization {
   myRole?: WorkspaceRole; // cấp quyền của user hiện tại trong workspace
 }
 
+// ─── Admin (superuser toàn cục) ───────────────────────────────────
+export interface AdminStats {
+  userCount: number;
+  superuserCount: number;
+  workspaceCount: number;
+  projectCount: number;
+  phaseBlockCount: number;
+}
+
+export interface AdminUserInfo {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  avatar: string | null;
+  isSuperuser: boolean;
+  createdAt: string | null;
+  workspaceCount: number;
+}
+
+export interface AdminWorkspaceInfo {
+  id: string;
+  name: string;
+  createdAt: string | null;
+  memberCount: number;
+  projectCount: number;
+  owners: User[];
+}
+
 // ─── Notifications & Change Requests (khớp backend) ───────────────
 export interface Notification {
   id: string;

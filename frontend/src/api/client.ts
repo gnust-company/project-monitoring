@@ -1,5 +1,19 @@
 // HTTP client mỏng cho backend ProjectHub: gắn JWT, parse JSON, ném lỗi có status.
-const BASE: string = (import.meta.env.VITE_API_BASE as string) || 'http://localhost:8000/api/v1';
+
+// Base URL backend — ưu tiên cấu hình RUNTIME (window.__RUNTIME_CONFIG__ do nginx ghi
+// từ biến môi trường lúc container khởi động) → đổi IP/port không cần build lại image.
+// Fallback: biến build-time VITE_API_BASE, rồi giá trị mặc định cho dev.
+declare global {
+  interface Window {
+    __RUNTIME_CONFIG__?: { API_BASE?: string };
+  }
+}
+
+const runtimeBase =
+  typeof window !== 'undefined' ? window.__RUNTIME_CONFIG__?.API_BASE : undefined;
+
+const BASE: string =
+  runtimeBase || (import.meta.env.VITE_API_BASE as string) || 'http://localhost:8000/api/v1';
 
 const TOKEN_KEY = 'projecthub.token';
 

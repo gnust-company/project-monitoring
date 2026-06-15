@@ -64,3 +64,23 @@ class SqlAlchemyUserRepository(UserRepository):
 
     async def count(self) -> int:
         return await self._session.scalar(select(func.count()).select_from(UserModel)) or 0
+
+    async def list_all(self) -> list[User]:
+        rows = await self._session.scalars(select(UserModel).order_by(UserModel.created_at))
+        return [_to_entity(m) for m in rows]
+
+    async def set_password(self, user_id: UUID, password_hash: str) -> bool:
+        m = await self._session.get(UserModel, user_id)
+        if m is None:
+            return False
+        m.password_hash = password_hash
+        await self._session.flush()
+        return True
+
+    async def set_superuser(self, user_id: UUID, value: bool) -> bool:
+        m = await self._session.get(UserModel, user_id)
+        if m is None:
+            return False
+        m.is_superuser = value
+        await self._session.flush()
+        return True

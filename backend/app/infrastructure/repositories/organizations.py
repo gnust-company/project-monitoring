@@ -39,6 +39,25 @@ class SqlAlchemyOrganizationRepository(OrganizationRepository):
             id=m.id, name=m.name, member_ids=await self._member_ids(org_id), created_at=m.created_at
         )
 
+    async def list_all(self) -> list[Organization]:
+        rows = await self._session.scalars(
+            select(OrganizationModel).order_by(OrganizationModel.created_at)
+        )
+        return [
+            Organization(
+                id=m.id, name=m.name,
+                member_ids=await self._member_ids(m.id), created_at=m.created_at,
+            )
+            for m in rows
+        ]
+
+    async def list_all_memberships(self) -> list[Membership]:
+        rows = await self._session.scalars(select(OrganizationMemberModel))
+        return [
+            Membership(user_id=m.user_id, org_id=m.org_id, role=m.role, joined_at=m.joined_at)
+            for m in rows
+        ]
+
     async def list_for_user(self, user_id: UUID) -> list[Organization]:
         org_ids = await self._session.scalars(
             select(OrganizationMemberModel.org_id).where(OrganizationMemberModel.user_id == user_id)

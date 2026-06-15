@@ -157,7 +157,7 @@ const features = [
 ];
 
 export default function LandingPage() {
-  const { goToLogin, goToWorkspaceSelector, currentUser, currentUserEmail, logout } = useApp();
+  const { goToLogin, goToWorkspaceSelector, goToAdmin, currentUser, currentUserEmail, logout } = useApp();
   const [activePhase, setActivePhase] = useState<DevPhase>('PA');
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -220,6 +220,12 @@ export default function LandingPage() {
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors">
                             <FolderKanban className="w-4 h-4" /> Workspaces của tôi
                           </button>
+                          {currentUser.isSuperuser && (
+                            <button onClick={() => { setShowMenu(false); goToAdmin(); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors">
+                              <Shield className="w-4 h-4" /> Bảng quản trị
+                            </button>
+                          )}
                         </div>
                         <div className="p-1.5 border-t border-hairline-soft">
                           <button onClick={() => { setShowMenu(false); logout(); }}

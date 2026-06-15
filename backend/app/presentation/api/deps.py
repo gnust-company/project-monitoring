@@ -50,6 +50,13 @@ from app.application.use_cases.projects import (
     ListProjectsByOrg,
     UpdateProjectOrRequest,
 )
+from app.application.use_cases.admin import (
+    GetAdminStats,
+    ListAllUsers,
+    ListAllWorkspaces,
+    ResetUserPassword,
+    SetSuperuser,
+)
 from app.application.use_cases.attachments import (
     AddFileAttachment,
     AddLinkAttachment,
@@ -165,6 +172,16 @@ async def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def require_superuser(current: CurrentUser) -> User:
+    """Chỉ admin toàn cục (is_superuser) — cho khu vực /admin."""
+    if not current.is_superuser:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Superuser permission required")
+    return current
+
+
+SuperuserDep = Annotated[User, Depends(require_superuser)]
 
 
 # ─── Workspace access guards ─────────────────────────────────────────
@@ -389,3 +406,28 @@ def update_profile_uc(repo: UserRepoDep) -> UpdateProfile:
 
 def set_avatar_uc(repo: UserRepoDep, storage: StorageDep) -> SetAvatar:
     return SetAvatar(repo, storage, _avatars_bucket())
+
+
+# ─── Admin use cases (superuser-only) ────────────────────────────────
+def admin_stats_uc(
+    users: UserRepoDep, orgs: OrgRepoDep, projects: ProjectRepoDep, blocks: BlockRepoDep
+) -> GetAdminStats:
+    return GetAdminStats(users, orgs, projects, blocks)
+
+
+def list_all_users_uc(users: UserRepoDep, orgs: OrgRepoDep) -> ListAllUsers:
+    return ListAllUsers(users, orgs)
+
+
+def list_all_workspaces_uc(
+    orgs: OrgRepoDep, projects: ProjectRepoDep, users: UserRepoDep
+) -> ListAllWorkspaces:
+    return ListAllWorkspaces(orgs, projects, users)
+
+
+def reset_password_uc(users: UserRepoDep) -> ResetUserPassword:
+    return ResetUserPassword(users, hash_password)
+
+
+def set_superuser_uc(users: UserRepoDep) -> SetSuperuser:
+    return SetSuperuser(users)

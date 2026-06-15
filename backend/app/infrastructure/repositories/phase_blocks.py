@@ -1,7 +1,7 @@
 """SqlAlchemy cài đặt PhaseBlockRepository (aggregate: items, participants, comments, attachments)."""
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -79,6 +79,9 @@ class SqlAlchemyPhaseBlockRepository(PhaseBlockRepository):
             .options(*_LIGHT).order_by(PhaseBlockModel.start_date)
         )
         return [_block_to_entity(m, full=False) for m in rows]
+
+    async def count_all(self) -> int:
+        return await self._session.scalar(select(func.count()).select_from(PhaseBlockModel)) or 0
 
     async def create(self, block: PhaseBlock) -> PhaseBlock:
         m = PhaseBlockModel(

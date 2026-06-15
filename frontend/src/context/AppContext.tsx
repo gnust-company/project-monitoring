@@ -12,7 +12,7 @@ import { registerUsers } from '../data/mockData';
 
 export interface PhaseBlockUI extends PhaseBlock {}
 
-type AppView = 'landing' | 'login' | 'setup' | 'workspace-selector' | 'workspace';
+type AppView = 'landing' | 'login' | 'setup' | 'workspace-selector' | 'workspace' | 'admin';
 
 interface AppState {
   currentView: AppView;
@@ -44,6 +44,7 @@ interface AppContextType extends AppState {
   goToLanding: () => void;
   goToLogin: () => void;
   goToWorkspaceSelector: () => void;
+  goToAdmin: () => void;
   selectOrg: (orgId: string) => void;
   setWorkspaceView: (view: WorkspaceView) => void;
 
@@ -212,6 +213,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const goToLanding = useCallback(() => setState(prev => ({ ...INITIAL_STATE, currentView: 'landing', currentUserEmail: prev.currentUserEmail })), []);
   const goToLogin = useCallback(() => setState(prev => ({ ...prev, currentView: 'login' })), []);
   const goToWorkspaceSelector = useCallback(() => setState(prev => ({ ...prev, currentView: 'workspace-selector', selectedOrgId: null })), []);
+  const goToAdmin = useCallback(() => setState(prev => ({ ...prev, currentView: 'admin' })), []);
 
   const selectOrg = useCallback(async (orgId: string) => {
     setState(prev => ({
@@ -561,7 +563,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...state,
       phaseBlocks: pbState,
       setPhaseBlocks: setPbState,
-      goToLanding, goToLogin, goToWorkspaceSelector, selectOrg, setWorkspaceView,
+      goToLanding, goToLogin, goToWorkspaceSelector, goToAdmin, selectOrg, setWorkspaceView,
       authReady, needsSetup, authError, login, register, setupSuperuser, logout,
       currentUser, updateCurrentUser, uploadAvatar,
       setSearchQuery, setPhaseFilter, setStatusFilter, setZoomLevel,

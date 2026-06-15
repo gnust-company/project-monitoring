@@ -1,7 +1,7 @@
 """Cài đặt ProjectRepository bằng SQLAlchemy — mẫu tham chiếu cho các repo khác."""
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.ports import ProjectRepository
@@ -37,6 +37,15 @@ class SqlAlchemyProjectRepository(ProjectRepository):
             select(ProjectModel).where(ProjectModel.org_id == org_id).order_by(ProjectModel.created_at)
         )
         return [_to_entity(m) for m in result]
+
+    async def count_all(self) -> int:
+        return await self._session.scalar(select(func.count()).select_from(ProjectModel)) or 0
+
+    async def count_by_org(self) -> dict[UUID, int]:
+        rows = await self._session.execute(
+            select(ProjectModel.org_id, func.count()).group_by(ProjectModel.org_id)
+        )
+        return {org_id: count for org_id, count in rows.all()}
 
     async def create(self, project: Project) -> Project:
         m = ProjectModel(

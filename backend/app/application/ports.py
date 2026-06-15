@@ -42,10 +42,31 @@ class UserRepository(ABC):
     @abstractmethod
     async def count(self) -> int: ...
 
+    @abstractmethod
+    async def list_all(self) -> list[User]: ...
+
+    @abstractmethod
+    async def set_password(self, user_id: UUID, password_hash: str) -> bool:
+        """Đặt lại mật khẩu (hash đã tính sẵn). True nếu user tồn tại."""
+        ...
+
+    @abstractmethod
+    async def set_superuser(self, user_id: UUID, value: bool) -> bool:
+        """Cấp/thu hồi quyền admin toàn cục. True nếu user tồn tại."""
+        ...
+
 
 class OrganizationRepository(ABC):
     @abstractmethod
     async def get(self, org_id: UUID) -> Organization | None: ...
+
+    @abstractmethod
+    async def list_all(self) -> list[Organization]: ...
+
+    @abstractmethod
+    async def list_all_memberships(self) -> list[Membership]:
+        """Toàn bộ membership (mọi workspace) — dùng cho thống kê admin."""
+        ...
 
     @abstractmethod
     async def list_for_user(self, user_id: UUID) -> list[Organization]: ...
@@ -116,6 +137,14 @@ class ProjectRepository(ABC):
     async def list_by_org(self, org_id: UUID) -> list[Project]: ...
 
     @abstractmethod
+    async def count_all(self) -> int: ...
+
+    @abstractmethod
+    async def count_by_org(self) -> dict[UUID, int]:
+        """Số dự án theo từng workspace (org_id → count)."""
+        ...
+
+    @abstractmethod
     async def create(self, project: Project) -> Project: ...
 
     @abstractmethod
@@ -134,6 +163,9 @@ class PhaseBlockRepository(ABC):
 
     @abstractmethod
     async def list_by_org(self, org_id: UUID) -> list[PhaseBlock]: ...
+
+    @abstractmethod
+    async def count_all(self) -> int: ...
 
     @abstractmethod
     async def get_project_id(self, block_id: UUID) -> UUID | None: ...
