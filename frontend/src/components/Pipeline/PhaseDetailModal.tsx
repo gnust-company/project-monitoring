@@ -416,7 +416,7 @@ export default function PhaseDetailModal() {
               ) : (
                 <div className="group cursor-pointer rounded-lg -mx-1 px-1 py-1 hover:bg-gray-50 transition-colors"
                   onClick={startEditDesc}>
-                  <p className="text-sm text-gray-600 leading-relaxed">{selectedPhaseBlock.description || 'Thêm mô tả...'}</p>
+                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{selectedPhaseBlock.description || 'Thêm mô tả...'}</p>
                   <span className="text-[10px] text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
                     <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa
                   </span>

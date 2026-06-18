@@ -196,7 +196,7 @@ export default function ProjectDetailModal() {
             ) : (
               <div className={`group rounded-lg -mx-1 px-1 py-1 transition-colors ${canManage ? 'cursor-pointer hover:bg-stone-50' : ''}`}
                 onClick={() => canManage && (setDescDraft(project.description), setEditingDesc(true))}>
-                <p className="text-sm text-stone-600 leading-relaxed">{project.description || (canManage ? 'Thêm mô tả...' : '—')}</p>
+                <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap break-words">{project.description || (canManage ? 'Thêm mô tả...' : '—')}</p>
                 {canManage && (
                   <span className="text-[10px] text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
                     <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa

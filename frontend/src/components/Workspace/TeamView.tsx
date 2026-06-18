@@ -1,6 +1,6 @@
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
-import { Mail, Shield, FolderKanban, Crown, ListTodo } from 'lucide-react';
+import { Mail, Shield, Crown, ListTodo } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { PHASE_META } from '../../types';
@@ -34,7 +34,7 @@ const statusStyle: Record<ProjectStatus, { text: string; bar: string }> = {
 };
 
 interface PicProject { id: string; name: string; status: ProjectStatus; progress: number; }
-interface Involvement { project: string; phases: string[]; }
+interface Involvement { project: string; phases: string[]; open: number; total: number; }
 
 export default function TeamView() {
   const { selectedOrg, phaseBlocks, orgProjects } = useApp();
@@ -71,8 +71,10 @@ export default function TeamView() {
         const project = orgProjects.find(p => p.id === pb.projectId);
         if (!project) return;
         let row = items.find(a => a.project === project.name);
-        if (!row) { row = { project: project.name, phases: [] }; items.push(row); }
+        if (!row) { row = { project: project.name, phases: [], open: 0, total: 0 }; items.push(row); }
         if (!row.phases.includes(pb.phaseType)) row.phases.push(pb.phaseType);
+        row.total += pb.checklist.length;
+        row.open += pb.checklist.filter(c => !c.done).length;
         assignedTasks += pb.checklist.length;
         openTasks += pb.checklist.filter(c => !c.done).length;
       });
@@ -201,9 +203,13 @@ export default function TeamView() {
                     <div className="space-y-1.5">
                       {involvement.items.slice(0, 3).map(a => (
                         <div key={a.project} className="flex items-center gap-2">
-                          <FolderKanban className="w-3 h-3 text-stone-400 flex-shrink-0" />
+                          {/* Bên trái: checklist mở/tổng được giao (x/y) */}
+                          <span className="text-[10px] font-bold text-stone-500 tabular-nums flex-shrink-0 min-w-[28px]">
+                            {a.open}/{a.total}
+                          </span>
                           <span className="text-xs text-stone-600 truncate flex-1">{a.project}</span>
-                          <div className="flex items-center gap-1 flex-shrink-0">
+                          {/* Bên phải: phase badges căn phải */}
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
                             {a.phases.slice(0, 3).map(p => {
                               const meta = PHASE_META[p as keyof typeof PHASE_META];
                               return (
@@ -222,12 +228,13 @@ export default function TeamView() {
                   </div>
                 )}
 
-                {/* Task stat (thay cho Workload) */}
-                <div className="mt-auto flex items-center gap-2 text-[11px] text-stone-500 pt-3 border-t border-stone-100">
-                  <ListTodo className="w-3.5 h-3.5 text-stone-400" />
-                  <span className="font-semibold text-ink">{involvement.openTasks}</span> task mở
-                  <span className="text-stone-300">·</span>
-                  <span className="font-semibold text-ink">{involvement.assignedTasks}</span> được giao
+                {/* Task stat — tổng checklist mở/được giao (x/y) bên trái, icon căn phải */}
+                <div className="mt-auto flex items-center justify-between text-[11px] text-stone-500 pt-3 border-t border-stone-100">
+                  <span className="flex items-baseline gap-1.5 min-w-0">
+                    <span className="font-bold text-ink tabular-nums">{involvement.openTasks}/{involvement.assignedTasks}</span>
+                    <span className="text-stone-400 truncate">checklist mở/được giao</span>
+                  </span>
+                  <ListTodo className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
                 </div>
 
                 {/* Email thật */}
