@@ -50,15 +50,16 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 ## Wave 3 — Phụ thuộc Wave 2
 
-- [ ] [#10 — Cải tổ Team View (PIC, bỏ workload, email thật)](https://github.com/gnust-company/project-monitoring/issues/10) *(phụ thuộc #11)*
-  - Bỏ email bịa `@projecthub.io`; "đang tham gia" → dự án làm PIC chính; bỏ workload → tổng task mở/assign; rút gọn ở mức phase; thêm tiến độ dự án PIC.
-- [ ] [#9 — Outcome bắt buộc có document/link mới mark done](https://github.com/gnust-company/project-monitoring/issues/9) *(tiền đề cho #8)*
-  - Gắn attachment/link theo outcome item (migration); checkbox done disabled khi chưa có attachment.
-- [ ] [#8 — Tiến độ phase tính cả Outcome](https://github.com/gnust-company/project-monitoring/issues/8) *(làm sau #9)*
-  - `phaseBlockProgress` gộp checklist + outcomes; đồng bộ FE/BE.
-- [ ] [#12 — Xem & sửa participants sau khi tạo phase](https://github.com/gnust-company/project-monitoring/issues/12)
-  - UI add/remove participants trong PhaseDetailModal + log; quyền theo PIC.
-- [ ] [#17 — Cho sửa Phase Type](https://github.com/gnust-company/project-monitoring/issues/17) *(phần cho sửa; phụ thuộc #16, #14, #11)*
+- [x] [#10 — Cải tổ Team View (PIC, bỏ workload, email thật)](https://github.com/gnust-company/project-monitoring/issues/10) *(phụ thuộc #11)*
+  - Bỏ email bịa `@projecthub.io`; "đang tham gia" → dự án làm PIC chính (`picUserId ?? createdBy`); bỏ workload → tổng task mở/assign; rút gọn ở mức phase; thêm tiến độ dự án PIC.
+- [x] [#9 — Outcome bắt buộc có document/link mới mark done](https://github.com/gnust-company/project-monitoring/issues/9) *(tiền đề cho #8)*
+  - Migration 0004 thêm `attachments.outcome_item_id` (FK → `phase_items`); BE chặn `done=true` nếu chưa có attachment (422); FE disabled checkbox + optimistic revert.
+- [x] [#8 — Tiến độ phase tính cả Outcome](https://github.com/gnust-company/project-monitoring/issues/8) *(làm sau #9)*
+  - `phaseBlockProgress` gộp checklist + outcomes; đồng bộ FE/BE (`progress_pct`).
+- [x] [#12 — Xem & sửa participants sau khi tạo phase](https://github.com/gnust-company/project-monitoring/issues/12)
+  - UI add/remove participants trong PhaseDetailModal + activity log ("added/removed participant"); quyền theo PIC.
+- [x] [#17 — Cho sửa Phase Type](https://github.com/gnust-company/project-monitoring/issues/17) *(phần cho sửa; phụ thuộc #16, #14, #11)*
+  - Dropdown chọn phaseType (tên đầy đủ) trong PhaseDetailModal; PIC-gated (`can_edit_phase`).
 
 ## Wave 4 — UX staged-save
 
