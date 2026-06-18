@@ -10,7 +10,8 @@ from app.application.ports import (
     PhaseBlockRepository,
     PhaseTaskTemplateRepository,
 )
-from app.domain.entities import ActivityEntry, Comment, PhaseBlock, PhaseItem
+from app.application.authz import can_edit_phase
+from app.domain.entities import ActivityEntry, Comment, PhaseBlock, PhaseItem, User
 from app.domain.value_objects import DevPhase, PhaseItemKind, PhaseTag, UserRole
 
 
@@ -20,6 +21,10 @@ class PhaseBlockNotFoundError(Exception):
 
 class PhaseItemNotFoundError(Exception):
     pass
+
+
+class PhaseForbiddenError(Exception):
+    """Không phải PIC phase → không được sửa/xóa metadata (#11)."""
 
 
 @dataclass(slots=True)
@@ -175,10 +180,13 @@ class UpdatePhaseBlock:
         self._activity = activity
         self._notifier = notifier
 
-    async def execute(self, block_id: UUID, payload: dict[str, Any], actor_id: UUID) -> PhaseBlock:
+    async def execute(self, block_id: UUID, payload: dict[str, Any], actor: User) -> PhaseBlock:
         block = await self._blocks.get(block_id)
         if block is None:
             raise PhaseBlockNotFoundError(str(block_id))
+        # #11: chỉ PIC phase (= người tạo)/superuser mới sửa metadata.
+        if not can_edit_phase(actor, block):
+            raise PhaseForbiddenError("Chỉ PIC phase mới được sửa")
 
         diffs = _diffs(block, payload)
         reassigned_to = (
@@ -189,10 +197,10 @@ class UpdatePhaseBlock:
         updated = await self._blocks.update(_apply_block_updates(block, payload))
         for action, target in diffs:
             await self._activity.add(ActivityEntry(
-                id=uuid4(), project_id=updated.project_id, user_id=actor_id,
+                id=uuid4(), project_id=updated.project_id, user_id=actor.id,
                 action=action, target=target, created_at=None, phase_block_id=block_id,
             ))
-        if reassigned_to and reassigned_to != actor_id:
+        if reassigned_to and reassigned_to != actor.id:
             await self._notifier.notify(
                 reassigned_to, "phase_assigned", f"Bạn được giao phase {updated.title}",
                 project_id=updated.project_id, phase_block_id=block_id,
@@ -205,13 +213,16 @@ class DeletePhaseBlock:
         self._blocks = blocks
         self._activity = activity
 
-    async def execute(self, block_id: UUID, actor_id: UUID) -> None:
+    async def execute(self, block_id: UUID, actor: User) -> None:
         block = await self._blocks.get(block_id)
         if block is None:
             raise PhaseBlockNotFoundError(str(block_id))
+        # #11: chỉ PIC phase (= người tạo)/superuser mới xóa.
+        if not can_edit_phase(actor, block):
+            raise PhaseForbiddenError("Chỉ PIC phase mới được xóa")
         # ghi changelog cấp dự án TRƯỚC khi xóa, phase_block_id=None để còn lại
         await self._activity.add(ActivityEntry(
-            id=uuid4(), project_id=block.project_id, user_id=actor_id,
+            id=uuid4(), project_id=block.project_id, user_id=actor.id,
             action="deleted phase", target=block.title, created_at=None, phase_block_id=None,
         ))
         await self._blocks.delete(block_id)
@@ -303,7 +314,9 @@ class AddComment:
         comment = await self._blocks.add_comment(
             block_id, Comment(id=uuid4(), author_id=author_id, content=content, created_at=None)
         )
-        recipients = ({block.assignee, *block.participant_ids}) - {author_id}
+        # #13: assignee giờ có thể None (chỉ là note) → lọc bỏ.
+        raw = {block.assignee, *block.participant_ids} - {author_id}
+        recipients = [r for r in raw if r is not None]
         await self._notifier.notify_many(
             list(recipients), "comment_added", f"Bình luận mới ở phase {block.title}",
             project_id=block.project_id, phase_block_id=block_id,

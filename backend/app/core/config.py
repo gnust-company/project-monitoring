@@ -13,6 +13,20 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 1440
     cors_origins: str = "http://localhost:5173"
 
+    # Allowlist domain email (#5): CSV, vd "company.com, company.vn".
+    # Rỗng = không giới hạn (backward-compatible). KHÔNG áp cho /auth/setup.
+    allowed_email_domains: str = ""
+
+    @property
+    def allowed_email_domain_list(self) -> list[str]:
+        """Domain dạng thường, bỏ dấu @ thừa, lọc rỗng."""
+        out: list[str] = []
+        for raw in self.allowed_email_domains.split(","):
+            d = raw.strip().lower().lstrip("@")
+            if d:
+                out.append(d)
+        return out
+
     # MinIO / object storage (S3-compatible)
     minio_endpoint: str = "http://localhost:9000"
     minio_access_key: str = "minioadmin"

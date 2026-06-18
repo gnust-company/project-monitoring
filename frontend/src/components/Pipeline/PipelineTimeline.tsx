@@ -160,7 +160,13 @@ export default function PipelineTimeline() {
   // ─── Columns & widths ─────────────────────────────────────────────
   const { columns, colWidth, totalWidth } = useMemo(() => {
     let cols: Date[] = [], width = 0;
-    if (zoomLevel === 'week') {
+    if (zoomLevel === '3day') {
+      // Mỗi cột = 3 ngày, to hơn để thấy task ngắn (1–3 ngày).
+      const days: Date[] = [];
+      let d = new Date(minDate);
+      while (d <= maxDate) { days.push(new Date(d)); d = addDays(d, 3); }
+      cols = days; width = 150;
+    } else if (zoomLevel === 'week') {
       cols = eachWeekOfInterval({ start: minDate, end: maxDate }, { weekStartsOn: 1 }); width = 120;
     } else if (zoomLevel === 'month') {
       cols = eachMonthOfInterval({ start: minDate, end: maxDate }); width = 140;
@@ -176,6 +182,7 @@ export default function PipelineTimeline() {
   // ─── Position helpers ─────────────────────────────────────────────
   const getDatePos = useCallback((date: Date) => {
     if (columns.length === 0) return 0;
+    if (zoomLevel === '3day') return (differenceInDays(date, columns[0]) / 3) * colWidth;
     if (zoomLevel === 'week') return (differenceInDays(date, columns[0]) / 7) * colWidth;
 
     // For month & quarter: include day-fraction within the month for precision
@@ -191,6 +198,9 @@ export default function PipelineTimeline() {
   }, [columns, colWidth, zoomLevel]);
 
   const getPosDate = useCallback((px: number) => {
+    if (zoomLevel === '3day') {
+      return addDays(columns[0], Math.round((px / colWidth) * 3));
+    }
     if (zoomLevel === 'week') {
       const ratio = px / colWidth;
       return addDays(columns[0], Math.round(ratio * 7));
@@ -224,11 +234,17 @@ export default function PipelineTimeline() {
     return phaseBlocks.filter(pb => pb.projectId === projectId);
   }, [phaseBlocks]);
 
-  // ─── Row indices (auto + manual) ──────────────────────────────────
+  // ─── Row indices (auto + lưu + manual) ─────────────────────────────
+  // Ưu tiên: override trong session (manualRows, đang kéo) > displayRow đã lưu
+  // (ý người dùng) > assignRows (auto). #bug A/B: giữ bố cục qua reload.
   const baseRowIndices = useMemo(() => {
     const result = new Map<string, number>();
     for (const project of filteredProjects) {
-      assignRows(getFilteredPbs(project.id)).forEach((ri, id) => result.set(id, ri));
+      const pbs = getFilteredPbs(project.id);
+      assignRows(pbs).forEach((ri, id) => result.set(id, ri));
+      for (const pb of pbs) {
+        if (pb.displayRow != null) result.set(pb.id, pb.displayRow);
+      }
     }
     manualRows.forEach((ri, id) => result.set(id, ri));
     return result;
@@ -329,14 +345,20 @@ export default function PipelineTimeline() {
         (draggedPos.startDate !== dragged.startDate || draggedPos.endDate !== dragged.endDate)) {
       updatePhaseBlock(draggedId, { startDate: draggedPos.startDate, endDate: draggedPos.endDate });
     }
-    setManualRows(prev => {
-      const next = new Map(prev);
-      for (const pb of pbs) {
-        const pos = currentLayout.get(pb.id);
-        if (pos) next.set(pb.id, pos.row);
-      }
-      return next;
-    });
+    // #bug A/B: lưu displayRow cho mọi block đổi hàng → giữ bố cục qua reload.
+    const rowUpdates: Array<[string, number]> = [];
+    for (const pb of pbs) {
+      const pos = currentLayout.get(pb.id);
+      if (pos && pb.displayRow !== pos.row) rowUpdates.push([pb.id, pos.row]);
+    }
+    if (rowUpdates.length > 0) {
+      setManualRows(prev => {
+        const next = new Map(prev);
+        for (const [id, row] of rowUpdates) next.set(id, row);
+        return next;
+      });
+      for (const [id, row] of rowUpdates) updatePhaseBlock(id, { displayRow: row });
+    }
   }, [getFilteredPbs, updatePhaseBlock]);
 
   // ─── Board mousedown: pan (kéo dọc) hoặc tạo phase (kéo ngang) ────
@@ -666,11 +688,11 @@ export default function PipelineTimeline() {
                 Hôm nay
               </button>
               <div className="w-px h-4 bg-stone-300 mx-0.5" />
-              {(['week', 'month', 'quarter'] as const).map(z => (
+              {(['3day', 'week', 'month', 'quarter'] as const).map(z => (
                 <button key={z} onClick={() => { setZoomLevel(z); hasScrolled.current = false; }}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize transition-colors
                     ${zoomLevel === z ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
-                  {z === 'week' ? 'Tuần' : z === 'month' ? 'Tháng' : 'Quý'}
+                  {z === '3day' ? '3 ngày' : z === 'week' ? 'Tuần' : z === 'month' ? 'Tháng' : 'Quý'}
                 </button>
               ))}
             </div>
@@ -727,6 +749,12 @@ export default function PipelineTimeline() {
                   <div key={i}
                     className="flex-shrink-0 border-r border-stone-200/40 px-2 flex flex-col items-center justify-center text-xs font-medium text-stone-500 leading-tight"
                     style={{ width: colWidth }}>
+                    {zoomLevel === '3day' && (
+                      <>
+                        <span className="font-bold text-stone-700">{format(col, 'dd')}</span>
+                        <span className="text-[10px] text-stone-400 font-light">{format(col, 'dd/MM')} – {format(addDays(col, 2), 'dd/MM')}</span>
+                      </>
+                    )}
                     {zoomLevel === 'week' && (
                       <>
                         <span className="font-bold text-stone-700">W{format(col, 'ww')}</span>
@@ -798,7 +826,7 @@ export default function PipelineTimeline() {
                     const totalChecks = pb.checklist.length;
                     const doneChecks = pb.checklist.filter(c => c.done).length;
                     const pct = totalChecks > 0 ? Math.round((doneChecks / totalChecks) * 100) : 0;
-                    const assignee = getUserById(pb.assignee || pb.createdBy);
+                    const assignee = getUserById(pb.createdBy); // #13: PIC = người tạo
                     return (
                       <div key={pb.id}
                         className={`phase-block absolute rounded-lg border cursor-pointer group transition-shadow duration-150
@@ -811,10 +839,15 @@ export default function PipelineTimeline() {
                         onMouseMove={e => setHoverInfo({ id: pb.id, x: e.clientX, y: e.clientY })}
                         onMouseLeave={() => setHoverInfo(null)}
                       >
-                        <div className="px-2.5 py-1 flex items-center gap-1.5 h-full overflow-hidden">
-                          <span className={`text-[11px] font-semibold ${meta.color} truncate flex-1`}>
+                        {/* Title sticky: khi block dài & cuộn ngang, title dính mép trái board
+                            cho đến khi hết block (#sticky title). Ellipsis cho block hẹp. */}
+                        <div className="px-2.5 py-1 flex items-center gap-1.5 h-full">
+                          <span className={`text-[11px] font-semibold ${meta.color} whitespace-nowrap ${meta.bg}`}
+                            style={{ position: 'sticky', left: 10, maxWidth: Math.max(40, width - 16),
+                                     overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 6, borderRadius: 4 }}>
                             [{pb.phaseType}] {pb.title}
                           </span>
+                          <span className="flex-1" />
                           {width > 110 && (
                             <span className="text-[9px] font-bold text-stone-500/80 shrink-0">{pct}%</span>
                           )}
@@ -875,13 +908,13 @@ export default function PipelineTimeline() {
         const meta = PHASE_META[pb.phaseType];
         const totalChecks = pb.checklist.length;
         const pct = totalChecks > 0 ? Math.round((pb.checklist.filter(c => c.done).length / totalChecks) * 100) : 0;
-        const assignee = getUserById(pb.assignee || pb.createdBy);
+        const assignee = getUserById(pb.createdBy); // #13: PIC = người tạo
         const boardTop = boardRef.current?.getBoundingClientRect().top ?? 0;
         return (
           <CursorTooltip x={hoverInfo.x} y={hoverInfo.y} boundary={boardTop + HEADER_HEIGHT}>
             <div className="font-bold">{pb.title}</div>
             <div className="text-stone-400">{meta.fullLabel} · {pct}% hoàn thành</div>
-            {assignee && <div className="text-stone-400">Assignee: {assignee.name}</div>}
+            {assignee && <div className="text-stone-400">PIC: {assignee.name}</div>}
             <div className="text-stone-500 font-light">{format(parseISO(pos.startDate), 'dd/MM/yyyy')} – {format(parseISO(pos.endDate), 'dd/MM/yyyy')}</div>
           </CursorTooltip>
         );

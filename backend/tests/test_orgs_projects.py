@@ -106,42 +106,27 @@ async def test_owner_edits_project_directly(client: AsyncClient, make_user):
     assert resp.json()["progress"] == 40
 
 
-async def test_member_edit_creates_pending_change_request(client: AsyncClient, make_user):
-    o_token, o_user = await make_user("o6@hub.io")
+async def test_non_pic_member_cannot_edit_project(client: AsyncClient, make_user):
+    """#11: member không phải PIC → không sửa được metadata project (403)."""
+    o_token, _ = await make_user("o6@hub.io")
     m_token, m_user = await make_user("m6@hub.io", role="BA")
     org = await _make_org(client, o_token)
     await client.post(f"{API}/organizations/{org['id']}/members",
                       json={"email": "m6@hub.io"}, headers=auth(o_token))
-    proj = await _make_project(client, o_token, org["id"])
+    proj = await _make_project(client, o_token, org["id"])  # PIC = owner
 
-    # member PATCH → 202, KHÔNG áp dụng ngay
     resp = await client.patch(f"{API}/projects/{proj['id']}",
                               json={"name": "Proposed"}, headers=auth(m_token))
-    assert resp.status_code == 202, resp.text
-    cr = resp.json()
-    assert cr["status"] == "pending"
-    assert cr["action"] == "update_project"
+    assert resp.status_code == 403, resp.text
 
+    # project không đổi
     unchanged = await client.get(f"{API}/projects/{proj['id']}", headers=auth(o_token))
     assert unchanged.json()["name"] == "Cloud Migration"
-
-    # owner thấy change request đang chờ + nhận notification
-    pending = await client.get(f"{API}/organizations/{org['id']}/change-requests",
-                               headers=auth(o_token))
-    assert len(pending.json()) == 1
-    owner_notifs = await client.get(f"{API}/notifications", headers=auth(o_token))
-    assert any(n["type"] == "change_request_created" for n in owner_notifs.json())
-
-    # owner duyệt → áp dụng + requester được báo
-    approve = await client.post(f"{API}/change-requests/{cr['id']}/approve", headers=auth(o_token))
-    assert approve.status_code == 200
-    applied = await client.get(f"{API}/projects/{proj['id']}", headers=auth(o_token))
-    assert applied.json()["name"] == "Proposed"
-    m_notifs = await client.get(f"{API}/notifications", headers=auth(m_token))
-    assert any(n["type"] == "change_request_approved" for n in m_notifs.json())
+    assert unchanged.json()["picUserId"] == unchanged.json()["createdBy"]
 
 
-async def test_member_delete_request_then_reject(client: AsyncClient, make_user):
+async def test_non_pic_member_cannot_delete_project(client: AsyncClient, make_user):
+    """#11: member không phải PIC → không xóa được project (403)."""
     o_token, _ = await make_user("o7@hub.io")
     m_token, _ = await make_user("m7@hub.io", role="BA")
     org = await _make_org(client, o_token)
@@ -150,17 +135,44 @@ async def test_member_delete_request_then_reject(client: AsyncClient, make_user)
     proj = await _make_project(client, o_token, org["id"])
 
     resp = await client.delete(f"{API}/projects/{proj['id']}", headers=auth(m_token))
-    assert resp.status_code == 202
-    cr = resp.json()
-    assert cr["action"] == "delete_project"
-
+    assert resp.status_code == 403
     # project vẫn còn
     assert (await client.get(f"{API}/projects/{proj['id']}", headers=auth(o_token))).status_code == 200
 
-    reject = await client.post(f"{API}/change-requests/{cr['id']}/reject", headers=auth(o_token))
-    assert reject.status_code == 200
-    # vẫn còn sau khi từ chối
-    assert (await client.get(f"{API}/projects/{proj['id']}", headers=auth(o_token))).status_code == 200
+
+async def test_owner_can_change_project_pic(client: AsyncClient, make_user):
+    """#11: owner đổi PIC sang member; member giờ sửa được; user lạ (không PIC/owner) 403."""
+    o_token, _ = await make_user("o6b@hub.io")
+    m_token, m_user = await make_user("m6b@hub.io", role="SW_Developer")
+    x_token, _ = await make_user("x6b@hub.io", role="BA")
+    org = await _make_org(client, o_token)
+    await client.post(f"{API}/organizations/{org['id']}/members",
+                      json={"email": "m6b@hub.io"}, headers=auth(o_token))
+    await client.post(f"{API}/organizations/{org['id']}/members",
+                      json={"email": "x6b@hub.io"}, headers=auth(o_token))
+    proj = await _make_project(client, o_token, org["id"])
+
+    # owner đổi PIC sang member
+    resp = await client.patch(f"{API}/projects/{proj['id']}/pic",
+                              json={"picUserId": m_user["id"]}, headers=auth(o_token))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["picUserId"] == m_user["id"]
+
+    # member (PIC mới) giờ sửa metadata được
+    ok = await client.patch(f"{API}/projects/{proj['id']}",
+                            json={"name": "By New PIC"}, headers=auth(m_token))
+    assert ok.status_code == 200
+    assert ok.json()["name"] == "By New PIC"
+
+    # owner cũ (không còn là PIC, không phải superuser) giờ KHÔNG sửa metadata được nữa
+    owner_blocked = await client.patch(f"{API}/projects/{proj['id']}",
+                                       json={"name": "By Owner Again"}, headers=auth(o_token))
+    assert owner_blocked.status_code == 403
+
+    # user lạ (không phải owner, không phải PIC) → không đổi PIC được
+    denied = await client.patch(f"{API}/projects/{proj['id']}/pic",
+                                json={"picUserId": m_user["id"]}, headers=auth(x_token))
+    assert denied.status_code == 403
 
 
 async def test_owner_deletes_project_directly(client: AsyncClient, make_user):

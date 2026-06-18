@@ -23,6 +23,7 @@ from app.application.use_cases.phase_blocks import (
     ListComments,
     ListPhaseBlocks,
     PhaseBlockNotFoundError,
+    PhaseForbiddenError,
     PhaseItemNotFoundError,
     UpdatePhaseBlock,
     UpdatePhaseItem,
@@ -115,7 +116,12 @@ async def update_block(
     uc: Annotated[UpdatePhaseBlock, Depends(update_block_uc)],
 ) -> PhaseBlockOut:
     payload = body.model_dump(mode="json", exclude_unset=True, by_alias=False)
-    block = await uc.execute(block_id, payload, access.user.id)
+    try:
+        block = await uc.execute(block_id, payload, access.user)
+    except PhaseBlockNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase block not found")
+    except PhaseForbiddenError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
     return PhaseBlockOut.from_entity(block, full=True)
 
 
@@ -123,7 +129,12 @@ async def update_block(
 async def delete_block(
     block_id: UUID, access: BlockAccessDep, uc: Annotated[DeletePhaseBlock, Depends(delete_block_uc)]
 ) -> None:
-    await uc.execute(block_id, access.user.id)
+    try:
+        await uc.execute(block_id, access.user)
+    except PhaseBlockNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase block not found")
+    except PhaseForbiddenError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 # ─── Items ───────────────────────────────────────────────────────────

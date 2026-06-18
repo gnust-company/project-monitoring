@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { PHASE_META } from '../../types';
 import Avatar from '../common/Avatar';
+import { isPhaseComplete } from '../../lib/projectStatus';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -19,7 +20,6 @@ const fadeUp = {
 // (Backlog / Todo / Inprogress) mà member là assignee hoặc participant.
 // Quy đổi: WORKLOAD_CAPACITY item đang mở = 100% (quá tải).
 const WORKLOAD_CAPACITY = 15;
-const ACTIVE_TAGS = ['Backlog', 'Todo', 'Inprogress'];
 
 const roleColors: Record<string, { bg: string; text: string; dot: string }> = {
   PM: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' },
@@ -72,7 +72,7 @@ export default function TeamView() {
 
     selectedOrg.members.forEach(member => {
       const openTasks = phaseBlocks
-        .filter(pb => ACTIVE_TAGS.includes(pb.tag)
+        .filter(pb => !isPhaseComplete(pb)
           && (pb.participants.includes(member.id) || pb.assignee === member.id))
         .reduce((sum, pb) => sum + pb.checklist.filter(c => !c.done).length, 0);
 

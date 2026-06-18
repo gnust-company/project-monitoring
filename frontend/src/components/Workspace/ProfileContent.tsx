@@ -2,8 +2,9 @@ import { useState, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
-import { PHASE_META, PHASE_TAG_META } from '../../types';
+import { PHASE_META } from '../../types';
 import type { UserRole } from '../../types';
+import { isPhaseComplete } from '../../lib/projectStatus';
 import {
   Mail, Shield, FolderKanban, GitBranch, CheckSquare, Layers,
   Pencil, Check, ChevronRight, Camera, Lock, Trash2, AlertTriangle,
@@ -61,7 +62,7 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
     const projectIds = new Set(myPbs.map(pb => pb.projectId));
     const assignedPhases = phaseBlocks.filter(pb => pb.assignee === currentUser.id);
     const openTasks = myPbs
-      .filter(pb => ['Backlog', 'Todo', 'Inprogress'].includes(pb.tag))
+      .filter(pb => !isPhaseComplete(pb))
       .reduce((sum, pb) => sum + pb.checklist.filter(c => !c.done).length, 0);
     return {
       workspaces: organizations.filter(o => o.members.some(m => m.id === currentUser.id)).length,
@@ -206,7 +207,6 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
           <div className="space-y-1.5">
             {assignedBlocks.map(pb => {
               const meta = PHASE_META[pb.phaseType];
-              const tagMeta = PHASE_TAG_META[pb.tag];
               const project = orgProjects.find(p => p.id === pb.projectId);
               const done = pb.checklist.filter(c => c.done).length;
               const pct = pb.checklist.length > 0 ? Math.round((done / pb.checklist.length) * 100) : 0;
@@ -227,8 +227,8 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${tagMeta.bg} ${tagMeta.color}`}>
-                      {tagMeta.label}
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${pct >= 100 ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-500'}`}>
+                      {pct >= 100 ? 'Hoàn thành' : `${pct}%`}
                     </span>
                     <div className="w-16 h-1.5 bg-stone-100 rounded-full overflow-hidden hidden sm:block">
                       <div className={`h-full ${meta.solid} rounded-full`} style={{ width: `${pct}%` }} />

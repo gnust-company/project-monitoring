@@ -9,7 +9,7 @@ import { parseISO, differenceInDays, format } from 'date-fns';
 import { motion } from 'framer-motion';
 import { useMemo, useState, useEffect } from 'react';
 import Avatar from '../common/Avatar';
-import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
+import { computeProjectStatus, projectPhaseProgress, daysToNearestDeadline, isPhaseComplete } from '../../lib/projectStatus';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -96,12 +96,14 @@ export default function DashboardView() {
     const atRisk = orgProjects.filter(p => statusOf.get(p.id) === 'At Risk').length;
     const delayed = orgProjects.filter(p => statusOf.get(p.id) === 'Delayed').length;
     const avgProgress = total > 0 ? Math.round(orgProjects.reduce((s, p) => s + (progressOf.get(p.id) ?? 0), 0) / total) : 0;
-    const inProgressPhases = phaseBlocks.filter(pb => pb.tag === 'Inprogress').length;
+    const inProgressPhases = phaseBlocks.filter(pb => pb.checklist.some(c => c.done) && !isPhaseComplete(pb)).length;
     const allTasks = phaseBlocks.reduce((s, pb) => s + pb.checklist.length, 0);
     const doneTasks = phaseBlocks.reduce((s, pb) => s + pb.checklist.filter(c => c.done).length, 0);
+    // #20: "đến hạn 7 ngày" dựa trên deadline phase gần nhất (không còn targetDate).
     const dueIn7 = orgProjects.filter(p => {
-      const d = differenceInDays(parseISO(p.targetDate), new Date());
-      return d >= 0 && d <= 7;
+      const pbs = phaseBlocks.filter(pb => pb.projectId === p.id);
+      const d = daysToNearestDeadline(pbs);
+      return d !== null && d >= 0 && d <= 7;
     }).length;
     return { total, onTrack, atRisk, delayed, avgProgress, inProgressPhases, allTasks, doneTasks, dueIn7 };
   }, [orgProjects, phaseBlocks, statusOf, progressOf]);
@@ -124,7 +126,7 @@ export default function DashboardView() {
         const project = orgProjects.find(p => p.id === pb.projectId);
         return { ...pb, daysLeft, projectName: project?.name || '' };
       })
-      .filter(pb => pb.daysLeft >= -5 && pb.tag !== 'Complete' && pb.tag !== 'Canceled')
+      .filter(pb => pb.daysLeft >= -5 && !isPhaseComplete(pb))
       .sort((a, b) => a.daysLeft - b.daysLeft)
       .slice(0, 5);
   }, [phaseBlocks, orgProjects]);
@@ -434,7 +436,8 @@ export default function DashboardView() {
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               {recentProjects.map(project => {
-                const daysLeft = differenceInDays(parseISO(project.targetDate), new Date());
+                // #20: hạn theo phase gần nhất (không còn targetDate).
+                const daysLeft = daysToNearestDeadline(phaseBlocks.filter(pb => pb.projectId === project.id));
                 const status = statusOf.get(project.id) ?? project.status;
                 const progress = progressOf.get(project.id) ?? project.progress;
                 const cfg = statusConfig[status];
@@ -476,8 +479,10 @@ export default function DashboardView() {
                           style={{ background: cfg.bar }} />
                       </div>
                     </div>
-                    <div className={`text-[10px] ${daysLeft < 7 ? 'text-red-500' : 'text-muted-soft'}`}>
-                      {daysLeft > 0 ? `Còn ${daysLeft} ngày` : `${Math.abs(daysLeft)} ngày quá hạn`}
+                    <div className={`text-[10px] ${daysLeft !== null && daysLeft < 7 ? 'text-red-500' : 'text-muted-soft'}`}>
+                      {daysLeft === null
+                        ? 'Không có phase đang chạy'
+                        : daysLeft > 0 ? `Còn ${daysLeft} ngày` : `${Math.abs(daysLeft)} ngày quá hạn`}
                     </div>
                   </div>
                 );

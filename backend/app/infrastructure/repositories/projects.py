@@ -17,9 +17,10 @@ def _to_entity(m: ProjectModel) -> Project:
         description=m.description,
         status=m.status,
         start_date=m.start_date,
+        created_by=m.created_by,
+        pic_user_id=m.pic_user_id,
         target_date=m.target_date,
         progress=m.progress,
-        created_by=m.created_by,
         created_at=m.created_at,
     )
 
@@ -58,6 +59,7 @@ class SqlAlchemyProjectRepository(ProjectRepository):
             target_date=project.target_date,
             progress=project.progress,
             created_by=project.created_by,
+            pic_user_id=project.pic_user_id or project.created_by,
         )
         self._session.add(m)
         await self._session.flush()
@@ -73,6 +75,7 @@ class SqlAlchemyProjectRepository(ProjectRepository):
         m.start_date = project.start_date
         m.target_date = project.target_date
         m.progress = project.progress
+        m.pic_user_id = project.pic_user_id or project.created_by
         await self._session.flush()
         return _to_entity(m)
 

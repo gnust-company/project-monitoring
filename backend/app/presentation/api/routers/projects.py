@@ -1,23 +1,26 @@
-"""Projects router — list/create (member được phép), get, và sửa/xóa qua luồng duyệt."""
+"""Projects router — list/create/get + sửa/xóa/đổi PIC theo quyền PIC (#11)."""
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.application.authz import can_access_workspace
 from app.application.use_cases.projects import (
+    ChangeProjectPic,
     CreateProject,
     CreateProjectInput,
-    DeleteProjectOrRequest,
+    DeleteProject,
     GetProject,
     ListProjectsByOrg,
+    ProjectForbiddenError,
     ProjectNotFoundError,
-    UpdateProjectOrRequest,
+    UpdateProject,
 )
 from app.presentation.api.deps import (
     AccessDep,
     CurrentUser,
     OrgRepoDep,
+    change_project_pic_uc,
     create_project_uc,
     delete_project_uc,
     get_project_uc,
@@ -25,9 +28,9 @@ from app.presentation.api.deps import (
     update_project_uc,
 )
 from app.presentation.api.schemas import (
-    ChangeRequestOut,
     ProjectCreate,
     ProjectOut,
+    ProjectPicUpdate,
     ProjectUpdate,
 )
 
@@ -89,38 +92,58 @@ async def get_project(
     return ProjectOut.model_validate(project)
 
 
-@router.patch("/projects/{project_id}")
+@router.patch("/projects/{project_id}", response_model=ProjectOut)
 async def update_project(
     project_id: UUID,
     body: ProjectUpdate,
     current: CurrentUser,
     orgs: OrgRepoDep,
-    response: Response,
     get_uc: Annotated[GetProject, Depends(get_project_uc)],
-    uc: Annotated[UpdateProjectOrRequest, Depends(update_project_uc)],
+    uc: Annotated[UpdateProject, Depends(update_project_uc)],
 ):
-    _, membership = await _require_project_access(project_id, current, orgs, get_uc)
+    await _require_project_access(project_id, current, orgs, get_uc)
     payload = body.model_dump(mode="json", exclude_unset=True, by_alias=False)
-    project, cr = await uc.execute(project_id, payload, current, membership)
-    if cr is not None:  # member → chờ duyệt
-        response.status_code = status.HTTP_202_ACCEPTED
-        return ChangeRequestOut.model_validate(cr)
+    try:
+        project = await uc.execute(project_id, payload, current)
+    except ProjectNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
+    except ProjectForbiddenError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
     return ProjectOut.model_validate(project)
 
 
-@router.delete("/projects/{project_id}")
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: UUID,
     current: CurrentUser,
     orgs: OrgRepoDep,
-    response: Response,
     get_uc: Annotated[GetProject, Depends(get_project_uc)],
-    uc: Annotated[DeleteProjectOrRequest, Depends(delete_project_uc)],
+    uc: Annotated[DeleteProject, Depends(delete_project_uc)],
+):
+    await _require_project_access(project_id, current, orgs, get_uc)
+    try:
+        await uc.execute(project_id, current)
+    except ProjectNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
+    except ProjectForbiddenError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
+    return None
+
+
+@router.patch("/projects/{project_id}/pic", response_model=ProjectOut)
+async def change_pic(
+    project_id: UUID,
+    body: ProjectPicUpdate,
+    current: CurrentUser,
+    orgs: OrgRepoDep,
+    get_uc: Annotated[GetProject, Depends(get_project_uc)],
+    uc: Annotated[ChangeProjectPic, Depends(change_project_pic_uc)],
 ):
     _, membership = await _require_project_access(project_id, current, orgs, get_uc)
-    cr = await uc.execute(project_id, current, membership)
-    if cr is not None:  # member → chờ duyệt
-        response.status_code = status.HTTP_202_ACCEPTED
-        return ChangeRequestOut.model_validate(cr)
-    response.status_code = status.HTTP_204_NO_CONTENT
-    return None
+    try:
+        project = await uc.execute(project_id, body.pic_user_id, current, membership)
+    except ProjectNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
+    except ProjectForbiddenError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
+    return ProjectOut.model_validate(project)

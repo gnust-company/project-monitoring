@@ -50,14 +50,18 @@ Schema database tương ứng: [SCHEMA.md](./SCHEMA.md).
 Hai chiều **độc lập**:
 - `user.isSuperuser` — admin toàn cục (tạo ở first-run setup), làm được mọi thứ.
 - Cấp workspace (`organization_members.role`) ∈ `owner | member`:
-  - **owner** (người tạo) / **superuser**: toàn quyền workspace + dự án + phase + thành viên.
-  - **member**: tạo dự án/phase được; **sửa/xóa dự án phải owner duyệt** (→ 202 + ChangeRequest);
-    **không** sửa workspace hay quản lý thành viên (→ 403).
+  - **owner** (người tạo) / **superuser**: toàn quyền workspace (đổi tên/xóa/thành viên).
+  - **mọi member**: tạo dự án/phase được; **sửa/xóa *metadata* chỉ PIC mới được** (xem dưới).
+
+> **PIC** (#11): mỗi dự án có PIC = `picUserId` (mặc định `createdBy`, đổi qua
+> `PATCH /projects/{id}/pic`); phase PIC = `createdBy`. **Chỉ PIC (hoặc superuser)** mới
+> sửa/xóa metadata dự án/phase (→ 403 nếu không phải). Checklist/outcome item & comment
+> thì ai trong workspace cũng tick/note được (ghi activity log). Cơ chế `change_requests`
+> (approval queue) cũ đã **deprecated**.
 
 | Mã | Khi nào |
 |---|---|
-| 202 | member sửa/xóa dự án → tạo ChangeRequest chờ duyệt (không áp dụng ngay) |
-| 403 | không thuộc workspace, hoặc member làm hành động owner-only |
+| 403 | không thuộc workspace, hoặc không phải PIC/superuser mà sửa/xóa metadata, hoặc member làm hành động owner-only |
 
 ### Users / Profile
 
@@ -105,10 +109,11 @@ Nguồn cho **Workspace Settings view** (FE: trang Cài đặt mở từ sidebar
 | Method | Path | Mô tả |
 |---|---|---|
 | GET | `/organizations/{orgId}/projects` | Dự án trong workspace |
-| POST | `/organizations/{orgId}/projects` | Body: `{ name, description, startDate, targetDate, status? }` |
+| POST | `/organizations/{orgId}/projects` | Body: `{ name, description, startDate, targetDate?, status? }` — `targetDate` optional (#20) |
 | GET | `/projects/{projectId}` | Chi tiết |
-| PATCH | `/projects/{projectId}` | Partial update + `progress`. Owner → 200 (áp dụng). **Member → 202 + ChangeRequest** |
-| DELETE | `/projects/{projectId}` | Owner → 204. **Member → 202 + ChangeRequest** |
+| PATCH | `/projects/{projectId}` | Partial update (`name`/`description`/`status`/`progress`/`startDate`/`targetDate`). **Chỉ PIC/superuser** → 200; không phải → 403. `targetDate: null` = xóa ngày kết thúc |
+| PATCH | `/projects/{projectId}/pic` | Đổi PIC. Body `{ picUserId }`. PIC hiện tại / owner / superuser → 200; khác → 403 (#11) |
+| DELETE | `/projects/{projectId}` | **Chỉ PIC/superuser** → 204; không phải → 403 |
 | GET | `/projects/{projectId}/activity` | Changelog dự án (ai tạo/sửa/xóa phase) — nguồn cho Project Detail Modal |
 
 ```json
@@ -119,9 +124,10 @@ Nguồn cho **Workspace Settings view** (FE: trang Cài đặt mở từ sidebar
   "description": "Migrate infra to AWS",
   "status": "On Track",
   "startDate": "2026-04-03",
-  "targetDate": "2026-07-17",
+  "targetDate": null,
   "progress": 55,
-  "createdBy": "uuid"
+  "createdBy": "uuid",
+  "picUserId": "uuid"
 }
 ```
 
@@ -220,19 +226,16 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
 
 Owner/superuser xử lý yêu cầu sửa/xóa dự án của member.
 
+> ⚠️ **DEPRECATED (#11)**: các endpoint change-requests vẫn được mount (backward-compat) nhưng
+> **không còn tạo change request mới** — sửa/xóa dự án giờ do PIC quyết định trực tiếp (xem
+> Projects). Endpoint `GET /organizations/{orgId}/change-requests` sẽ luôn trả danh sách rỗng
+> sau khi nâng cấp.
+
 | Method | Path | Mô tả |
 |---|---|---|
-| GET | `/organizations/{orgId}/change-requests` | Danh sách `pending` (owner-only) |
-| POST | `/change-requests/{id}/approve` | Owner duyệt → áp dụng thay đổi/xóa, báo người tạo |
-| POST | `/change-requests/{id}/reject` | Owner từ chối → báo người tạo |
-
-```json
-{ "id": "uuid", "orgId": "uuid", "projectId": "uuid", "requestedBy": "uuid",
-  "action": "update_project", "payload": { "name": "..." }, "status": "pending",
-  "reviewedBy": null, "createdAt": "...", "resolvedAt": null }
-```
-
-`action` ∈ `update_project | delete_project` · `status` ∈ `pending | approved | rejected`
+| GET | `/organizations/{orgId}/change-requests` | Danh sách `pending` (owner-only) — deprecated, thường rỗng |
+| POST | `/change-requests/{id}/approve` | Owner duyệt → áp dụng thay đổi/xóa, báo người tạo — deprecated |
+| POST | `/change-requests/{id}/reject` | Owner từ chối → báo người tạo — deprecated |
 
 ### Notifications (in-app)
 

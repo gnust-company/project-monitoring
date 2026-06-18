@@ -101,9 +101,13 @@ class ProjectModel(Base):
         default=ProjectStatus.ON_TRACK,
     )
     start_date: Mapped[date] = mapped_column(Date)
-    target_date: Mapped[date] = mapped_column(Date)
+    target_date: Mapped[date | None] = mapped_column(Date)  # #20: nullable (dự án không định hạn)
     progress: Mapped[int] = mapped_column(Integer, default=0)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # #11: PIC — mặc định = created_by, đổi được. NULL khi user bị xóa.
+    pic_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -131,7 +135,8 @@ class PhaseBlockModel(Base):
     actual_end_date: Mapped[date | None] = mapped_column(Date)
     display_row: Mapped[int | None] = mapped_column(Integer)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    assignee: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # #13: assignee nullable (chỉ là note). PIC phase = created_by.
+    assignee: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

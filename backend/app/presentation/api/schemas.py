@@ -171,9 +171,10 @@ class ProjectOut(CamelModel):
     description: str
     status: ProjectStatus
     start_date: date
-    target_date: date
+    target_date: date | None = None  # #20: optional
     progress: int
     created_by: UUID
+    pic_user_id: UUID | None = None  # #11: PIC (mặc định = created_by)
     created_at: datetime | None = None
 
 
@@ -181,7 +182,7 @@ class ProjectCreate(CamelModel):
     name: str = Field(min_length=1, max_length=255)
     description: str = ""
     start_date: date
-    target_date: date
+    target_date: date | None = None  # #20: không bắt buộc
     status: ProjectStatus = ProjectStatus.ON_TRACK
 
 
@@ -190,8 +191,13 @@ class ProjectUpdate(CamelModel):
     description: str | None = None
     status: ProjectStatus | None = None
     start_date: date | None = None
-    target_date: date | None = None
+    target_date: date | None = None  # #20: None = xóa ngày kết thúc
     progress: int | None = Field(default=None, ge=0, le=100)
+
+
+class ProjectPicUpdate(CamelModel):
+    """Đổi PIC project (#11)."""
+    pic_user_id: UUID
 
 
 # ─── Phase items ─────────────────────────────────────────────────────
@@ -274,7 +280,7 @@ class PhaseBlockOut(CamelModel):
     actual_end_date: date | None = None
     display_row: int | None = None
     created_by: UUID
-    assignee: UUID
+    assignee: UUID | None = None  # #13: chỉ là note; PIC phase = created_by
     participant_ids: list[UUID] = []
     progress_pct: int = 0
     checklist: list[PhaseItemOut] = []

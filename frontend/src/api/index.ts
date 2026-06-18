@@ -2,7 +2,7 @@
 import { api, setToken, clearToken } from './client';
 import type {
   User, Organization, Project, PhaseBlock, ChecklistItem, Comment, Attachment,
-  ActivityItem, Notification, ChangeRequest, UserRole, DevPhase, PhaseTag, ProjectStatus,
+  ActivityItem, Notification, UserRole, DevPhase, PhaseTag, ProjectStatus,
   AdminStats, AdminUserInfo, AdminWorkspaceInfo,
 } from '../types';
 
@@ -125,19 +125,18 @@ export const projectsApi = {
   async listByOrg(orgId: string): Promise<Project[]> {
     return await api.get<Project[]>(`/organizations/${orgId}/projects`);
   },
-  async create(orgId: string, body: { name: string; description: string; startDate: string; targetDate: string; status?: ProjectStatus }): Promise<Project> {
+  async create(orgId: string, body: { name: string; description: string; startDate: string; targetDate?: string | null; status?: ProjectStatus }): Promise<Project> {
     return await api.post<Project>(`/organizations/${orgId}/projects`, body);
   },
-  // 200 = áp dụng (owner); 202 = chờ duyệt (member)
-  async update(id: string, updates: Partial<Project>): Promise<{ pending: boolean; project?: Project; changeRequest?: ChangeRequest }> {
-    const { status, data } = await api.patchWithStatus<Project | ChangeRequest>(`/projects/${id}`, updates);
-    return status === 202
-      ? { pending: true, changeRequest: data as ChangeRequest }
-      : { pending: false, project: data as Project };
+  // #11: chỉ PIC (hoặc admin) mới sửa được — BE trả 403 nếu không phải.
+  async update(id: string, updates: Partial<Project>): Promise<Project> {
+    return await api.patch<Project>(`/projects/${id}`, updates);
   },
-  async remove(id: string): Promise<{ pending: boolean; changeRequest?: ChangeRequest }> {
-    const { status, data } = await api.deleteWithStatus<ChangeRequest>(`/projects/${id}`);
-    return status === 202 ? { pending: true, changeRequest: data as ChangeRequest } : { pending: false };
+  async remove(id: string): Promise<void> {
+    await api.del(`/projects/${id}`);
+  },
+  async changePic(id: string, picUserId: string): Promise<Project> {
+    return await api.patch<Project>(`/projects/${id}/pic`, { picUserId });
   },
   async activity(id: string): Promise<ActivityItem[]> {
     return (await api.get<ActivityDTO[]>(`/projects/${id}/activity`)).map(mapActivity);
@@ -217,19 +216,6 @@ export const notificationsApi = {
   },
   async markAllRead(): Promise<void> {
     await api.post('/notifications/read-all');
-  },
-};
-
-// ─── Change requests ─────────────────────────────────────────────────
-export const changeRequestsApi = {
-  async listPending(orgId: string): Promise<ChangeRequest[]> {
-    return await api.get<ChangeRequest[]>(`/organizations/${orgId}/change-requests`);
-  },
-  async approve(id: string): Promise<ChangeRequest> {
-    return await api.post<ChangeRequest>(`/change-requests/${id}/approve`);
-  },
-  async reject(id: string): Promise<ChangeRequest> {
-    return await api.post<ChangeRequest>(`/change-requests/${id}/reject`);
   },
 };
 

@@ -157,7 +157,8 @@ export const phaseBlocks: PhaseBlock[] = [];
 
 projects.forEach(project => {
   const start = new Date(project.startDate);
-  const end = new Date(project.targetDate);
+  // #20: targetDate giờ có thể không có → fallback +90 ngày để mock phase blocks.
+  const end = new Date(project.targetDate ?? start.getTime() + 90 * 24 * 60 * 60 * 1000);
   const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const phaseDuration = Math.floor(totalDays / 7);
 

@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { X, Plus, Calendar } from 'lucide-react';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 
 export default function CreateProjectModal() {
   const { createProjectOpen, closeCreateProject, selectedOrg, addProject } = useApp();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [targetDate, setTargetDate] = useState(format(addDays(new Date(), 90), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd')); // #20: chọn được
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,13 +19,13 @@ export default function CreateProjectModal() {
       name: name.trim(),
       description: description.trim() || 'New project',
       status: 'On Track',
-      startDate: format(new Date(), 'yyyy-MM-dd'),
-      targetDate,
+      startDate,
       progress: 0,
       createdBy: 'u1',
     });
     setName('');
     setDescription('');
+    setStartDate(format(new Date(), 'yyyy-MM-dd'));
     closeCreateProject();
   };
 
@@ -69,9 +69,9 @@ export default function CreateProjectModal() {
             </div>
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> Ngày mục tiêu
+                <Calendar className="w-3 h-3" /> Ngày bắt đầu
               </label>
-              <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
                 className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
                            focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
             </div>

@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { PHASE_META, DEV_PHASES, PHASE_TAG_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
-import type { DevPhase, PhaseBlock, PhaseTag, UserRole } from '../../types';
+import { PHASE_META, DEV_PHASES, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
+import type { DevPhase, PhaseBlock, UserRole } from '../../types';
 import { ROLE_LABELS } from '../../data/mockData';
 import { X, Plus, Calendar, Users, Trash2, Target, CheckSquare } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import Dropdown from '../common/Dropdown';
-
-const TAG_OPTIONS: PhaseTag[] = ['Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled'];
 
 type DraftItem = { text: string; done: boolean; role?: UserRole };
 
@@ -109,12 +107,10 @@ export default function CreatePhaseModal() {
 
   const [projectId, setProjectId] = useState(createPhaseProjectId || (orgProjects[0]?.id ?? ''));
   const [phaseType, setPhaseType] = useState<DevPhase>('PA');
-  const [tag, setTag] = useState<PhaseTag>('Todo');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(addDays(new Date(), 14), 'yyyy-MM-dd'));
-  const [assignee, setAssignee] = useState(meId);
   const [participants, setParticipants] = useState<string[]>(meId ? [meId] : []);
   const [showParticipants, setShowParticipants] = useState(false);
   const [checklistItems, setChecklistItems] = useState<DraftItem[]>(defaultChecklist('PA'));
@@ -126,12 +122,10 @@ export default function CreatePhaseModal() {
     if (!createPhaseOpen) return;
     setProjectId(createPhaseProjectId || (orgProjects[0]?.id ?? ''));
     setPhaseType('PA');
-    setTag('Todo');
     setTitle('');
     setDescription('');
     setStartDate(createPhaseDates?.startDate ?? format(new Date(), 'yyyy-MM-dd'));
     setEndDate(createPhaseDates?.endDate ?? format(addDays(new Date(), 14), 'yyyy-MM-dd'));
-    setAssignee(meId);
     setParticipants(meId ? [meId] : []);
     setShowParticipants(false);
     setChecklistItems(defaultChecklist('PA'));
@@ -155,11 +149,11 @@ export default function CreatePhaseModal() {
     setSubmitting(true);
     setError(null);
     const pb: PhaseBlock = {
-      id: '', projectId, phaseType, tag,
+      id: '', projectId, phaseType, tag: 'Todo',
       title: title.trim(),
       description: description.trim() || `${title} phase block.`,
       startDate, endDate,
-      createdBy: meId, assignee: assignee || meId, participants,
+      createdBy: meId, participants,
       checklist: checklistItems.map(item => ({ id: '', text: item.text, done: item.done, role: item.role })),
       outcomes: outcomeItems.map(item => ({ id: '', text: item.text, done: item.done, role: item.role })),
       comments: [], attachments: [], activityLog: [],
@@ -224,22 +218,6 @@ export default function CreatePhaseModal() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1 block">Trạng thái</label>
-              <div className="flex flex-wrap gap-1.5">
-                {TAG_OPTIONS.map(t => {
-                  const tm = PHASE_TAG_META[t];
-                  return (
-                    <button key={t} type="button" onClick={() => setTag(t)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all
-                        ${tag === t ? `${tm.bg} ${tm.color} ${tm.border}` : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300'}`}>
-                      {tm.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Tiêu đề</label>
               <input type="text" value={title} onChange={e => setTitle(e.target.value)}
                 placeholder="VD: Core Feature Development"
@@ -272,12 +250,6 @@ export default function CreatePhaseModal() {
                   className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
                              focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
               </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1 block">Assignee</label>
-              <Dropdown value={assignee} onChange={setAssignee}
-                options={orgMembers.map(m => ({ value: m.id, label: m.name, hint: ROLE_LABELS[m.role] ?? m.role, avatar: m.avatar }))} />
             </div>
 
             <div>

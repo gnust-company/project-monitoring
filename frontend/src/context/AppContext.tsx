@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type {
   Organization, Project, PhaseBlock, WorkspaceView, DevPhase, ProjectStatus, ZoomLevel,
-  User, UserRole, Notification, ChangeRequest,
+  User, UserRole, Notification,
 } from '../types';
 import {
-  auth, usersApi, orgsApi, projectsApi, phaseBlocksApi, notificationsApi, changeRequestsApi,
+  auth, usersApi, orgsApi, projectsApi, phaseBlocksApi, notificationsApi,
   type CreatePhaseBody,
 } from '../api';
 import { getToken } from '../api/client';
@@ -89,8 +89,9 @@ interface AppContextType extends AppState {
 
   // Project actions
   addProject: (project: Project) => Promise<void>;
-  updateProject: (id: string, updates: Partial<Project>) => Promise<{ pending: boolean }>;
-  deleteProject: (id: string) => Promise<{ pending: boolean }>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<Project>;
+  changeProjectPic: (id: string, picUserId: string) => Promise<Project>; // #11
+  deleteProject: (id: string) => Promise<void>;
 
   // Phase block actions
   addPhaseBlock: (pb: PhaseBlockUI) => Promise<void>;
@@ -118,12 +119,6 @@ interface AppContextType extends AppState {
   loadNotifications: () => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
-
-  // Change requests (owner)
-  pendingChangeRequests: ChangeRequest[];
-  loadChangeRequests: () => Promise<void>;
-  approveChangeRequest: (id: string) => Promise<void>;
-  rejectChangeRequest: (id: string) => Promise<void>;
 
   // Derived
   selectedOrg: Organization | null;
@@ -168,7 +163,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [pendingChangeRequests, setPendingChangeRequests] = useState<ChangeRequest[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -365,24 +359,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
-    const res = await projectsApi.update(id, updates);
-    if (!res.pending && res.project) {
-      setProjectsState(prev => prev.map(p => p.id === id ? res.project! : p));
-    }
-    return { pending: res.pending };
+    const updated = await projectsApi.update(id, updates);
+    setProjectsState(prev => prev.map(p => (p.id === id ? updated : p)));
+    return updated;
+  }, []);
+
+  const changeProjectPic = useCallback(async (id: string, picUserId: string) => {
+    const updated = await projectsApi.changePic(id, picUserId);
+    setProjectsState(prev => prev.map(p => (p.id === id ? updated : p)));
+    return updated;
   }, []);
 
   const deleteProject = useCallback(async (id: string) => {
-    const res = await projectsApi.remove(id);
-    if (!res.pending) {
-      setProjectsState(prev => prev.filter(p => p.id !== id));
-      setPbState(prev => prev.filter(pb => pb.projectId !== id));
-      setState(prev => ({ ...prev, selectedProjectIds: prev.selectedProjectIds?.filter(pid => pid !== id) ?? null }));
-    }
-    return { pending: res.pending };
+    await projectsApi.remove(id);
+    setProjectsState(prev => prev.filter(p => p.id !== id));
+    setPbState(prev => prev.filter(pb => pb.projectId !== id));
+    setState(prev => ({ ...prev, selectedProjectIds: prev.selectedProjectIds?.filter(pid => pid !== id) ?? null }));
   }, []);
 
   // ─── Phase blocks ─────────────────────────────────────────────────
+  // Đồng bộ ngày bắt đầu dự án = startDate của phase cũ nhất (#enhance). Ngày kết
+  // thúc dự án KHÔNG lưu — chỉ suy từ phase mới nhất khi cần view. Best-effort:
+  // chỉ PIC update được nên nuốt lỗi 403.
+  const syncProjectStartDate = useCallback(async (projectId: string, blocks: PhaseBlockUI[]) => {
+    const pbs = blocks.filter(b => b.projectId === projectId);
+    if (pbs.length === 0) return;
+    const earliest = pbs.reduce((min, b) => (b.startDate < min ? b.startDate : min), pbs[0].startDate);
+    const project = projectsState.find(p => p.id === projectId);
+    if (!project || project.startDate === earliest) return;
+    try {
+      const updated = await projectsApi.update(projectId, { startDate: earliest });
+      setProjectsState(prev => prev.map(p => (p.id === projectId ? updated : p)));
+    } catch { /* không phải PIC → bỏ qua */ }
+  }, [projectsState]);
+
   const addPhaseBlock = useCallback(async (pb: PhaseBlockUI) => {
     const body: CreatePhaseBody = {
       phaseType: pb.phaseType, title: pb.title, startDate: pb.startDate, endDate: pb.endDate,
@@ -392,8 +402,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       outcomes: pb.outcomes.map(o => ({ text: o.text, role: o.role, done: o.done })),
     };
     const created = await phaseBlocksApi.create(pb.projectId, body);
-    setPbState(prev => [...prev, created]);
-  }, []);
+    setPbState(prev => {
+      const next = [...prev, created];
+      void syncProjectStartDate(pb.projectId, next);
+      return next;
+    });
+  }, [syncProjectStartDate]);
 
   const updatePhaseBlock = useCallback(async (id: string, updates: Partial<PhaseBlockUI>) => {
     // chỉ gửi các field scalar PATCH chấp nhận
@@ -403,18 +417,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if ('participants' in updates && updates.participants) body.participantIds = updates.participants;
     // optimistic
-    setPbState(prev => prev.map(pb => pb.id === id ? { ...pb, ...updates } : pb));
+    let projectIdOfBlock: string | undefined;
+    setPbState(prev => {
+      const next = prev.map(pb => pb.id === id ? { ...pb, ...updates } : pb);
+      projectIdOfBlock = next.find(pb => pb.id === id)?.projectId;
+      return next;
+    });
     if (Object.keys(body).length === 0) return;
     try {
       const updated = await phaseBlocksApi.update(id, body);
-      setPbState(prev => prev.map(pb => pb.id === id ? { ...updated, comments: pb.comments, attachments: pb.attachments, activityLog: pb.activityLog } : pb));
+      setPbState(prev => {
+        const next = prev.map(pb => pb.id === id ? { ...updated, comments: pb.comments, attachments: pb.attachments, activityLog: pb.activityLog } : pb);
+        // #enhance: nếu sửa startDate, đồng bộ ngày bắt đầu dự án theo phase cũ nhất.
+        if ('startDate' in body && projectIdOfBlock) void syncProjectStartDate(projectIdOfBlock, next);
+        return next;
+      });
     } catch { /* ignore */ }
-  }, []);
+  }, [syncProjectStartDate]);
 
   const deletePhaseBlock = useCallback(async (id: string) => {
     await phaseBlocksApi.remove(id);
-    setPbState(prev => prev.filter(pb => pb.id !== id));
-  }, []);
+    setPbState(prev => {
+      const removed = prev.find(pb => pb.id === id);
+      const next = prev.filter(pb => pb.id !== id);
+      if (removed) void syncProjectStartDate(removed.projectId, next);
+      return next;
+    });
+  }, [syncProjectStartDate]);
 
   const patchBlock = useCallback((blockId: string, fn: (pb: PhaseBlockUI) => PhaseBlockUI) => {
     setPbState(prev => prev.map(pb => pb.id === blockId ? fn(pb) : pb));
@@ -546,34 +575,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(t);
   }, [currentUser, loadNotifications]);
 
-  // ─── Change requests ──────────────────────────────────────────────
-  const loadChangeRequests = useCallback(async () => {
-    if (!state.selectedOrgId) { setPendingChangeRequests([]); return; }
-    try {
-      setPendingChangeRequests(await changeRequestsApi.listPending(state.selectedOrgId));
-    } catch { setPendingChangeRequests([]); }
-  }, [state.selectedOrgId]);
-
-  const approveChangeRequest = useCallback(async (id: string) => {
-    await changeRequestsApi.approve(id);
-    setPendingChangeRequests(prev => prev.filter(c => c.id !== id));
-    if (state.selectedOrgId) {
-      const projects = await projectsApi.listByOrg(state.selectedOrgId);
-      setProjectsState(projects);
-    }
-  }, [state.selectedOrgId]);
-
-  const rejectChangeRequest = useCallback(async (id: string) => {
-    await changeRequestsApi.reject(id);
-    setPendingChangeRequests(prev => prev.filter(c => c.id !== id));
-  }, []);
-
-  // owner xem change requests khi vào workspace
-  useEffect(() => {
-    const org = orgsState.find(o => o.id === state.selectedOrgId);
-    if (org && (org.myRole === 'owner' || currentUser?.isSuperuser)) loadChangeRequests();
-  }, [state.selectedOrgId, orgsState, currentUser, loadChangeRequests]);
-
   // ─── Derived ──────────────────────────────────────────────────────
   const selectedOrg = state.selectedOrgId ? orgsState.find(o => o.id === state.selectedOrgId) ?? null : null;
   const orgProjects = projectsState;
@@ -604,13 +605,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openPhaseDetail, closePhaseDetail, openProjectDetail, closeProjectDetail,
       openCreateProject, closeCreateProject, openCreatePhase, closeCreatePhase,
       openCreateWorkspace, closeCreateWorkspace, openProfileModal, closeProfileModal, toggleSidebar,
-      addProject, updateProject, deleteProject,
+      addProject, updateProject, deleteProject, changeProjectPic,
       addPhaseBlock, updatePhaseBlock, deletePhaseBlock,
       addPhaseItem, updatePhaseItem, deletePhaseItem,
       addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,
       addOrganization, updateOrganization, deleteOrganization, addOrgMember, removeOrgMember,
       notifications, unreadCount, loadNotifications, markNotificationRead, markAllNotificationsRead,
-      pendingChangeRequests, loadChangeRequests, approveChangeRequest, rejectChangeRequest,
       selectedOrg, organizations: orgsState, orgProjects, orgPhaseBlocks,
       selectedPhaseBlock, selectedProjectDetail, isOwner, getUserById,
     }}>

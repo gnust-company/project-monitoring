@@ -2,16 +2,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById } from '../../data/mockData';
+import { ROLE_LABELS } from '../../data/mockData';
 import { projectsApi } from '../../api';
 import { PHASE_META } from '../../types';
 import type { ProjectStatus, ActivityItem } from '../../types';
 import {
   X, Calendar, Trash2, Pencil, Check, FolderKanban,
-  GitBranch, AlertTriangle, Clock, Hourglass,
+  GitBranch, AlertTriangle, Clock, Crown, Lock,
 } from 'lucide-react';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import Avatar from '../common/Avatar';
-import { computeProjectStatus, projectPhaseProgress, projectDateProgress } from '../../lib/projectStatus';
+import Dropdown from '../common/Dropdown';
+import { computeProjectStatus, projectPhaseProgress, projectDateProgress, daysToNearestDeadline, isPhaseComplete } from '../../lib/projectStatus';
 
 const STATUS_META: Record<ProjectStatus, { color: string; bg: string; border: string; bar: string }> = {
   'On Track': { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: '#10b981' },
@@ -22,7 +24,8 @@ const STATUS_META: Record<ProjectStatus, { color: string; bg: string; border: st
 export default function ProjectDetailModal() {
   const {
     selectedProjectDetail, projectDetailOpen, closeProjectDetail,
-    updateProject, deleteProject, phaseBlocks,
+    updateProject, deleteProject, changeProjectPic, phaseBlocks,
+    currentUser, selectedOrg, isOwner,
   } = useApp();
 
   // Inline editing
@@ -32,7 +35,6 @@ export default function ProjectDetailModal() {
   const [descDraft, setDescDraft] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [pendingMsg, setPendingMsg] = useState<string | null>(null);
 
   const projectId = selectedProjectDetail?.id;
 
@@ -46,16 +48,14 @@ export default function ProjectDetailModal() {
       setEditingName(false);
       setEditingDesc(false);
       setConfirmDelete(false);
-      setPendingMsg(null);
       loadActivity();
     }
   }, [selectedProjectDetail?.id, loadActivity]);
 
-  // Member sửa → 202 pending; bọc updateProject để hiện thông báo
+  // #11: PIC-gated. updateProject giờ trả Project trực tiếp (không còn approval queue).
   const doUpdate = useCallback(async (updates: Record<string, unknown>) => {
     if (!projectId) return;
-    const res = await updateProject(projectId, updates);
-    if (res.pending) setPendingMsg('Thay đổi đã gửi cho chủ workspace duyệt.');
+    await updateProject(projectId, updates);
     loadActivity();
   }, [projectId, updateProject, loadActivity]);
 
@@ -70,13 +70,22 @@ export default function ProjectDetailModal() {
   const project = selectedProjectDetail;
   const creator = getUserById(project.createdBy);
   const projectPbs = phaseBlocks.filter(pb => pb.projectId === project.id);
-  const completePbs = projectPbs.filter(pb => pb.tag === 'Complete').length;
-  const daysLeft = differenceInDays(parseISO(project.targetDate), new Date());
+  const completePbs = projectPbs.filter(pb => isPhaseComplete(pb)).length;
+
+  // #11: PIC hiệu dụng = picUserId ?? createdBy. Chỉ PIC/superuser sửa metadata; owner được đổi PIC.
+  const effectivePicId = project.picUserId ?? project.createdBy;
+  const canManage = !!currentUser && (currentUser.isSuperuser || effectivePicId === currentUser.id);
+  const canChangePic = canManage || isOwner;
+  const picUser = getUserById(effectivePicId);
+  const orgMembers = selectedOrg?.members ?? [];
+
+  // Deadline theo phase (#20) — không còn targetDate.
+  const deadlineDays = daysToNearestDeadline(projectPbs);
 
   // Trạng thái & tiến độ auto (derived) — không chỉnh tay
   const autoStatus = computeProjectStatus(project, phaseBlocks);
   const autoProgress = Math.round(projectPhaseProgress(projectPbs) * 100);
-  const dateProgress = Math.round(projectDateProgress(project) * 100);
+  const dateProgress = Math.round(projectDateProgress(project, projectPbs) * 100); // #20: mốc = phase xa nhất
   const statusMeta = STATUS_META[autoStatus];
 
   // Phân bố phase theo loại — để nhìn nhanh dự án đang nặng ở giai đoạn nào
@@ -98,13 +107,12 @@ export default function ProjectDetailModal() {
 
   const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
-    const res = await deleteProject(project.id);
-    if (res.pending) {
-      setPendingMsg('Yêu cầu xóa đã gửi cho chủ workspace duyệt.');
-      setConfirmDelete(false);
-    } else {
-      closeProjectDetail();
-    }
+    await deleteProject(project.id);
+    closeProjectDetail();
+  };
+
+  const handleChangePic = (uid: string) => {
+    changeProjectPic(project.id, uid);
   };
 
   return (
@@ -129,12 +137,18 @@ export default function ProjectDetailModal() {
               <h2 className="text-base font-bold text-ink">Chi tiết Dự án</h2>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={handleDelete}
-                className={`p-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold
-                  ${confirmDelete ? 'bg-red-500 text-white px-2.5 hover:bg-red-600' : 'hover:bg-red-50 text-stone-400 hover:text-red-500'}`}
-                title={confirmDelete ? 'Click lần nữa để xóa vĩnh viễn' : 'Xóa dự án'}>
-                {confirmDelete ? (<><AlertTriangle className="w-3.5 h-3.5" /> Xác nhận xóa?</>) : <Trash2 className="w-4 h-4" />}
-              </button>
+              {canManage ? (
+                <button onClick={handleDelete}
+                  className={`p-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold
+                    ${confirmDelete ? 'bg-red-500 text-white px-2.5 hover:bg-red-600' : 'hover:bg-red-50 text-stone-400 hover:text-red-500'}`}
+                  title={confirmDelete ? 'Click lần nữa để xóa vĩnh viễn' : 'Xóa dự án'}>
+                  {confirmDelete ? (<><AlertTriangle className="w-3.5 h-3.5" /> Xác nhận xóa?</>) : <Trash2 className="w-4 h-4" />}
+                </button>
+              ) : (
+                <span className="flex items-center gap-1 text-[10px] text-stone-400 pr-2" title="Chỉ PIC mới sửa/xóa dự án">
+                  <Lock className="w-3 h-3" /> Chỉ PIC
+                </span>
+              )}
               <button onClick={closeProjectDetail} className="p-1.5 hover:bg-stone-100 rounded-lg">
                 <X className="w-4 h-4 text-stone-500" />
               </button>
@@ -143,12 +157,7 @@ export default function ProjectDetailModal() {
 
           {/* Content */}
           <div className="p-5 space-y-4 overflow-y-auto">
-            {pendingMsg && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-                <Hourglass className="w-3.5 h-3.5 shrink-0" /> {pendingMsg}
-              </div>
-            )}
-            {/* Name (editable) */}
+            {/* Name (editable nếu canManage) */}
             {editingName ? (
               <div className="flex items-center gap-2">
                 <input type="text" value={nameDraft} onChange={e => setNameDraft(e.target.value)}
@@ -161,14 +170,14 @@ export default function ProjectDetailModal() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-start gap-2 group cursor-pointer"
-                onClick={() => { setNameDraft(project.name); setEditingName(true); }}>
+              <div className={`flex items-start gap-2 group ${canManage ? 'cursor-pointer' : ''}`}
+                onClick={() => canManage && (setNameDraft(project.name), setEditingName(true))}>
                 <h3 className="text-lg font-bold text-ink flex-1">{project.name}</h3>
-                <Pencil className="w-4 h-4 text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity mt-1 shrink-0" />
+                {canManage && <Pencil className="w-4 h-4 text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity mt-1 shrink-0" />}
               </div>
             )}
 
-            {/* Description (editable) */}
+            {/* Description (editable nếu canManage) */}
             {editingDesc ? (
               <div className="space-y-2">
                 <textarea value={descDraft} onChange={e => setDescDraft(e.target.value)} rows={3} autoFocus
@@ -185,16 +194,18 @@ export default function ProjectDetailModal() {
                 </div>
               </div>
             ) : (
-              <div className="group cursor-pointer rounded-lg -mx-1 px-1 py-1 hover:bg-stone-50 transition-colors"
-                onClick={() => { setDescDraft(project.description); setEditingDesc(true); }}>
-                <p className="text-sm text-stone-600 leading-relaxed">{project.description || 'Thêm mô tả...'}</p>
-                <span className="text-[10px] text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
-                  <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa
-                </span>
+              <div className={`group rounded-lg -mx-1 px-1 py-1 transition-colors ${canManage ? 'cursor-pointer hover:bg-stone-50' : ''}`}
+                onClick={() => canManage && (setDescDraft(project.description), setEditingDesc(true))}>
+                <p className="text-sm text-stone-600 leading-relaxed">{project.description || (canManage ? 'Thêm mô tả...' : '—')}</p>
+                {canManage && (
+                  <span className="text-[10px] text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
+                    <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa
+                  </span>
+                )}
               </div>
             )}
 
-            {/* Status (auto — tính từ tiến độ ngày & phase) */}
+            {/* Status (auto) */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1.5 block">Trạng thái (tự động)</label>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border
@@ -204,26 +215,36 @@ export default function ProjectDetailModal() {
               </span>
             </div>
 
-            {/* Dates */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Bắt đầu
-                </label>
-                <input type="date" value={project.startDate}
-                  onChange={e => doUpdate({ startDate: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
-                             focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Ngày mục tiêu
-                </label>
-                <input type="date" value={project.targetDate}
-                  onChange={e => doUpdate({ targetDate: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
-                             focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
-              </div>
+            {/* PIC (#11) */}
+            <div>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
+                <Crown className="w-3 h-3" /> Người phụ trách (PIC)
+              </label>
+              {canChangePic ? (
+                <Dropdown className="w-60" value={effectivePicId} onChange={handleChangePic}
+                  options={orgMembers.map(m => ({
+                    value: m.id, label: m.name,
+                    hint: ROLE_LABELS[m.role] ?? m.role, avatar: m.avatar,
+                  }))} />
+              ) : picUser ? (
+                <div className="flex items-center gap-1.5">
+                  <Avatar name={picUser.name} src={picUser.avatar} className="w-5 h-5" />
+                  <span className="text-xs font-medium text-stone-700">{picUser.name}</span>
+                </div>
+              ) : (
+                <span className="text-xs text-stone-400">—</span>
+              )}
+            </div>
+
+            {/* Dates — chỉ còn ngày bắt đầu (#20: dự án không có ngày kết thúc) */}
+            <div>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
+                <Calendar className="w-3 h-3" /> Ngày bắt đầu
+              </label>
+              <input type="date" value={project.startDate} disabled={!canManage}
+                onChange={e => doUpdate({ startDate: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm disabled:bg-stone-50 disabled:text-stone-400
+                           focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
             </div>
 
             {/* Progress (auto — trung bình % các phase) */}
@@ -238,21 +259,23 @@ export default function ProjectDetailModal() {
               </div>
             </div>
 
-            {/* Progress (auto — theo ngày: từ ngày bắt đầu → ngày mục tiêu) */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-stone-700">Tiến độ (theo ngày)</label>
-                <span className="text-xs font-bold text-ink">{dateProgress}%</span>
+            {/* Tiến độ theo ngày — mốc = endDate phase xa nhất (#20 item 6); chỉ tham chiếu, không phải ngày kết thúc thật */}
+            {projectPbs.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-stone-700">Tiến độ (theo ngày)</label>
+                  <span className="text-xs font-bold text-ink">{dateProgress}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-stone-400 transition-all" style={{ width: `${dateProgress}%` }} />
+                </div>
+                <p className="text-[10px] text-stone-400 mt-1">
+                  {dateProgress > autoProgress
+                    ? `Phase đang chậm hơn lịch ${dateProgress - autoProgress}%`
+                    : 'Phase đang bắt kịp hoặc vượt lịch'}
+                </p>
               </div>
-              <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-stone-400 transition-all" style={{ width: `${dateProgress}%` }} />
-              </div>
-              <p className="text-[10px] text-stone-400 mt-1">
-                {dateProgress > autoProgress
-                  ? `Phase đang chậm hơn lịch ${dateProgress - autoProgress}%`
-                  : 'Phase đang bắt kịp hoặc vượt lịch'}
-              </p>
-            </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
@@ -267,9 +290,9 @@ export default function ProjectDetailModal() {
                 <div className="text-base font-bold text-emerald-600">{completePbs}</div>
               </div>
               <div className="bg-surface-card rounded-lg p-3 border border-hairline">
-                <div className="text-[10px] text-stone-400 font-medium mb-0.5">Deadline</div>
-                <div className={`text-base font-bold ${daysLeft < 7 ? 'text-red-500' : 'text-ink'}`}>
-                  {daysLeft >= 0 ? `${daysLeft} ngày` : `Quá ${Math.abs(daysLeft)}d`}
+                <div className="text-[10px] text-stone-400 font-medium mb-0.5">Hạn phase gần nhất</div>
+                <div className={`text-base font-bold ${deadlineDays !== null && deadlineDays < 0 ? 'text-red-500' : deadlineDays !== null && deadlineDays < 7 ? 'text-amber-600' : 'text-ink'}`}>
+                  {deadlineDays === null ? '—' : deadlineDays >= 0 ? `${deadlineDays} ngày` : `Quá ${Math.abs(deadlineDays)}d`}
                 </div>
               </div>
             </div>
@@ -304,7 +327,7 @@ export default function ProjectDetailModal() {
                 )}
               </div>
               <span className="text-[10px] text-stone-400 pt-2">
-                {format(parseISO(project.startDate), 'dd/MM/yyyy')} – {format(parseISO(project.targetDate), 'dd/MM/yyyy')}
+                Bắt đầu {format(parseISO(project.startDate), 'dd/MM/yyyy')}
               </span>
             </div>
 

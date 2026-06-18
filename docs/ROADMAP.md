@@ -16,7 +16,7 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | Wave | Issue | Trạng thái |
 |---|---|---|
 | 1 | #4, #6, #16, #19, #17(phần bỏ viết tắt) | ✅ Xong (#17 phần "cho sửa" còn ở Wave 3) |
-| 2 | #5, #11, #13, #20 | ⬜ Chưa bắt đầu |
+| 2 | #5, #11, #13, #20 | ✅ Xong |
 | 3 | #10, #9, #8, #12, #17 | ⬜ Chưa bắt đầu |
 | 4 | #14, #18, #15 | ⬜ Chưa bắt đầu |
 
@@ -39,14 +39,14 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 ## Wave 2 — Backend nền tảng
 
-- [ ] [#5 — Giới hạn Domain Email (allowlist)](https://github.com/gnust-company/project-monitoring/issues/5)
-  - Setting `allowed_email_domains` (CSV); chặn ở `/auth/register`, KHÔNG chặn `/auth/setup`.
-- [ ] [#11 — Phân quyền theo PIC, bỏ approval queue](https://github.com/gnust-company/project-monitoring/issues/11) ⚠️ *breaking change*
-  - Thêm `Project.pic_user_id` (migration); viết lại `authz.py`; gỡ toàn bộ `change_requests` (BE + FE); endpoint đổi PIC; cập nhật docs.
-- [ ] [#13 — Bỏ assignee, creator là PIC, participant chỉ là note](https://github.com/gnust-company/project-monitoring/issues/13)
-  - Bỏ/deprecate cột `assignee` (migration); bỏ dropdown assignee; dùng `createdBy`.
-- [ ] [#20 — Bỏ ngày kết thúc dự án + redesign status](https://github.com/gnust-company/project-monitoring/issues/20) ⚠️ *ảnh hưởng rộng*
-  - `targetDate` nullable; redesign `computeProjectStatus`; dashboard deadline dựa phase `endDate`.
+- [x] [#5 — Giới hạn Domain Email (allowlist)](https://github.com/gnust-company/project-monitoring/issues/5)
+  - Setting `allowed_email_domains` (CSV, env-only); chặn ở `/auth/register` (422), KHÔNG chặn `/auth/setup`. List rỗng = không giới hạn.
+- [x] [#11 — Phân quyền theo PIC, bỏ approval queue](https://github.com/gnust-company/project-monitoring/issues/11) ⚠️ *breaking change*
+  - Thêm `Project.pic_user_id` (migration additive); viết lại `authz.py` (`can_edit_project`/`can_edit_phase`); deprecate `change_requests` (giữ bảng, FE gỡ UI duyệt); endpoint `PATCH /projects/{id}/pic`; gate edit phase metadata theo PIC; cập nhật docs.
+- [x] [#13 — Bỏ assignee, creator là PIC, participant chỉ là note](https://github.com/gnust-company/project-monitoring/issues/13)
+  - `assignee` nullable (cùng migration); bỏ dropdown assignee ở Phase/Create modal; PIC phase = `createdBy`.
+- [x] [#20 — Bỏ ngày kết thúc dự án + redesign status](https://github.com/gnust-company/project-monitoring/issues/20) ⚠️ *ảnh hưởng rộng*
+  - `target_date` nullable (cùng migration); redesign `computeProjectStatus` (Delayed/At Risk/On Track theo phase); dashboard "đến hạn"/"Deadline" + ProjectDetail dựa phase `endDate`; CreateProject chọn `startDate`, bỏ `targetDate`.
 
 ## Wave 3 — Phụ thuộc Wave 2
 

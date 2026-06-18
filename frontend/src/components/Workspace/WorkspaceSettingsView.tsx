@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
 import {
-  Settings, Users, Trash2, Check, AlertTriangle, UserPlus, X, Mail, Inbox,
+  Settings, Users, Trash2, Check, AlertTriangle, UserPlus, X, Mail,
 } from 'lucide-react';
 import Avatar from '../common/Avatar';
 
@@ -19,8 +19,7 @@ export default function WorkspaceSettingsView() {
   const {
     selectedOrg, currentUser, orgProjects, phaseBlocks, isOwner,
     updateOrganization, deleteOrganization, addOrgMember, removeOrgMember,
-    goToWorkspaceSelector, pendingChangeRequests, approveChangeRequest, rejectChangeRequest,
-    loadChangeRequests, getUserById,
+    goToWorkspaceSelector,
   } = useApp();
 
   const [nameDraft, setNameDraft] = useState(selectedOrg?.name ?? '');
@@ -32,8 +31,7 @@ export default function WorkspaceSettingsView() {
   useEffect(() => {
     setNameDraft(selectedOrg?.name ?? '');
     setConfirmDelete(false);
-    if (isOwner) loadChangeRequests();
-  }, [selectedOrg?.id, isOwner, loadChangeRequests]);
+  }, [selectedOrg?.id]);
 
   if (!selectedOrg) return null;
 
@@ -81,49 +79,8 @@ export default function WorkspaceSettingsView() {
           </p>
         </motion.div>
 
-        {/* Pending approvals (owner) */}
-        {isOwner && pendingChangeRequests.length > 0 && (
-          <motion.div custom={1} variants={fadeUp} initial="hidden" animate="visible"
-            className="bg-amber-50/50 rounded-2xl border border-amber-200 p-6 mb-6">
-            <h2 className="text-sm font-semibold text-amber-700 mb-4 flex items-center gap-2">
-              <Inbox className="w-4 h-4" /> Yêu cầu chờ duyệt ({pendingChangeRequests.length})
-            </h2>
-            <div className="space-y-2">
-              {pendingChangeRequests.map(cr => {
-                const requester = cr.requestedBy ? getUserById(cr.requestedBy) : undefined;
-                const project = orgProjects.find(p => p.id === cr.projectId);
-                const verb = cr.action === 'delete_project' ? 'Xóa' : 'Sửa';
-                return (
-                  <div key={cr.id} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-amber-100">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-ink">
-                        <span className="font-medium">{requester?.name ?? 'Thành viên'}</span> yêu cầu{' '}
-                        <span className="font-semibold">{verb.toLowerCase()}</span> dự án{' '}
-                        <span className="font-medium">{project?.name ?? cr.projectId.slice(0, 8)}</span>
-                      </div>
-                      {cr.action === 'update_project' && (
-                        <div className="text-[11px] text-stone-400 mt-0.5 truncate">
-                          {Object.entries(cr.payload).map(([k, v]) => `${k}: ${String(v)}`).join(' · ')}
-                        </div>
-                      )}
-                    </div>
-                    <button onClick={() => approveChangeRequest(cr.id)}
-                      className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-lg hover:bg-emerald-600 flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Duyệt
-                    </button>
-                    <button onClick={() => rejectChangeRequest(cr.id)}
-                      className="px-3 py-1.5 bg-white text-stone-500 border border-stone-200 text-xs font-semibold rounded-lg hover:border-stone-300">
-                      Từ chối
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-
         {/* General */}
-        <motion.div custom={2} variants={fadeUp} initial="hidden" animate="visible"
+        <motion.div custom={1} variants={fadeUp} initial="hidden" animate="visible"
           className="bg-surface-card rounded-2xl border border-hairline p-6 mb-6">
           <h2 className="text-sm font-semibold text-ink mb-4">Thông tin chung</h2>
           <label className="text-xs font-semibold text-stone-700 mb-1 block">Tên workspace</label>

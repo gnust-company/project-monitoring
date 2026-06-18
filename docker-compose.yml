@@ -64,6 +64,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me}
       # phải khớp host:port mà trình duyệt mở frontend (đổi FRONTEND_PORT thì sửa luôn)
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173}}
+      # Allowlist domain email (#5): CSV. Rỗng = không giới hạn. /auth/setup luôn được qua.
+      ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-}
       # MinIO nội bộ container dùng để upload. Dùng MinIO ngoài thì đặt MINIO_ENDPOINT trong .env.
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}

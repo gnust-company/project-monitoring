@@ -58,10 +58,18 @@ class Project:
     description: str
     status: ProjectStatus
     start_date: date
-    target_date: date
-    progress: int  # 0-100
     created_by: UUID
+    # #11: PIC (person-in-charge). Mặc định = created_by; chủ workspace/PIC có thể đổi.
+    pic_user_id: UUID | None = None
+    # #20: dự án không bắt buộc có ngày kết thúc.
+    target_date: date | None = None
+    progress: int = 0  # 0-100
     created_at: datetime | None = None
+
+    @property
+    def effective_pic(self) -> UUID | None:
+        """PIC hiệu dụng = pic_user_id nếu có, không thì người tạo."""
+        return self.pic_user_id or self.created_by
 
 
 @dataclass(slots=True)
@@ -118,7 +126,8 @@ class PhaseBlock:
     start_date: date
     end_date: date
     created_by: UUID
-    assignee: UUID  # mặc định = created_by, đổi được sang thành viên khác
+    # #13: assignee giờ chỉ là "note" (không tác dụng quyền). PIC phase = created_by.
+    assignee: UUID | None = None
     actual_end_date: date | None = None
     display_row: int | None = None  # hàng hiển thị trên timeline (FE quản lý)
     participant_ids: list[UUID] = field(default_factory=list)

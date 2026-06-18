@@ -2,9 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById, ROLE_LABELS } from '../../data/mockData';
-import Dropdown from '../common/Dropdown';
-import { PHASE_META, PHASE_TAG_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
-import type { PhaseTag, ChecklistItem, UserRole } from '../../types';
+import { PHASE_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
+import type { ChecklistItem, UserRole } from '../../types';
 import {
   X, CheckSquare, Square, MessageSquare, Paperclip, Clock,
   Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check,
@@ -12,8 +11,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Avatar from '../common/Avatar';
-
-const ALL_TAGS: PhaseTag[] = ['Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled'];
+import Dropdown from '../common/Dropdown';
 
 // Gom item theo role — luôn hiện đủ role chuẩn của phase (kèm ô thêm riêng),
 // thêm role lạ nếu có, cuối cùng là nhóm "Chung".
@@ -28,9 +26,10 @@ function buildGroups(items: ChecklistItem[], roles: UserRole[]): Array<{ role: U
 export default function PhaseDetailModal() {
   const {
     selectedPhaseBlock, phaseDetailOpen, closePhaseDetail,
-    updatePhaseBlock, deletePhaseBlock, orgProjects, selectedOrg,
+    updatePhaseBlock, deletePhaseBlock, orgProjects,
     addPhaseItem, updatePhaseItem, deletePhaseItem,
     addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,
+    currentUser, selectedOrg,
   } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,6 +44,7 @@ export default function PhaseDetailModal() {
   // Inline editing
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [descDraft, setDescDraft] = useState('');
 
@@ -233,12 +233,22 @@ export default function PhaseDetailModal() {
   if (!selectedPhaseBlock || !phaseDetailOpen) return null;
 
   const meta = PHASE_META[selectedPhaseBlock.phaseType];
-  const creator = getUserById(selectedPhaseBlock.createdBy);
   const project = orgProjects.find(p => p.id === selectedPhaseBlock.projectId);
   const completedChecks = checklist.filter(c => c.done).length;
   const progressPct = checklist.length > 0 ? Math.round((completedChecks / checklist.length) * 100) : 0;
-  const tagMeta = PHASE_TAG_META[selectedPhaseBlock.tag];
-  const orgMembers = selectedOrg?.members || [];
+  const orgMembers = selectedOrg?.members ?? [];
+  // #11/#4: PIC phase = assignee (đổi được) hoặc người tạo. Chỉ PIC/superuser sửa metadata.
+  const phasePicId = selectedPhaseBlock.assignee ?? selectedPhaseBlock.createdBy;
+  const picUser = getUserById(phasePicId);
+  const canEditPhase = !!currentUser && (currentUser.isSuperuser || phasePicId === currentUser.id);
+  const participants = selectedPhaseBlock.participants;
+  const addableMembers = orgMembers.filter(m => !participants.includes(m.id));
+
+  const changePic = (uid: string) => updatePhaseBlock(selectedPhaseBlock.id, { assignee: uid });
+  const addParticipant = (uid: string) =>
+    updatePhaseBlock(selectedPhaseBlock.id, { participants: Array.from(new Set([...participants, uid])) });
+  const removeParticipant = (uid: string) =>
+    updatePhaseBlock(selectedPhaseBlock.id, { participants: participants.filter(p => p !== uid) });
 
   return (
     <AnimatePresence>
@@ -258,9 +268,6 @@ export default function PhaseDetailModal() {
               <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${meta.bg} ${meta.color} border ${meta.border}`}>
                 {meta.fullLabel}
               </span>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${tagMeta.bg} ${tagMeta.color} border ${tagMeta.border}`}>
-                {tagMeta.label}
-              </span>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 border border-gray-200">
                 {progressPct}% hoàn thành
               </span>
@@ -278,24 +285,6 @@ export default function PhaseDetailModal() {
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            {/* Tag selector */}
-            <div className="px-6 pt-4 pb-3">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {ALL_TAGS.map(t => {
-                  const tm = PHASE_TAG_META[t];
-                  const isActive = selectedPhaseBlock.tag === t;
-                  return (
-                    <button key={t}
-                      onClick={() => updatePhaseBlock(selectedPhaseBlock.id, { tag: t })}
-                      className={`text-[10px] font-semibold px-2.5 py-1 rounded-md border transition-all
-                        ${isActive ? `${tm.bg} ${tm.color} ${tm.border}` : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'}`}>
-                      {tm.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Title (editable) */}
             <div className="px-6 pb-3">
               {editingTitle ? (
@@ -384,41 +373,90 @@ export default function PhaseDetailModal() {
               </div>
             </div>
 
-            {/* Assignee, Creator & Participants */}
+            {/* PIC (creator), Participants (#13: bỏ assignee — PIC = người tạo) */}
             <div className="px-6 pb-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 flex items-center gap-1 w-24 shrink-0">
-                  <UserCircle2 className="w-3.5 h-3.5" /> Assignee:
-                </span>
-                <Dropdown
-                  className="w-56"
-                  value={selectedPhaseBlock.assignee || selectedPhaseBlock.createdBy}
-                  onChange={v => updatePhaseBlock(selectedPhaseBlock.id, { assignee: v })}
-                  options={orgMembers.map(m => ({
-                    value: m.id,
-                    label: m.name,
-                    hint: ROLE_LABELS[m.role] ?? m.role,
-                    avatar: m.avatar,
-                  }))}
-                />
-              </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                {/* PIC (đổi được nếu canEditPhase) */}
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">Người tạo:</span>
-                  {creator && (
+                  <span className="text-xs text-gray-400 flex items-center gap-1 shrink-0">
+                    <UserCircle2 className="w-3.5 h-3.5" /> PIC
+                  </span>
+                  {canEditPhase ? (
+                    <Dropdown className="w-52" value={phasePicId} onChange={changePic}
+                      options={orgMembers.map(m => ({
+                        value: m.id, label: m.name,
+                        hint: ROLE_LABELS[m.role] ?? m.role, avatar: m.avatar,
+                      }))} />
+                  ) : picUser ? (
                     <div className="flex items-center gap-1.5">
-                      <Avatar name={creator.name} src={creator.avatar} className="w-5 h-5" />
-                      <span className="text-xs font-medium text-slate-700">{creator.name}</span>
+                      <Avatar name={picUser.name} src={picUser.avatar} className="w-5 h-5" />
+                      <span className="text-xs font-medium text-slate-700">{picUser.name}</span>
                     </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-3 h-3 text-gray-400" />
-                  <div className="flex -space-x-1">
-                    {selectedPhaseBlock.participants.map(uid => {
+
+                {/* Participants — avatar stack, hover expand + tooltip tên + add/remove */}
+                <div className="flex items-center gap-2 group/parts">
+                  <span className="text-xs text-gray-400 flex items-center gap-1 shrink-0">
+                    <Users className="w-3.5 h-3.5" /> Người tham gia
+                  </span>
+                  <div className="flex items-center">
+                    {participants.map(uid => {
                       const u = getUserById(uid);
-                      return <Avatar key={uid} name={u?.name} src={u?.avatar} className="w-4 h-4 border border-white" />;
+                      return (
+                        <div key={uid}
+                          className="relative -ml-2 first:ml-0 transition-all duration-200 group-hover/parts:ml-0 group/member">
+                          <Avatar name={u?.name} src={u?.avatar}
+                            className="w-6 h-6 border-2 border-white ring-1 ring-gray-200 cursor-default" />
+                          {/* tooltip tên */}
+                          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5
+                            whitespace-nowrap rounded bg-slate-900 px-1.5 py-0.5 text-[10px] text-white
+                            opacity-0 group-hover/member:opacity-100 transition-opacity z-20">
+                            {u?.name ?? 'Người dùng'}
+                          </span>
+                          {/* nút xóa (chỉ PIC) */}
+                          {canEditPhase && (
+                            <button onClick={() => removeParticipant(uid)} title={`Xóa ${u?.name ?? ''}`}
+                              className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full
+                                flex items-center justify-center opacity-0 group-hover/member:opacity-100
+                                hover:bg-red-600 transition-opacity z-20">
+                              <X className="w-2 h-2" />
+                            </button>
+                          )}
+                        </div>
+                      );
                     })}
+                    {/* nút thêm (chỉ PIC) */}
+                    {canEditPhase && (
+                      <div className="relative -ml-2 transition-all duration-200 group-hover/parts:ml-0">
+                        <button onClick={() => setShowAddParticipant(s => !s)}
+                          title="Thêm người tham gia"
+                          className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 text-gray-400
+                            hover:border-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors">
+                          <Plus className="w-3 h-3" />
+                        </button>
+                        {showAddParticipant && (
+                          <>
+                            <div className="fixed inset-0 z-30" onClick={() => setShowAddParticipant(false)} />
+                            <div className="absolute left-0 top-full mt-1 z-40 w-48 max-h-48 overflow-y-auto
+                              bg-white rounded-lg border border-gray-200 shadow-lg py-1">
+                              {addableMembers.length === 0 ? (
+                                <p className="px-3 py-2 text-[11px] text-gray-400">Đã thêm đủ thành viên.</p>
+                              ) : addableMembers.map(m => (
+                                <button key={m.id}
+                                  onClick={() => { addParticipant(m.id); }}
+                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 text-left">
+                                  <Avatar name={m.name} src={m.avatar} className="w-5 h-5" />
+                                  <span className="text-xs text-slate-700 truncate">{m.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

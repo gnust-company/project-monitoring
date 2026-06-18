@@ -86,9 +86,11 @@ CREATE TABLE organization_members (
 );
 ```
 
-> **Quyền**: `owner`/`superuser` toàn quyền với workspace + artifact (dự án, phase,
-> thành viên). `member` tạo dự án/phase được, nhưng **sửa/xóa dự án phải owner duyệt**
-> (qua `change_requests`) và **không** sửa được workspace hay quản lý thành viên.
+> **Quyền PIC** (#11): `owner`/`superuser` toàn quyền với workspace (đổi tên/xóa/thành viên).
+> Mỗi dự án/phase có **PIC = người tạo** (`projects.pic_user_id` mặc định = `created_by`, đổi
+> được qua `PATCH /projects/{id}/pic`; phase PIC = `created_by`). **Chỉ PIC (hoặc superuser)
+> mới sửa/xóa *metadata* dự án/phase**. Checklist/outcome & comment thì ai cũng note/tick được
+> (ghi log). Cơ chế duyệt `change_requests` cũ đã **deprecated** (giữ bảng, không còn dùng).
 
 ### projects
 
@@ -100,12 +102,15 @@ CREATE TABLE projects (
   description TEXT NOT NULL DEFAULT '',
   status      project_status NOT NULL DEFAULT 'On Track',
   start_date  DATE NOT NULL,
-  target_date DATE NOT NULL,
+  target_date DATE,                       -- #20: NULL = dự án không có ngày kết thúc (deadline theo phase)
   progress    INTEGER NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
   created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  pic_user_id UUID REFERENCES users(id) ON DELETE SET NULL,  -- #11: PIC (mặc định = created_by, đổi được)
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_projects_pic_user_id ON projects(pic_user_id);
 
 CREATE INDEX idx_projects_org ON projects(org_id);
 ```
@@ -125,7 +130,7 @@ CREATE TABLE phase_blocks (
   actual_end_date DATE,                -- ngày kết thúc thực tế (nếu có)
   display_row     INTEGER,             -- hàng hiển thị trên timeline (NULL = auto-layout)
   created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
-  assignee        UUID REFERENCES users(id) ON DELETE SET NULL,  -- default = created_by (BE gán khi tạo)
+  assignee        UUID REFERENCES users(id) ON DELETE SET NULL,  -- #13: chỉ là "note" (NULL ok); PIC phase = created_by
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (end_date > start_date)
@@ -236,9 +241,13 @@ CREATE INDEX idx_templates_phase ON phase_task_templates(phase_type, kind);
 
 **Seed data**: chuyển nguyên nội dung `PHASE_ROLE_TASKS` và `PHASE_ROLE_OUTCOMES` từ `frontend/src/types.ts` vào bảng này (VD: `('PA', 'PM', 'checklist', 'Define goals and objectives', 0)` ...). Nguồn sự thật ở backend: `app/domain/phase_templates.py`; seed bằng migration `0002_seed_templates` (56 dòng).
 
-### change_requests — hàng đợi duyệt
+### change_requests — ⚠️ DEPRECATED (#11)
 
-Member sửa/xóa dự án → tạo 1 bản ghi `pending`; owner duyệt (áp dụng) hoặc từ chối.
+> Kể từ mô hình PIC (#11), cơ chế duyệt này **không còn được dùng** — member không còn
+> tạo change request; sửa/xóa do PIC quyết định trực tiếp. Bảng & repo được **giữ lại**
+> (additive, không drop) để tránh phá DB đang chạy; sẽ xoá sạch ở migration dọn dẹp sau.
+
+(Lịch sử: member sửa/xóa dự án → tạo 1 bản ghi `pending`; owner duyệt/từ chối.)
 
 ```sql
 CREATE TABLE change_requests (
@@ -295,7 +304,8 @@ CREATE INDEX idx_notif_user ON notifications(user_id, read, created_at DESC);
 | `ActivityItem` | `activity_log` | nay có `project_id` → dùng cho cả changelog dự án |
 | `PHASE_ROLE_TASKS/OUTCOMES` | `phase_task_templates` | từ hằng số → data |
 | *(mới)* permission | `users.is_superuser` + `organization_members.role` | tách khỏi `UserRole` |
-| *(mới)* approval queue | `change_requests` | member sửa/xóa dự án chờ owner duyệt |
+| *(mới)* PIC dự án (#11) | `projects.pic_user_id` | mặc định `created_by`, đổi được; thay thế approval queue |
+| *(deprecated)* approval queue | `change_requests` | đã thay bằng PIC; bảng giữ lại, không dùng (#11) |
 | *(mới)* notifications | `notifications` | in-app, FE poll |
 
 ## Ghi chú thiết kế

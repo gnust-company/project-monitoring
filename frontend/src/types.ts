@@ -252,9 +252,10 @@ export interface Project {
   description: string;
   status: ProjectStatus;
   startDate: string;
-  targetDate: string;
+  targetDate?: string | null; // #20: không bắt buộc (dự án có thể kéo dài không định hạn)
   progress: number; // 0-100
   createdBy: string; // userId
+  picUserId?: string | null; // #11: PIC (mặc định = createdBy)
 }
 
 // ─── Phase Tags ──────────────────────────────────────────────────────
@@ -286,8 +287,8 @@ export interface PhaseBlock {
   startDate: string;        // ISO
   endDate: string;          // ISO — ngày kết thúc dự kiến
   actualEndDate?: string;   // ISO — ngày kết thúc thực tế (nếu có)
-  createdBy: string; // userId
-  assignee: string; // userId — mặc định là người tạo, có thể đổi sang thành viên khác
+  createdBy: string; // userId — PIC phase (#11/#13)
+  assignee?: string | null; // userId — giờ chỉ là "note" (#13); PIC = createdBy
   participants: string[]; // userIds
   checklist: ChecklistItem[];
   outcomes: ChecklistItem[];
@@ -324,4 +325,4 @@ export interface ActivityItem {
 
 export type WorkspaceView = 'dashboard' | 'pipeline' | 'team' | 'profile' | 'settings';
 
-export type ZoomLevel = 'week' | 'month' | 'quarter';
+export type ZoomLevel = '3day' | 'week' | 'month' | 'quarter';

@@ -44,11 +44,12 @@ from app.application.use_cases.phase_blocks import (
     UpdatePhaseItem,
 )
 from app.application.use_cases.projects import (
+    ChangeProjectPic,
     CreateProject,
-    DeleteProjectOrRequest,
+    DeleteProject,
     GetProject,
     ListProjectsByOrg,
-    UpdateProjectOrRequest,
+    UpdateProject,
 )
 from app.application.use_cases.admin import (
     DeleteUser,
@@ -139,8 +140,13 @@ NotifierDep = Annotated[NotificationService, Depends(get_notifier)]
 
 
 # ─── Auth use cases ──────────────────────────────────────────────────
+def _register_factory(repo: UserRepoDep) -> RegisterUser:
+    """RegisterUser kèm allowlist domain từ cấu hình (#5)."""
+    return RegisterUser(repo, hash_password, allowed_email_domains=get_settings().allowed_email_domain_list)
+
+
 def register_user_uc(repo: UserRepoDep) -> RegisterUser:
-    return RegisterUser(repo, hash_password)
+    return _register_factory(repo)
 
 
 def authenticate_user_uc(repo: UserRepoDep) -> AuthenticateUser:
@@ -152,7 +158,7 @@ def setup_status_uc(repo: UserRepoDep) -> GetSetupStatus:
 
 
 def setup_superuser_uc(repo: UserRepoDep) -> SetupSuperuser:
-    return SetupSuperuser(repo, RegisterUser(repo, hash_password))
+    return SetupSuperuser(repo, _register_factory(repo))
 
 
 # ─── Current user (JWT) ──────────────────────────────────────────────
@@ -258,16 +264,16 @@ def create_project_uc(repo: ProjectRepoDep) -> CreateProject:
     return CreateProject(repo)
 
 
-def update_project_uc(
-    repo: ProjectRepoDep, crs: ChangeRequestRepoDep, orgs: OrgRepoDep, notifier: NotifierDep
-) -> UpdateProjectOrRequest:
-    return UpdateProjectOrRequest(repo, crs, orgs, notifier)
+def update_project_uc(repo: ProjectRepoDep) -> UpdateProject:
+    return UpdateProject(repo)
 
 
-def delete_project_uc(
-    repo: ProjectRepoDep, crs: ChangeRequestRepoDep, orgs: OrgRepoDep, notifier: NotifierDep
-) -> DeleteProjectOrRequest:
-    return DeleteProjectOrRequest(repo, crs, orgs, notifier)
+def delete_project_uc(repo: ProjectRepoDep) -> DeleteProject:
+    return DeleteProject(repo)
+
+
+def change_project_pic_uc(repo: ProjectRepoDep, notifier: NotifierDep) -> ChangeProjectPic:
+    return ChangeProjectPic(repo, notifier)
 
 
 # ─── Change request use cases ────────────────────────────────────────

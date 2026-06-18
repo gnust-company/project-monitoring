@@ -1,22 +1,26 @@
-"""Use cases cho Project — gồm luồng duyệt (approval queue) cho member."""
+"""Use cases cho Project — PIC permissions (#11), bỏ approval queue.
+
+PIC = người tạo (project cho đổi PIC trong detail; phase PIC = người tạo).
+Chỉ PIC (hoặc superuser) mới sửa/xóa metadata project. Owner workspace được đổi PIC.
+"""
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
 from uuid import UUID, uuid4
 
-from app.application.authz import can_edit_project_directly
+from app.application.authz import can_edit_project, effective_project_pic
 from app.application.notifications import NotificationService
-from app.application.ports import (
-    ChangeRequestRepository,
-    OrganizationRepository,
-    ProjectRepository,
-)
-from app.domain.entities import ChangeRequest, Membership, Project, User
-from app.domain.value_objects import ChangeRequestAction, ProjectStatus
+from app.application.ports import ProjectRepository
+from app.domain.entities import Membership, Project, User
+from app.domain.value_objects import ProjectStatus
 
 
 class ProjectNotFoundError(Exception):
     pass
+
+
+class ProjectForbiddenError(Exception):
+    """Actor không phải PIC/superuser → không được sửa/xóa/đổi PIC."""
 
 
 @dataclass(slots=True)
@@ -25,9 +29,10 @@ class CreateProjectInput:
     name: str
     description: str
     start_date: date
-    target_date: date
     created_by: UUID
+    target_date: date | None = None  # #20: không bắt buộc
     status: ProjectStatus = ProjectStatus.ON_TRACK
+    pic_user_id: UUID | None = None  # #11: mặc định = created_by
 
 
 def _apply_updates(project: Project, payload: dict[str, Any]) -> Project:
@@ -42,8 +47,10 @@ def _apply_updates(project: Project, payload: dict[str, Any]) -> Project:
         project.progress = payload["progress"]
     if payload.get("start_date"):
         project.start_date = date.fromisoformat(payload["start_date"])
-    if payload.get("target_date"):
-        project.target_date = date.fromisoformat(payload["target_date"])
+    # #20: target_date có thể là None (xóa ngày kết thúc) hoặc ISO string.
+    if "target_date" in payload:
+        v = payload["target_date"]
+        project.target_date = date.fromisoformat(v) if v else None
     return project
 
 
@@ -73,79 +80,74 @@ class CreateProject:
     async def execute(self, data: CreateProjectInput) -> Project:
         project = Project(
             id=uuid4(), org_id=data.org_id, name=data.name, description=data.description,
-            status=data.status, start_date=data.start_date, target_date=data.target_date,
-            progress=0, created_by=data.created_by,
+            status=data.status, start_date=data.start_date, created_by=data.created_by,
+            pic_user_id=data.pic_user_id or data.created_by,
+            target_date=data.target_date, progress=0,
         )
         return await self._projects.create(project)
 
 
-class UpdateProjectOrRequest:
-    """Owner/superuser sửa trực tiếp; member tạo ChangeRequest chờ duyệt."""
+class UpdateProject:
+    """Sửa metadata project — chỉ PIC (hiệu dụng)/superuser (#11)."""
 
-    def __init__(
-        self, projects: ProjectRepository, change_requests: ChangeRequestRepository,
-        orgs: OrganizationRepository, notifier: NotificationService,
-    ) -> None:
+    def __init__(self, projects: ProjectRepository) -> None:
         self._projects = projects
-        self._crs = change_requests
-        self._orgs = orgs
+
+    async def execute(self, project_id: UUID, payload: dict[str, Any], actor: User) -> Project:
+        project = await self._projects.get(project_id)
+        if project is None:
+            raise ProjectNotFoundError(str(project_id))
+        if not can_edit_project(actor, project):
+            raise ProjectForbiddenError(
+                "Chỉ PIC (hoặc admin) mới được sửa dự án này"
+            )
+        return await self._projects.update(_apply_updates(project, payload))
+
+
+class DeleteProject:
+    """Xóa project — chỉ PIC (hiệu dụng)/superuser (#11)."""
+
+    def __init__(self, projects: ProjectRepository) -> None:
+        self._projects = projects
+
+    async def execute(self, project_id: UUID, actor: User) -> None:
+        project = await self._projects.get(project_id)
+        if project is None:
+            raise ProjectNotFoundError(str(project_id))
+        if not can_edit_project(actor, project):
+            raise ProjectForbiddenError(
+                "Chỉ PIC (hoặc admin) mới được xóa dự án này"
+            )
+        await self._projects.delete(project_id)
+
+
+class ChangeProjectPic:
+    """Đổi PIC project — PIC hiện tại, owner workspace, hoặc superuser."""
+
+    def __init__(self, projects: ProjectRepository, notifier: NotificationService) -> None:
+        self._projects = projects
         self._notifier = notifier
 
     async def execute(
-        self, project_id: UUID, payload: dict[str, Any], actor: User, membership: Membership | None
-    ) -> tuple[Project | None, ChangeRequest | None]:
+        self, project_id: UUID, new_pic_id: UUID, actor: User, membership: Membership | None,
+    ) -> Project:
         project = await self._projects.get(project_id)
         if project is None:
             raise ProjectNotFoundError(str(project_id))
 
-        if can_edit_project_directly(actor, membership):
-            return await self._projects.update(_apply_updates(project, payload)), None
-
-        cr = await self._crs.create(ChangeRequest(
-            id=uuid4(), org_id=project.org_id, project_id=project_id,
-            requested_by=actor.id, action=ChangeRequestAction.UPDATE_PROJECT, payload=payload,
-        ))
-        await self._notify_owners(project, actor, cr.id, "sửa")
-        return None, cr
-
-    async def _notify_owners(self, project: Project, actor: User, cr_id: UUID, verb: str) -> None:
-        owners = [o for o in await self._orgs.list_owner_ids(project.org_id) if o != actor.id]
-        await self._notifier.notify_many(
-            owners, "change_request_created",
-            f"{actor.name} yêu cầu {verb} dự án {project.name}",
-            org_id=project.org_id, project_id=project.id, change_request_id=cr_id,
+        is_owner = (
+            actor.is_superuser
+            or (membership is not None and membership.role == membership.role.OWNER)
         )
+        if not (is_owner or effective_project_pic(project) == str(actor.id)):
+            raise ProjectForbiddenError("Bạn không có quyền đổi PIC dự án này")
 
-
-class DeleteProjectOrRequest:
-    def __init__(
-        self, projects: ProjectRepository, change_requests: ChangeRequestRepository,
-        orgs: OrganizationRepository, notifier: NotificationService,
-    ) -> None:
-        self._projects = projects
-        self._crs = change_requests
-        self._orgs = orgs
-        self._notifier = notifier
-
-    async def execute(
-        self, project_id: UUID, actor: User, membership: Membership | None
-    ) -> ChangeRequest | None:
-        project = await self._projects.get(project_id)
-        if project is None:
-            raise ProjectNotFoundError(str(project_id))
-
-        if can_edit_project_directly(actor, membership):
-            await self._projects.delete(project_id)
-            return None
-
-        cr = await self._crs.create(ChangeRequest(
-            id=uuid4(), org_id=project.org_id, project_id=project_id,
-            requested_by=actor.id, action=ChangeRequestAction.DELETE_PROJECT, payload={},
-        ))
-        owners = [o for o in await self._orgs.list_owner_ids(project.org_id) if o != actor.id]
-        await self._notifier.notify_many(
-            owners, "change_request_created",
-            f"{actor.name} yêu cầu xóa dự án {project.name}",
-            org_id=project.org_id, project_id=project.id, change_request_id=cr.id,
-        )
-        return cr
+        project.pic_user_id = new_pic_id
+        updated = await self._projects.update(project)
+        if new_pic_id != actor.id:
+            await self._notifier.notify(
+                new_pic_id, "project_pic_changed",
+                f"Bạn được chỉ định làm PIC dự án {project.name}",
+                org_id=project.org_id, project_id=project.id,
+            )
+        return updated

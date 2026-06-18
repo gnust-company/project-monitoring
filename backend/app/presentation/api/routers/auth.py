@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.application.use_cases.auth import (
     AuthenticateUser,
+    EmailDomainNotAllowedError,
     EmailTakenError,
     GetSetupStatus,
     InvalidCredentialsError,
@@ -57,6 +58,9 @@ async def register(
         user = await uc.execute(body.email, body.password, body.name, body.role)
     except EmailTakenError:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Email already registered")
+    except EmailDomainNotAllowedError as e:
+        # #5: 422 — message kèm allowlist để FE hiện hint.
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
     return TokenOut(access_token=create_access_token(str(user.id)), user=UserOut.from_entity(user))
 
 

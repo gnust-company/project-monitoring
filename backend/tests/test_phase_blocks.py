@@ -139,3 +139,39 @@ async def test_delete_block_keeps_project_changelog(client: AsyncClient, make_us
     # changelog dự án vẫn còn dòng nhắc tới phase đã xóa
     log2 = (await client.get(f"{API}/projects/{proj['id']}/activity", headers=auth(token))).json()
     assert any("Phase X" in a["target"] or "Phase X" in a["action"] for a in log2)
+
+
+# ─── PIC phase (#11) ─────────────────────────────────────────────────
+async def test_non_creator_cannot_edit_phase_but_can_tick_items(client: AsyncClient, make_user):
+    """#11: chỉ PIC phase (= người tạo) sửa/xóa metadata; ai cũng tick checklist được."""
+    o_token, _ = await make_user("pb-owner2@hub.io")
+    m_token, _ = await make_user("pb-member2@hub.io", role="SW_Developer")
+    org = (await client.post(f"{API}/organizations", json={"name": "PB2"}, headers=auth(o_token))).json()
+    await client.post(f"{API}/organizations/{org['id']}/members",
+                      json={"email": "pb-member2@hub.io"}, headers=auth(o_token))
+    proj = (await client.post(f"{API}/organizations/{org['id']}/projects", json={
+        "name": "App2", "description": "", "startDate": "2026-04-01",
+    }, headers=auth(o_token))).json()
+    block = await _make_block(client, o_token, proj["id"], checklist=[{"text": "Task"}])
+
+    # member (không phải creator) sửa metadata → 403
+    bad = await client.patch(f"{API}/phase-blocks/{block['id']}",
+                             json={"title": "Hacked"}, headers=auth(m_token))
+    assert bad.status_code == 403
+
+    # member vẫn tick checklist được (không bị PIC khóa)
+    item_id = block["checklist"][0]["id"]
+    tick = await client.patch(f"{API}/phase-blocks/{block['id']}/items/{item_id}",
+                              json={"done": True}, headers=auth(m_token))
+    assert tick.status_code == 200
+    assert tick.json()["done"] is True
+
+    # member xóa phase → 403
+    dele = await client.delete(f"{API}/phase-blocks/{block['id']}", headers=auth(m_token))
+    assert dele.status_code == 403
+
+    # owner (creator phase) sửa được
+    ok = await client.patch(f"{API}/phase-blocks/{block['id']}",
+                            json={"title": "Renamed"}, headers=auth(o_token))
+    assert ok.status_code == 200
+    assert ok.json()["title"] == "Renamed"

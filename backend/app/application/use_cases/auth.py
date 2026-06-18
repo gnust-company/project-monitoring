@@ -3,7 +3,7 @@
 Use case không biết JWT — token do tầng presentation phát sau khi nhận User.
 Mật khẩu được hash/verify qua hai callable tiêm vào (giữ domain sạch khỏi bcrypt).
 """
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from uuid import uuid4
 
 from app.application.ports import UserRepository
@@ -23,14 +23,40 @@ class SetupAlreadyDoneError(Exception):
     pass
 
 
+class EmailDomainNotAllowedError(Exception):
+    """Domain email không nằm trong allowlist (#5)."""
+
+    def __init__(self, email: str, allowed: Sequence[str] = ()) -> None:
+        self.email = email
+        self.allowed = list(allowed)
+        msg = f"Email domain not allowed: {email}"
+        if self.allowed:
+            msg += f". Allowed: {', '.join(self.allowed)}"
+        super().__init__(msg)
+
+
 class RegisterUser:
-    def __init__(self, users: UserRepository, hasher: Callable[[str], str]) -> None:
+    def __init__(
+        self,
+        users: UserRepository,
+        hasher: Callable[[str], str],
+        *,
+        allowed_email_domains: Sequence[str] = (),
+    ) -> None:
         self._users = users
         self._hash = hasher
+        self._allowed = tuple(d.strip().lower().lstrip("@") for d in allowed_email_domains if d.strip())
 
     async def execute(
-        self, email: str, password: str, name: str, role: UserRole, *, is_superuser: bool = False
+        self, email: str, password: str, name: str, role: UserRole, *,
+        is_superuser: bool = False, enforce_email_domain: bool = True,
     ) -> User:
+        # #5: chặn domain ngoài allowlist (trừ /auth/setup vì enforce_email_domain=False).
+        if enforce_email_domain and self._allowed:
+            domain = email.rsplit("@", 1)[-1].lower() if "@" in email else ""
+            if domain not in self._allowed:
+                raise EmailDomainNotAllowedError(email, self._allowed)
+
         if await self._users.get_by_email(email):
             raise EmailTakenError(email)
         user = User(
@@ -78,6 +104,7 @@ class SetupSuperuser:
     async def execute(self, email: str, password: str, name: str, role: UserRole) -> User:
         if (await self._users.count()) > 0:
             raise SetupAlreadyDoneError()
+        # #5: setup (admin đầu tiên) KHÔNG bị giới hạn domain.
         return await self._register.execute(
-            email, password, name, role, is_superuser=True
+            email, password, name, role, is_superuser=True, enforce_email_domain=False
         )
