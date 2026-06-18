@@ -23,7 +23,8 @@ Schema database tương ứng: [SCHEMA.md](./SCHEMA.md).
 | 401 | Thiếu hoặc sai token |
 | 403 | Không thuộc workspace / không có quyền |
 | 404 | Không tìm thấy resource |
-| 422 | Validation error (FastAPI) |
+| 422 | Validation error (FastAPI) — bao gồm #9: outcome `done=true` khi chưa có tài liệu |
+| 409 | Resource tồn tại (VD: first-run setup đã tạo user) |
 
 ## Resources
 
@@ -195,7 +196,7 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
 | Method | Path | Mô tả |
 |---|---|---|
 | POST | `/phase-blocks/{blockId}/items` | Body: `{ kind, text, role? }` |
-| PATCH | `/phase-blocks/{blockId}/items/{itemId}` | Body: `{ text?, done?, role?, position? }` — toggle done dùng cái này |
+| PATCH | `/phase-blocks/{blockId}/items/{itemId}` | Body: `{ text?, done?, role?, position? }` — toggle done dùng cái này. **#9**: nếu `kind=outcome` và `done=true` khi chưa có attachment (`outcome_item_id` trỏ tới item) → **422** |
 | DELETE | `/phase-blocks/{blockId}/items/{itemId}` | → 204 |
 
 ### Comments
@@ -214,13 +215,15 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
 | Method | Path | Mô tả |
 |---|---|---|
 | GET | `/phase-blocks/{blockId}/attachments` | |
-| POST | `/phase-blocks/{blockId}/attachments/link` | JSON `{ fileName, url }` → `kind: "link"` |
-| POST | `/phase-blocks/{blockId}/attachments/file` | `multipart/form-data` field `file` → upload MinIO (bucket `attachments`), BE set `kind: "file"` + `url` |
+| POST | `/phase-blocks/{blockId}/attachments/link` | JSON `{ fileName, url, outcomeItemId? }` → `kind: "link"`; `outcomeItemId` trỏ vào `phase_items` kind=`outcome` (#9) |
+| POST | `/phase-blocks/{blockId}/attachments/file` | `multipart/form-data` field `file`, optional `outcomeItemId` (UUID) → upload MinIO (bucket `attachments`), BE set `kind: "file"` + `url` |
 | DELETE | `/phase-blocks/{blockId}/attachments/{attachmentId}` | xóa row + object MinIO → 204 |
 
 ```json
-{ "id": "uuid", "kind": "link", "fileName": "Spec (Google Docs)", "url": "https://...", "uploadedBy": "uuid", "uploadedAt": "..." }
+{ "id": "uuid", "kind": "link", "fileName": "Spec (Google Docs)", "url": "https://...", "outcomeItemId": "uuid", "uploadedBy": "uuid", "uploadedAt": "..." }
 ```
+
+> **#9 — Outcome bắt buúc có tài liệu**: attachment có `outcomeItemId` là tài liệu đính kèm cho outcome item đó. Khi tick outcome item `done=true`, BE kiểm tra ≥1 attachment trỏ tới nó — không có → **422**.
 
 ### Change Requests (approval queue)
 
@@ -312,7 +315,7 @@ Lộ trình thay mock data trong `frontend/src/context/AppContext.tsx`:
 
 Các số liệu này không lưu DB, tính khi đọc. Định nghĩa thống nhất:
 
-- **Tiến độ phase block** (`progressPct`) = `done / total` của checklist items (`kind=checklist`), làm tròn %. Phase không có checklist → 0%.
+- **Tiến độ phase block** (`progressPct`) = `(done checklist + done outcomes) / (total checklist + total outcomes)`, làm tròn %. Phase không có items → 0% (#8).
 - **Tiến độ dự án** (`projects.progress`) = hiện do người dùng đặt thủ công (slider trong Project Detail). BE giữ là cột lưu trực tiếp, không auto-tính.
 - **Workload thành viên** (Team view) = số checklist item `done=false` trong các phase block **đang hoạt động** (`tag ∈ {Backlog, Todo, Inprogress}`) mà user là `assignee` **hoặc** có trong `participantIds`. Quy đổi %: `min(100, openTasks / CAPACITY * 100)` với `CAPACITY = 15` task mở ≈ 100%.
 - **Phân bổ phase** (Dashboard) = đếm phase block theo `phaseType` trong workspace.

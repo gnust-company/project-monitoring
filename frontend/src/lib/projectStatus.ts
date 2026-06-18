@@ -11,17 +11,22 @@ import type { Project, PhaseBlock, ProjectStatus } from '../types';
 //  - At Risk: không Delayed, nhưng phaseProgress < dateProgress (thực chậm hơn lịch).
 //  - On Track: còn lại.
 
-/** Phase HOÀN TẤT khi checklist tick hết (bỏ tag phase — #2). */
-export function isPhaseComplete(pb: PhaseBlock): boolean {
-  return pb.checklist.length > 0 && pb.checklist.every(c => c.done);
+/** Tất cả "item" của phase = checklist + outcomes (#8). */
+function phaseItems(pb: PhaseBlock): { done: boolean }[] {
+  return [...pb.checklist, ...(pb.outcomes ?? [])];
 }
 
-/** % hoàn thành của 1 phase block (0..1). Hoàn tất = 1. */
+/** Phase HOÀN TẤT khi mọi item (checklist + outcome) đều tick (#8, bỏ tag — #2). */
+export function isPhaseComplete(pb: PhaseBlock): boolean {
+  const items = phaseItems(pb);
+  return items.length > 0 && items.every(i => i.done);
+}
+
+/** % hoàn thành của 1 phase block (0..1) — gộp checklist + outcomes (#8). */
 export function phaseBlockProgress(pb: PhaseBlock): number {
-  if (isPhaseComplete(pb)) return 1;
-  const total = pb.checklist.length;
-  if (total === 0) return 0;
-  return pb.checklist.filter(c => c.done).length / total;
+  const items = phaseItems(pb);
+  if (items.length === 0) return 0;
+  return items.filter(i => i.done).length / items.length;
 }
 
 /** Tiến độ dự án theo phase (0..1) — trung bình tất cả phase. */

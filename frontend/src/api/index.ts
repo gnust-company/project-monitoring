@@ -18,7 +18,7 @@ interface PhaseBlockDTO {
   comments?: CommentDTO[] | null; attachments?: AttachmentDTO[] | null;
 }
 interface CommentDTO { id: string; authorId: string | null; content: string; createdAt: string; }
-interface AttachmentDTO { id: string; kind: 'file' | 'link'; fileName: string; url: string; uploadedAt: string; }
+interface AttachmentDTO { id: string; kind: 'file' | 'link'; fileName: string; url: string; outcomeItemId: string | null; uploadedAt: string; }
 interface ActivityDTO { id: string; projectId: string; phaseBlockId: string | null; userId: string | null; action: string; target: string; createdAt: string; }
 
 // ─── Mappers ─────────────────────────────────────────────────────────
@@ -35,7 +35,8 @@ function mapComment(d: CommentDTO): Comment {
   return { id: d.id, authorId: d.authorId ?? '', content: d.content, createdAt: d.createdAt };
 }
 function mapAttachment(d: AttachmentDTO): Attachment {
-  return { id: d.id, kind: d.kind, fileName: d.fileName, url: d.url, uploadedAt: d.uploadedAt };
+  return { id: d.id, kind: d.kind, fileName: d.fileName, url: d.url,
+           outcomeItemId: d.outcomeItemId ?? null, uploadedAt: d.uploadedAt };
 }
 export function mapActivity(d: ActivityDTO): ActivityItem {
   return { id: d.id, userId: d.userId ?? '', action: d.action, target: d.target, timestamp: d.createdAt, phaseBlockId: d.phaseBlockId };
@@ -188,11 +189,12 @@ export const phaseBlocksApi = {
   async listAttachments(blockId: string): Promise<Attachment[]> {
     return (await api.get<AttachmentDTO[]>(`/phase-blocks/${blockId}/attachments`)).map(mapAttachment);
   },
-  async addLink(blockId: string, fileName: string, url: string): Promise<Attachment> {
-    return mapAttachment(await api.post<AttachmentDTO>(`/phase-blocks/${blockId}/attachments/link`, { fileName, url }));
+  async addLink(blockId: string, fileName: string, url: string, outcomeItemId?: string | null): Promise<Attachment> {
+    return mapAttachment(await api.post<AttachmentDTO>(`/phase-blocks/${blockId}/attachments/link`, { fileName, url, outcomeItemId }));
   },
-  async uploadFile(blockId: string, file: File): Promise<Attachment> {
-    return mapAttachment(await api.upload<AttachmentDTO>(`/phase-blocks/${blockId}/attachments/file`, file));
+  async uploadFile(blockId: string, file: File, outcomeItemId?: string | null): Promise<Attachment> {
+    const qs = outcomeItemId ? `?outcome_item_id=${outcomeItemId}` : '';
+    return mapAttachment(await api.upload<AttachmentDTO>(`/phase-blocks/${blockId}/attachments/file${qs}`, file));
   },
   async deleteAttachment(blockId: string, attachmentId: string): Promise<void> {
     await api.del(`/phase-blocks/${blockId}/attachments/${attachmentId}`);

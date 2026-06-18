@@ -1,11 +1,12 @@
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
-import { Mail, Shield, FolderKanban, Info } from 'lucide-react';
+import { Mail, Shield, FolderKanban, Crown, ListTodo } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { PHASE_META } from '../../types';
+import type { ProjectStatus } from '../../types';
 import Avatar from '../common/Avatar';
-import { isPhaseComplete } from '../../lib/projectStatus';
+import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -14,12 +15,6 @@ const fadeUp = {
     transition: { delay: i * 0.05, duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
-
-// ─── Workload ─────────────────────────────────────────────────────────
-// Workload = số checklist item CHƯA XONG trong các phase ĐANG HOẠT ĐỘNG
-// (Backlog / Todo / Inprogress) mà member là assignee hoặc participant.
-// Quy đổi: WORKLOAD_CAPACITY item đang mở = 100% (quá tải).
-const WORKLOAD_CAPACITY = 15;
 
 const roleColors: Record<string, { bg: string; text: string; dot: string }> = {
   PM: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' },
@@ -32,61 +27,63 @@ const roleColors: Record<string, { bg: string; text: string; dot: string }> = {
   SysOps: { bg: 'bg-stone-100', text: 'text-stone-700', dot: 'bg-stone-400' },
 };
 
+const statusStyle: Record<ProjectStatus, { text: string; bar: string }> = {
+  'On Track': { text: 'text-emerald-600', bar: '#10b981' },
+  'At Risk':  { text: 'text-amber-600',  bar: '#f59e0b' },
+  'Delayed':  { text: 'text-red-500',    bar: '#ef4444' },
+};
+
+interface PicProject { id: string; name: string; status: ProjectStatus; progress: number; }
+interface Involvement { project: string; phases: string[]; }
+
 export default function TeamView() {
   const { selectedOrg, phaseBlocks, orgProjects } = useApp();
 
-  // Build member assignments
-  const memberAssignments = useMemo(() => {
-    if (!selectedOrg) return new Map<string, { project: string; phases: string[]; taskCount: number }[]>();
-
-    const map = new Map<string, { project: string; phases: string[]; taskCount: number }[]>();
-
+  // #10: dự án member làm PIC chính (Project.picUserId ?? createdBy).
+  const picProjectsByMember = useMemo(() => {
+    const map = new Map<string, PicProject[]>();
+    if (!selectedOrg) return map;
     selectedOrg.members.forEach(member => {
-      const assignments: { project: string; phases: string[]; taskCount: number }[] = [];
+      const list = orgProjects
+        .filter(p => (p.picUserId ?? p.createdBy) === member.id)
+        .map<PicProject>(p => ({
+          id: p.id,
+          name: p.name,
+          status: computeProjectStatus(p, phaseBlocks),
+          progress: Math.round(projectPhaseProgress(phaseBlocks.filter(b => b.projectId === p.id)) * 100),
+        }));
+      map.set(member.id, list);
+    });
+    return map;
+  }, [selectedOrg, orgProjects, phaseBlocks]);
 
+  // #10: tham gia ở mức PHASE (không drill checklist) + thống kê task mở/được giao.
+  const involvementByMember = useMemo(() => {
+    const map = new Map<string, { items: Involvement[]; openTasks: number; assignedTasks: number }>();
+    if (!selectedOrg) return map;
+    selectedOrg.members.forEach(member => {
+      const items: Involvement[] = [];
+      let openTasks = 0;
+      let assignedTasks = 0;
       phaseBlocks.forEach(pb => {
-        if (!pb.participants.includes(member.id)) return;
+        const involved = pb.participants.includes(member.id) || pb.createdBy === member.id;
+        if (!involved) return;
         const project = orgProjects.find(p => p.id === pb.projectId);
         if (!project) return;
-
-        let existing = assignments.find(a => a.project === project.name);
-        if (!existing) {
-          existing = { project: project.name, phases: [], taskCount: 0 };
-          assignments.push(existing);
-        }
-        if (!existing.phases.includes(pb.phaseType)) {
-          existing.phases.push(pb.phaseType);
-        }
-        existing.taskCount += pb.checklist.filter(c => !c.done).length;
+        let row = items.find(a => a.project === project.name);
+        if (!row) { row = { project: project.name, phases: [] }; items.push(row); }
+        if (!row.phases.includes(pb.phaseType)) row.phases.push(pb.phaseType);
+        assignedTasks += pb.checklist.length;
+        openTasks += pb.checklist.filter(c => !c.done).length;
       });
-
-      map.set(member.id, assignments);
+      map.set(member.id, { items, openTasks, assignedTasks });
     });
-
     return map;
   }, [selectedOrg, phaseBlocks, orgProjects]);
-
-  const memberWorkload = useMemo(() => {
-    const map = new Map<string, { openTasks: number; pct: number }>();
-    if (!selectedOrg) return map;
-
-    selectedOrg.members.forEach(member => {
-      const openTasks = phaseBlocks
-        .filter(pb => !isPhaseComplete(pb)
-          && (pb.participants.includes(member.id) || pb.assignee === member.id))
-        .reduce((sum, pb) => sum + pb.checklist.filter(c => !c.done).length, 0);
-
-      const pct = Math.min(100, Math.round((openTasks / WORKLOAD_CAPACITY) * 100));
-      map.set(member.id, { openTasks, pct });
-    });
-
-    return map;
-  }, [selectedOrg, phaseBlocks]);
 
   if (!selectedOrg) return null;
 
   const members = selectedOrg.members;
-
   const roleGroups = members.reduce<Record<string, typeof members>>((acc, m) => {
     if (!acc[m.role]) acc[m.role] = [];
     acc[m.role].push(m);
@@ -142,18 +139,18 @@ export default function TeamView() {
         <div className="flex items-baseline justify-between mb-4 flex-wrap gap-1">
           <h2 className="text-sm font-semibold text-ink">Tất cả thành viên</h2>
           <span className="text-[10px] text-stone-400 font-light">
-            Workload = task chưa xong trong phase đang hoạt động ({WORKLOAD_CAPACITY} task mở ≈ 100%)
+            Tiến độ tính theo các dự án mà thành viên làm PIC chính
           </span>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {members.map((member, i) => {
             const colors = roleColors[member.role] || { bg: 'bg-stone-50', text: 'text-stone-700', dot: 'bg-stone-400' };
-            const assignments = memberAssignments.get(member.id) || [];
-            const workload = memberWorkload.get(member.id) || { openTasks: 0, pct: 0 };
+            const picProjects = picProjectsByMember.get(member.id) || [];
+            const involvement = involvementByMember.get(member.id) || { items: [], openTasks: 0, assignedTasks: 0 };
 
             return (
               <motion.div key={member.id} custom={i} variants={fadeUp} initial="hidden" animate="visible"
-                className="bg-white rounded-2xl border border-hairline p-5 card-hover">
+                className="bg-white rounded-2xl border border-hairline p-5 card-hover flex flex-col">
                 {/* Top: Avatar + info */}
                 <div className="flex items-center gap-3 mb-4">
                   <Avatar name={member.name} src={member.avatar} className="w-12 h-12" />
@@ -166,12 +163,43 @@ export default function TeamView() {
                   </div>
                 </div>
 
-                {/* Assignments */}
-                {assignments.length > 0 && (
+                {/* PIC chính — dự án + tiến độ */}
+                <div className="mb-4">
+                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <Crown className="w-3 h-3 text-amber-400" /> PIC chính ({picProjects.length})
+                  </div>
+                  {picProjects.length === 0 ? (
+                    <p className="text-[11px] text-stone-400 font-light">Chưa phụ trách dự án nào.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {picProjects.slice(0, 4).map(p => {
+                        const st = statusStyle[p.status];
+                        return (
+                          <div key={p.id}>
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span className="text-xs text-stone-600 truncate flex-1">{p.name}</span>
+                              <span className={`text-[10px] font-semibold ${st.text} shrink-0`}>{p.progress}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all"
+                                style={{ width: `${p.progress}%`, background: st.bar }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {picProjects.length > 4 && (
+                        <div className="text-[10px] text-stone-400">+{picProjects.length - 4} dự án khác</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tham gia (mức phase) */}
+                {involvement.items.length > 0 && (
                   <div className="mb-4">
-                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">Đang tham gia</div>
+                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">Tham gia</div>
                     <div className="space-y-1.5">
-                      {assignments.slice(0, 3).map(a => (
+                      {involvement.items.slice(0, 3).map(a => (
                         <div key={a.project} className="flex items-center gap-2">
                           <FolderKanban className="w-3 h-3 text-stone-400 flex-shrink-0" />
                           <span className="text-xs text-stone-600 truncate flex-1">{a.project}</span>
@@ -185,42 +213,27 @@ export default function TeamView() {
                               );
                             })}
                           </div>
-                          {a.taskCount > 0 && (
-                            <span className="text-[10px] text-stone-400 flex-shrink-0">{a.taskCount} task</span>
-                          )}
                         </div>
                       ))}
-                      {assignments.length > 3 && (
-                        <div className="text-[10px] text-stone-400 pl-5">+{assignments.length - 3} dự án khác</div>
+                      {involvement.items.length > 3 && (
+                        <div className="text-[10px] text-stone-400 pl-5">+{involvement.items.length - 3} dự án khác</div>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* Workload bar */}
-                <div className="mb-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] text-stone-400 font-medium flex items-center gap-1"
-                      title={`Workload = số task chưa xong trong các phase đang hoạt động (Backlog/Todo/In progress) mà thành viên tham gia hoặc được giao. ${WORKLOAD_CAPACITY} task đang mở ≈ 100%.`}>
-                      Workload <Info className="w-2.5 h-2.5" />
-                    </span>
-                    <span className="text-[10px] font-semibold text-ink">
-                      {workload.openTasks} task mở · {workload.pct}%
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${workload.pct}%`,
-                        background: workload.pct > 80 ? '#ef4444' : workload.pct > 50 ? '#f59e0b' : '#10b981',
-                      }} />
-                  </div>
+                {/* Task stat (thay cho Workload) */}
+                <div className="mt-auto flex items-center gap-2 text-[11px] text-stone-500 pt-3 border-t border-stone-100">
+                  <ListTodo className="w-3.5 h-3.5 text-stone-400" />
+                  <span className="font-semibold text-ink">{involvement.openTasks}</span> task mở
+                  <span className="text-stone-300">·</span>
+                  <span className="font-semibold text-ink">{involvement.assignedTasks}</span> được giao
                 </div>
 
-                {/* Email */}
-                <div className="flex items-center gap-2 text-xs text-stone-400 font-light pt-3 border-t border-stone-100">
+                {/* Email thật */}
+                <div className="flex items-center gap-2 text-xs text-stone-400 font-light pt-2">
                   <Mail className="w-3 h-3" />
-                  <span className="truncate">{member.name.toLowerCase().replace(' ', '.')}@projecthub.io</span>
+                  <span className="truncate">{member.email || '—'}</span>
                 </div>
               </motion.div>
             );

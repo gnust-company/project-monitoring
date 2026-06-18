@@ -175,3 +175,64 @@ async def test_non_creator_cannot_edit_phase_but_can_tick_items(client: AsyncCli
                             json={"title": "Renamed"}, headers=auth(o_token))
     assert ok.status_code == 200
     assert ok.json()["title"] == "Renamed"
+
+
+# ─── #9 Outcome bắt buộc có tài liệu mới được mark done ───────────────
+async def test_outcome_requires_attachment_to_complete(client: AsyncClient, make_user):
+    token, *_, proj = await _setup(client, make_user)
+    block = await _make_block(client, token, proj["id"], checklist=[],
+                              outcomes=[{"text": "SRS", "role": "BA"}])
+    oid = block["outcomes"][0]["id"]
+
+    # chưa có tài liệu → tick done bị từ chối (422)
+    bad = await client.patch(f"{API}/phase-blocks/{block['id']}/items/{oid}",
+                             json={"done": True}, headers=auth(token))
+    assert bad.status_code == 422
+
+    # đính kèm link cho outcome
+    att = await client.post(f"{API}/phase-blocks/{block['id']}/attachments/link",
+                            json={"fileName": "SRS doc", "url": "https://x.com/srs",
+                                  "outcomeItemId": oid}, headers=auth(token))
+    assert att.status_code == 201
+    assert att.json()["outcomeItemId"] == oid
+
+    # giờ tick được
+    ok = await client.patch(f"{API}/phase-blocks/{block['id']}/items/{oid}",
+                            json={"done": True}, headers=auth(token))
+    assert ok.status_code == 200
+    assert ok.json()["done"] is True
+
+
+# ─── #8 progressPct gộp checklist + outcomes ─────────────────────────
+async def test_progress_includes_outcomes(client: AsyncClient, make_user):
+    token, *_, proj = await _setup(client, make_user)
+    block = await _make_block(client, token, proj["id"],
+                              checklist=[{"text": "A", "role": "BA"}],
+                              outcomes=[{"text": "O", "role": "BA"}])
+    cid = block["checklist"][0]["id"]
+    oid = block["outcomes"][0]["id"]
+
+    # tick checklist → 1/2 = 50% (outcome chưa xong)
+    await client.patch(f"{API}/phase-blocks/{block['id']}/items/{cid}",
+                       json={"done": True}, headers=auth(token))
+    detail = (await client.get(f"{API}/phase-blocks/{block['id']}", headers=auth(token))).json()
+    assert detail["progressPct"] == 50
+
+    # đính kèm + tick outcome → 2/2 = 100%
+    await client.post(f"{API}/phase-blocks/{block['id']}/attachments/link",
+                      json={"fileName": "d", "url": "https://x.com/d", "outcomeItemId": oid},
+                      headers=auth(token))
+    await client.patch(f"{API}/phase-blocks/{block['id']}/items/{oid}",
+                       json={"done": True}, headers=auth(token))
+    detail2 = (await client.get(f"{API}/phase-blocks/{block['id']}", headers=auth(token))).json()
+    assert detail2["progressPct"] == 100
+
+
+# ─── #17 đổi phase type ──────────────────────────────────────────────
+async def test_change_phase_type(client: AsyncClient, make_user):
+    token, *_, proj = await _setup(client, make_user)
+    block = await _make_block(client, token, proj["id"])  # SD
+    resp = await client.patch(f"{API}/phase-blocks/{block['id']}",
+                              json={"phaseType": "ST"}, headers=auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["phaseType"] == "ST"

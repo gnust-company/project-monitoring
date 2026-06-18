@@ -311,6 +311,7 @@ export interface Attachment {
   kind: 'file' | 'link'; // file upload hoặc link tài liệu ở nền tảng khác
   fileName: string;
   url: string;
+  outcomeItemId?: string | null; // #9: đính kèm cho 1 outcome (null = cấp phase)
   uploadedAt: string;
 }
 

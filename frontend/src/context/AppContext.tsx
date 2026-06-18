@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type {
   Organization, Project, PhaseBlock, WorkspaceView, DevPhase, ProjectStatus, ZoomLevel,
-  User, UserRole, Notification,
+  User, UserRole, Notification, ChecklistItem,
 } from '../types';
 import {
   auth, usersApi, orgsApi, projectsApi, phaseBlocksApi, notificationsApi,
@@ -102,8 +102,8 @@ interface AppContextType extends AppState {
   updatePhaseItem: (blockId: string, itemId: string, updates: { text?: string; done?: boolean }) => Promise<void>;
   deletePhaseItem: (blockId: string, itemId: string) => Promise<void>;
   addPhaseComment: (blockId: string, content: string) => Promise<void>;
-  addPhaseLink: (blockId: string, fileName: string, url: string) => Promise<void>;
-  uploadPhaseFile: (blockId: string, file: File) => Promise<void>;
+  addPhaseLink: (blockId: string, fileName: string, url: string, outcomeItemId?: string | null) => Promise<void>;
+  uploadPhaseFile: (blockId: string, file: File, outcomeItemId?: string | null) => Promise<void>;
   deletePhaseAttachment: (blockId: string, attachmentId: string) => Promise<void>;
 
   // Org actions
@@ -450,13 +450,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updatePhaseItem = useCallback(async (blockId: string, itemId: string, updates: { text?: string; done?: boolean }) => {
-    // optimistic: cập nhật item ngay trong state
-    patchBlock(blockId, pb => ({
-      ...pb,
-      checklist: pb.checklist.map(i => i.id === itemId ? { ...i, ...updates } : i),
-      outcomes: pb.outcomes.map(i => i.id === itemId ? { ...i, ...updates } : i),
-    }));
-    await phaseBlocksApi.updateItem(blockId, itemId, updates);
+    // optimistic: cập nhật item ngay trong state, nhớ giá trị cũ để revert nếu BE từ chối
+    // (#9: tick outcome khi chưa có tài liệu → BE trả 422).
+    let prev: ChecklistItem | undefined;
+    patchBlock(blockId, pb => {
+      prev = [...pb.checklist, ...pb.outcomes].find(i => i.id === itemId) ?? prev;
+      return {
+        ...pb,
+        checklist: pb.checklist.map(i => i.id === itemId ? { ...i, ...updates } : i),
+        outcomes: pb.outcomes.map(i => i.id === itemId ? { ...i, ...updates } : i),
+      };
+    });
+    try {
+      await phaseBlocksApi.updateItem(blockId, itemId, updates);
+    } catch (e) {
+      if (prev) {
+        const restore = prev;
+        patchBlock(blockId, pb => ({
+          ...pb,
+          checklist: pb.checklist.map(i => i.id === itemId ? restore : i),
+          outcomes: pb.outcomes.map(i => i.id === itemId ? restore : i),
+        }));
+      }
+      throw e;
+    }
   }, [patchBlock]);
 
   const deletePhaseItem = useCallback(async (blockId: string, itemId: string) => {
@@ -485,13 +502,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     patchBlock(blockId, pb => ({ ...pb, comments: pb.comments.map(c => c.id === temp.id ? saved : c) }));
   }, [patchBlock, currentUser]);
 
-  const addPhaseLink = useCallback(async (blockId: string, fileName: string, url: string) => {
-    const att = await phaseBlocksApi.addLink(blockId, fileName, url);
+  const addPhaseLink = useCallback(async (blockId: string, fileName: string, url: string, outcomeItemId?: string | null) => {
+    const att = await phaseBlocksApi.addLink(blockId, fileName, url, outcomeItemId);
     patchBlock(blockId, pb => ({ ...pb, attachments: [...pb.attachments, att] }));
   }, [patchBlock]);
 
-  const uploadPhaseFile = useCallback(async (blockId: string, file: File) => {
-    const att = await phaseBlocksApi.uploadFile(blockId, file);
+  const uploadPhaseFile = useCallback(async (blockId: string, file: File, outcomeItemId?: string | null) => {
+    const att = await phaseBlocksApi.uploadFile(blockId, file, outcomeItemId);
     patchBlock(blockId, pb => ({ ...pb, attachments: [...pb.attachments, att] }));
   }, [patchBlock]);
 

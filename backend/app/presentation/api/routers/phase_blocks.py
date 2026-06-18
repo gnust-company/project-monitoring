@@ -22,6 +22,7 @@ from app.application.use_cases.phase_blocks import (
     ListActivity,
     ListComments,
     ListPhaseBlocks,
+    OutcomeAttachmentRequiredError,
     PhaseBlockNotFoundError,
     PhaseForbiddenError,
     PhaseItemNotFoundError,
@@ -157,6 +158,11 @@ async def update_item(
         item = await uc.execute(block_id, item_id, body.model_dump(exclude_unset=True), access.user.id)
     except PhaseItemNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Item not found")
+    except OutcomeAttachmentRequiredError:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Outcome cần đính kèm ít nhất 1 tài liệu/link trước khi đánh dấu hoàn thành",
+        )
     return PhaseItemOut.model_validate(item)
 
 
@@ -215,7 +221,7 @@ async def add_link_attachment(
     block_id: UUID, body: LinkAttachmentCreate, access: BlockAccessDep,
     uc: Annotated[AddLinkAttachment, Depends(add_link_uc)],
 ) -> AttachmentOut:
-    att = await uc.execute(block_id, body.file_name, body.url, access.user.id)
+    att = await uc.execute(block_id, body.file_name, body.url, access.user.id, body.outcome_item_id)
     return AttachmentOut.model_validate(att)
 
 
@@ -225,10 +231,12 @@ async def add_file_attachment(
     block_id: UUID, access: BlockAccessDep,
     uc: Annotated[AddFileAttachment, Depends(add_file_uc)],
     file: Annotated[UploadFile, File()],
+    outcome_item_id: UUID | None = None,
 ) -> AttachmentOut:
     data = await file.read()
     att = await uc.execute(
-        block_id, file.filename or "file", file.content_type or "", data, access.user.id
+        block_id, file.filename or "file", file.content_type or "", data, access.user.id,
+        outcome_item_id,
     )
     return AttachmentOut.model_validate(att)
 

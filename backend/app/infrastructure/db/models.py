@@ -210,6 +210,10 @@ class AttachmentModel(Base):
     )
     file_name: Mapped[str] = mapped_column(String(512))
     url: Mapped[str] = mapped_column(String(2048))
+    # #9: NULL = đính kèm cấp phase; có giá trị = đính kèm cho 1 outcome item.
+    outcome_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("phase_items.id", ondelete="CASCADE"), index=True
+    )
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

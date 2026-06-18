@@ -210,6 +210,9 @@ class PhaseBlockRepository(ABC):
     async def add_attachment(self, block_id: UUID, attachment: Attachment) -> Attachment: ...
 
     @abstractmethod
+    async def count_outcome_attachments(self, item_id: UUID) -> int: ...
+
+    @abstractmethod
     async def get_attachment(self, attachment_id: UUID) -> Attachment | None: ...
 
     @abstractmethod

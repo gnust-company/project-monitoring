@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById, ROLE_LABELS } from '../../data/mockData';
-import { PHASE_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
-import type { ChecklistItem, UserRole } from '../../types';
+import { PHASE_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES, DEV_PHASES } from '../../types';
+import type { ChecklistItem, UserRole, DevPhase } from '../../types';
 import {
   X, CheckSquare, Square, MessageSquare, Paperclip, Clock,
   Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check,
@@ -62,6 +62,13 @@ export default function PhaseDetailModal() {
   const [expandOutcomes, setExpandOutcomes] = useState(false);
   const [expandDocs, setExpandDocs] = useState(false);
 
+  // #9: đính kèm tài liệu theo từng outcome
+  const [outcomeAttachId, setOutcomeAttachId] = useState<string | null>(null);
+  const [oLinkName, setOLinkName] = useState('');
+  const [oLinkUrl, setOLinkUrl] = useState('');
+  const outcomeFileRef = useRef<HTMLInputElement>(null);
+  const outcomeFileTargetRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (selectedPhaseBlock) {
       setChecklist(selectedPhaseBlock.checklist);
@@ -80,6 +87,9 @@ export default function PhaseDetailModal() {
       setExpandChecklist(false);
       setExpandOutcomes(false);
       setExpandDocs(false);
+      setOutcomeAttachId(null);
+      setOLinkName('');
+      setOLinkUrl('');
     }
   }, [selectedPhaseBlock?.id]);
 
@@ -96,7 +106,8 @@ export default function PhaseDetailModal() {
   // #19: click backdrop KHÔNG đóng modal (chỉ nút X đóng). Esc chỉ đóng khi KHÔNG có
   // nội dung đang soạn — tránh lỡ tay mất title/desc/checklist/comment/link đang dở.
   const hasDraft = editingTitle || editingDesc || editingCheckId !== null
-    || commentText.trim() !== '' || linkName.trim() !== '' || linkUrl.trim() !== '';
+    || commentText.trim() !== '' || linkName.trim() !== '' || linkUrl.trim() !== ''
+    || oLinkName.trim() !== '' || oLinkUrl.trim() !== '';
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -141,11 +152,47 @@ export default function PhaseDetailModal() {
     updatePhaseItem(selectedPhaseBlock.id, itemId, { done: !item?.done });
   };
 
-  const toggleOutcomeItem = (itemId: string) => {
+  // #9: tài liệu đính kèm cho 1 outcome
+  const outcomeAtts = (itemId: string) =>
+    attachments.filter(a => a.outcomeItemId === itemId);
+
+  const toggleOutcomeItem = async (itemId: string) => {
     if (!selectedPhaseBlock) return;
     const item = outcomes.find(i => i.id === itemId);
+    if (!item) return;
+    // #9: chưa có tài liệu → không cho tick done (vẫn cho phép bỏ tick).
+    if (!item.done && outcomeAtts(itemId).length === 0) return;
     setOutcomes(outcomes.map(i => i.id === itemId ? { ...i, done: !i.done } : i));
-    updatePhaseItem(selectedPhaseBlock.id, itemId, { done: !item?.done });
+    try {
+      await updatePhaseItem(selectedPhaseBlock.id, itemId, { done: !item.done });
+    } catch {
+      // BE từ chối (vd 422) — context đã revert, đồng bộ lại local.
+      setOutcomes(selectedPhaseBlock.outcomes || []);
+    }
+  };
+
+  const handleOutcomeLink = async (itemId: string) => {
+    if (!selectedPhaseBlock || !oLinkUrl.trim()) return;
+    let url = oLinkUrl.trim();
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    await addPhaseLink(selectedPhaseBlock.id, oLinkName.trim() || url, url, itemId);
+    setOLinkName('');
+    setOLinkUrl('');
+    setOutcomeAttachId(null);
+  };
+
+  const handleOutcomeFilePick = (itemId: string) => {
+    outcomeFileTargetRef.current = itemId;
+    outcomeFileRef.current?.click();
+  };
+
+  const handleOutcomeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const itemId = outcomeFileTargetRef.current;
+    if (!file || !selectedPhaseBlock || !itemId) return;
+    uploadPhaseFile(selectedPhaseBlock.id, file, itemId);
+    if (outcomeFileRef.current) outcomeFileRef.current.value = '';
+    outcomeFileTargetRef.current = null;
   };
 
   const handleDeleteChecklistItem = (itemId: string) => {
@@ -236,6 +283,11 @@ export default function PhaseDetailModal() {
   const project = orgProjects.find(p => p.id === selectedPhaseBlock.projectId);
   const completedChecks = checklist.filter(c => c.done).length;
   const progressPct = checklist.length > 0 ? Math.round((completedChecks / checklist.length) * 100) : 0;
+  // #8: tiến độ phase gộp checklist + outcomes (dùng cho badge tổng quan ở header).
+  const totalItems = checklist.length + outcomes.length;
+  const phasePct = totalItems > 0
+    ? Math.round(((completedChecks + outcomes.filter(o => o.done).length) / totalItems) * 100)
+    : 0;
   const orgMembers = selectedOrg?.members ?? [];
   // #11/#4: PIC phase = assignee (đổi được) hoặc người tạo. Chỉ PIC/superuser sửa metadata.
   const phasePicId = selectedPhaseBlock.assignee ?? selectedPhaseBlock.createdBy;
@@ -265,11 +317,21 @@ export default function PhaseDetailModal() {
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50/50">
             <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${meta.bg} ${meta.color} border ${meta.border}`}>
-                {meta.fullLabel}
-              </span>
+              {/* #17: PIC đổi được loại phase (tên đầy đủ); giữ nguyên checklist/outcome hiện có */}
+              {canEditPhase ? (
+                <Dropdown className="w-52" value={selectedPhaseBlock.phaseType}
+                  onChange={v => updatePhaseBlock(selectedPhaseBlock.id, { phaseType: v as DevPhase })}
+                  options={DEV_PHASES.map(p => ({
+                    value: p, label: PHASE_META[p].fullLabel,
+                    dotClass: PHASE_META[p].solid, labelClass: PHASE_META[p].color,
+                  }))} />
+              ) : (
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${meta.bg} ${meta.color} border ${meta.border}`}>
+                  {meta.fullLabel}
+                </span>
+              )}
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 border border-gray-200">
-                {progressPct}% hoàn thành
+                {phasePct}% hoàn thành
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -562,6 +624,7 @@ export default function PhaseDetailModal() {
 
             {/* Outcomes — grouped by role */}
             <div className="px-6 pb-4">
+              <input ref={outcomeFileRef} type="file" onChange={handleOutcomeFile} className="hidden" />
               <button onClick={() => setExpandOutcomes(!expandOutcomes)}
                 className="w-full flex items-center justify-between mb-2 group/sec">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -583,28 +646,99 @@ export default function PhaseDetailModal() {
                       <div className="flex-1 h-px bg-gray-100" />
                     </div>
                     <div className="space-y-0.5">
-                      {group.items.map(item => (
-                        <div key={item.id} className="flex items-center gap-1 group">
-                          <button
-                            onClick={() => toggleOutcomeItem(item.id)}
-                            className="flex-1 flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
-                          >
-                            {item.done
-                              ? <CheckSquare className="w-4 h-4 text-blue-500 shrink-0" />
-                              : <Square className="w-4 h-4 text-gray-300 shrink-0" />
-                            }
-                            <span className={`text-sm ${item.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                              {item.text}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteOutcomeItem(item.id)}
-                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all"
-                            title="Xóa">
-                            <Trash2 className="w-3 h-3 text-red-400" />
-                          </button>
+                      {group.items.map(item => {
+                        const atts = outcomeAtts(item.id);
+                        const canTick = item.done || atts.length > 0;
+                        return (
+                        <div key={item.id} className="rounded-lg group">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => toggleOutcomeItem(item.id)}
+                              disabled={!canTick}
+                              title={!canTick ? 'Cần đính kèm ≥1 tài liệu/link trước khi đánh dấu hoàn thành' : undefined}
+                              className={`flex-1 flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors ${canTick ? 'hover:bg-gray-50' : 'cursor-not-allowed'}`}
+                            >
+                              {item.done
+                                ? <CheckSquare className="w-4 h-4 text-blue-500 shrink-0" />
+                                : <Square className={`w-4 h-4 shrink-0 ${canTick ? 'text-gray-300' : 'text-gray-200'}`} />
+                              }
+                              <span className={`text-sm ${item.done ? 'text-gray-400 line-through' : canTick ? 'text-gray-700' : 'text-gray-400'}`}>
+                                {item.text}
+                              </span>
+                              {!item.done && atts.length === 0 && (
+                                <span className="text-[9px] font-medium text-amber-500 flex items-center gap-0.5 shrink-0">
+                                  <Paperclip className="w-2.5 h-2.5" /> cần tài liệu
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => { setOutcomeAttachId(outcomeAttachId === item.id ? null : item.id); setOLinkName(''); setOLinkUrl(''); }}
+                              className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-all"
+                              title="Đính kèm tài liệu / link">
+                              <Paperclip className="w-3 h-3 text-gray-400" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteOutcomeItem(item.id)}
+                              className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all"
+                              title="Xóa">
+                              <Trash2 className="w-3 h-3 text-red-400" />
+                            </button>
+                          </div>
+
+                          {/* Tài liệu đính kèm của outcome */}
+                          {atts.length > 0 && (
+                            <div className="ml-9 mb-1 space-y-1">
+                              {atts.map(att => (
+                                <div key={att.id} className="flex items-center gap-1.5 text-xs group/att">
+                                  {att.kind === 'link'
+                                    ? <Link2 className="w-3 h-3 text-blue-500 shrink-0" />
+                                    : <Paperclip className="w-3 h-3 text-slate-500 shrink-0" />}
+                                  <a href={att.url} target="_blank" rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline truncate flex-1 flex items-center gap-1">
+                                    {att.fileName}
+                                    {att.kind === 'link' && <ExternalLink className="w-2.5 h-2.5 shrink-0" />}
+                                  </a>
+                                  <button onClick={() => handleDeleteAttachment(att.id)}
+                                    className="opacity-0 group-hover/att:opacity-100 hover:bg-red-50 rounded p-0.5 transition-all" title="Xóa">
+                                    <Trash2 className="w-3 h-3 text-red-400" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Form đính kèm cho outcome này */}
+                          {outcomeAttachId === item.id && (
+                            <div className="ml-9 mb-2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                              <input type="text" value={oLinkName} onChange={e => setOLinkName(e.target.value)}
+                                placeholder="Tên tài liệu (tùy chọn)"
+                                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs
+                                           text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                              <input type="url" value={oLinkUrl} onChange={e => setOLinkUrl(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleOutcomeLink(item.id); }}
+                                placeholder="https://..." autoFocus
+                                className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs
+                                           text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                              <div className="flex items-center justify-between">
+                                <button onClick={() => handleOutcomeFilePick(item.id)}
+                                  className="px-2.5 py-1 border border-dashed border-gray-300 rounded-lg text-xs text-gray-500
+                                             hover:border-gray-400 flex items-center gap-1">
+                                  <Paperclip className="w-3 h-3" /> Upload tệp
+                                </button>
+                                <div className="flex gap-2">
+                                  <button onClick={() => { setOutcomeAttachId(null); setOLinkName(''); setOLinkUrl(''); }}
+                                    className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700">Hủy</button>
+                                  <button onClick={() => handleOutcomeLink(item.id)} disabled={!oLinkUrl.trim()}
+                                    className="px-2.5 py-1 bg-slate-900 text-white text-xs rounded-lg hover:bg-slate-800 disabled:opacity-40 flex items-center gap-1">
+                                    <Link2 className="w-3 h-3" /> Đính kèm link
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                       <div className="flex items-center gap-1.5 pl-2 pt-0.5">
                         <input type="text" value={outcomeDrafts[key] ?? ''}
                           onChange={e => setOutcomeDrafts(d => ({ ...d, [key]: e.target.value }))}
@@ -630,13 +764,13 @@ export default function PhaseDetailModal() {
                 className="w-full flex items-center justify-between mb-2 group/sec">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider
                                flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" /> Document ({attachments.length})
+                  <FileText className="w-3.5 h-3.5" /> Document ({attachments.filter(a => !a.outcomeItemId).length})
                 </h3>
                 <ChevronDown className={`w-3.5 h-3.5 text-gray-400 group-hover/sec:text-gray-600 transition-transform ${expandDocs ? 'rotate-180' : ''}`} />
               </button>
               {expandDocs && (<>
               <div className="space-y-1.5 mb-2">
-                {attachments.map(att => (
+                {attachments.filter(a => !a.outcomeItemId).map(att => (
                   <div key={att.id} className="flex items-center gap-2.5 p-2 bg-gray-50 rounded-lg border border-gray-100 group">
                     <div className="w-7 h-7 bg-slate-100 rounded-md flex items-center justify-center shrink-0">
                       {att.kind === 'link'

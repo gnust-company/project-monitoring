@@ -11,7 +11,7 @@ import {
 import PhaseDetailModal from './PhaseDetailModal';
 import CreatePhaseModal from '../Modals/CreatePhaseModal';
 import Avatar from '../common/Avatar';
-import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
+import { computeProjectStatus, projectPhaseProgress, phaseBlockProgress } from '../../lib/projectStatus';
 
 const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 52;
@@ -823,9 +823,7 @@ export default function PipelineTimeline() {
                     const top = pos.row * ROW_HEIGHT + 6;
                     const isHover = hoverInfo?.id === pb.id;
                     const isDragging = dragPreview?.blockId === pb.id;
-                    const totalChecks = pb.checklist.length;
-                    const doneChecks = pb.checklist.filter(c => c.done).length;
-                    const pct = totalChecks > 0 ? Math.round((doneChecks / totalChecks) * 100) : 0;
+                    const pct = Math.round(phaseBlockProgress(pb) * 100); // #8: gộp checklist + outcomes
                     const assignee = getUserById(pb.createdBy); // #13: PIC = người tạo
                     return (
                       <div key={pb.id}
@@ -906,8 +904,7 @@ export default function PipelineTimeline() {
         const pos = layoutMap.get(hoverInfo.id);
         if (!pb || !pos) return null;
         const meta = PHASE_META[pb.phaseType];
-        const totalChecks = pb.checklist.length;
-        const pct = totalChecks > 0 ? Math.round((pb.checklist.filter(c => c.done).length / totalChecks) * 100) : 0;
+        const pct = Math.round(phaseBlockProgress(pb) * 100); // #8: gộp checklist + outcomes
         const assignee = getUserById(pb.createdBy); // #13: PIC = người tạo
         const boardTop = boardRef.current?.getBoundingClientRect().top ?? 0;
         return (

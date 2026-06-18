@@ -27,6 +27,7 @@ def _comment_to_entity(m: CommentModel) -> Comment:
 
 def _attachment_to_entity(m: AttachmentModel) -> Attachment:
     return Attachment(id=m.id, kind=m.kind, file_name=m.file_name, url=m.url,
+                      outcome_item_id=m.outcome_item_id,
                       uploaded_by=m.uploaded_by, uploaded_at=m.uploaded_at)
 
 
@@ -170,10 +171,17 @@ class SqlAlchemyPhaseBlockRepository(PhaseBlockRepository):
     async def add_attachment(self, block_id: UUID, attachment: Attachment) -> Attachment:
         m = AttachmentModel(id=attachment.id, phase_block_id=block_id, kind=attachment.kind,
                             file_name=attachment.file_name, url=attachment.url,
+                            outcome_item_id=attachment.outcome_item_id,
                             uploaded_by=attachment.uploaded_by)
         self._session.add(m)
         await self._session.flush()
         return _attachment_to_entity(m)
+
+    async def count_outcome_attachments(self, item_id: UUID) -> int:
+        return await self._session.scalar(
+            select(func.count()).select_from(AttachmentModel)
+            .where(AttachmentModel.outcome_item_id == item_id)
+        ) or 0
 
     async def get_attachment(self, attachment_id: UUID) -> Attachment | None:
         m = await self._session.get(AttachmentModel, attachment_id)

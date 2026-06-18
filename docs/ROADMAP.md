@@ -17,7 +17,7 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 |---|---|---|
 | 1 | #4, #6, #16, #19, #17(phần bỏ viết tắt) | ✅ Xong (#17 phần "cho sửa" còn ở Wave 3) |
 | 2 | #5, #11, #13, #20 | ✅ Xong |
-| 3 | #10, #9, #8, #12, #17 | ⬜ Chưa bắt đầu |
+| 3 | #10, #9, #8, #12, #17 | ✅ Xong |
 | 4 | #14, #18, #15 | ⬜ Chưa bắt đầu |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong

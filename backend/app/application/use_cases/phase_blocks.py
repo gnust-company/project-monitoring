@@ -27,6 +27,10 @@ class PhaseForbiddenError(Exception):
     """Không phải PIC phase → không được sửa/xóa metadata (#11)."""
 
 
+class OutcomeAttachmentRequiredError(Exception):
+    """#9: outcome phải có ≥1 document/link mới được tick done."""
+
+
 @dataclass(slots=True)
 class CreatePhaseBlockInput:
     project_id: UUID
@@ -264,6 +268,14 @@ class UpdatePhaseItem:
         item = await self._blocks.get_item(item_id)
         if item is None:
             raise PhaseItemNotFoundError(str(item_id))
+        # #9: outcome chỉ được tick done khi đã có ≥1 document/link đính kèm.
+        if (
+            item.kind == PhaseItemKind.OUTCOME
+            and payload.get("done") is True
+            and not item.done
+            and await self._blocks.count_outcome_attachments(item_id) == 0
+        ):
+            raise OutcomeAttachmentRequiredError(str(item_id))
         action: str | None = None
         if "done" in payload and payload["done"] != item.done:
             action = "completed item" if payload["done"] else "reopened item"

@@ -193,12 +193,22 @@ CREATE TABLE attachments (
   kind           attachment_kind NOT NULL,
   file_name      VARCHAR(512) NOT NULL,   -- tên hiển thị (với link: tên tài liệu)
   url            VARCHAR(2048) NOT NULL,  -- file: storage URL; link: URL ngoài
+  -- #9: NULL = đính kèm cấp phase; có giá trị = đính kèm cho 1 outcome item.
+  outcome_item_id UUID REFERENCES phase_items(id) ON DELETE CASCADE,
   uploaded_by    UUID REFERENCES users(id) ON DELETE SET NULL,
   uploaded_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_attachments_block ON attachments(phase_block_id);
+CREATE INDEX ix_attachments_outcome_item_id ON attachments(outcome_item_id);
 ```
+
+> **#9 — Outcome bắt buộc có tài liệu:** một `phase_items` kind=`outcome` chỉ được
+> set `done=true` khi đã có **≥1 attachment** trỏ tới nó (`outcome_item_id`). BE chặn
+> ở use case (`UpdatePhaseItem`) → trả **422** nếu vi phạm.
+
+> Migration **0004_outcome_attach** (additive-only): thêm `attachments.outcome_item_id`
+> nullable + FK + index. Không xóa/sửa cột cũ (ràng buộc on-air).
 
 ### activity_log
 

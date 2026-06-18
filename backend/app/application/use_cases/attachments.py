@@ -31,10 +31,11 @@ class AddLinkAttachment:
         self._blocks = blocks
         self._activity = activity
 
-    async def execute(self, block_id: UUID, file_name: str, url: str, uploaded_by: UUID) -> Attachment:
+    async def execute(self, block_id: UUID, file_name: str, url: str, uploaded_by: UUID,
+                      outcome_item_id: UUID | None = None) -> Attachment:
         att = await self._blocks.add_attachment(block_id, Attachment(
             id=uuid4(), kind=AttachmentKind.LINK, file_name=file_name, url=url,
-            uploaded_by=uploaded_by, uploaded_at=None,
+            outcome_item_id=outcome_item_id, uploaded_by=uploaded_by, uploaded_at=None,
         ))
         pid = await self._blocks.get_project_id(block_id)
         if pid:
@@ -51,13 +52,14 @@ class AddFileAttachment:
         self._activity = activity
 
     async def execute(
-        self, block_id: UUID, filename: str, content_type: str, data: bytes, uploaded_by: UUID
+        self, block_id: UUID, filename: str, content_type: str, data: bytes, uploaded_by: UUID,
+        outcome_item_id: UUID | None = None,
     ) -> Attachment:
         key = f"{block_id}/{uuid4().hex}-{filename}"
         url = await self._storage.put(self._bucket, key, data, content_type or "application/octet-stream")
         att = await self._blocks.add_attachment(block_id, Attachment(
             id=uuid4(), kind=AttachmentKind.FILE, file_name=filename, url=url,
-            uploaded_by=uploaded_by, uploaded_at=None,
+            outcome_item_id=outcome_item_id, uploaded_by=uploaded_by, uploaded_at=None,
         ))
         pid = await self._blocks.get_project_id(block_id)
         if pid:

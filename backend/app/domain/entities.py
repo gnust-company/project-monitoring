@@ -97,6 +97,8 @@ class Attachment:
     kind: AttachmentKind
     file_name: str
     url: str
+    # #9: gắn với 1 outcome item (None = đính kèm cấp phase).
+    outcome_item_id: UUID | None = None
     uploaded_by: UUID | None = None
     uploaded_at: datetime | None = None
 
@@ -138,11 +140,14 @@ class PhaseBlock:
 
     @property
     def progress_pct(self) -> int:
-        """Tiến độ phase = % checklist hoàn thành."""
-        checks = [i for i in self.items if i.kind == PhaseItemKind.CHECKLIST]
-        if not checks:
+        """Tiến độ phase = % item hoàn thành, gộp checklist + outcomes (#8)."""
+        items = [
+            i for i in self.items
+            if i.kind in (PhaseItemKind.CHECKLIST, PhaseItemKind.OUTCOME)
+        ]
+        if not items:
             return 0
-        return round(sum(1 for i in checks if i.done) / len(checks) * 100)
+        return round(sum(1 for i in items if i.done) / len(items) * 100)
 
 
 @dataclass(slots=True)

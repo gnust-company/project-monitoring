@@ -246,6 +246,7 @@ class AttachmentOut(CamelModel):
     kind: str
     file_name: str
     url: str
+    outcome_item_id: UUID | None = None
     uploaded_by: UUID | None = None
     uploaded_at: datetime | None = None
 
@@ -254,6 +255,7 @@ class LinkAttachmentCreate(CamelModel):
     kind: str = "link"
     file_name: str = Field(min_length=1)
     url: str = Field(min_length=1)
+    outcome_item_id: UUID | None = None
 
 
 # ─── Activity (changelog) ────────────────────────────────────────────
