@@ -1,9 +1,8 @@
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
-import { Mail, Shield, Crown, ListTodo } from 'lucide-react';
+import { Mail, Shield, FolderKanban, Crown, ListTodo } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
-import { PHASE_META } from '../../types';
 import type { ProjectStatus } from '../../types';
 import Avatar from '../common/Avatar';
 import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
@@ -34,7 +33,6 @@ const statusStyle: Record<ProjectStatus, { text: string; bar: string }> = {
 };
 
 interface PicProject { id: string; name: string; status: ProjectStatus; progress: number; }
-interface Involvement { project: string; phases: string[]; open: number; total: number; }
 
 export default function TeamView() {
   const { selectedOrg, phaseBlocks, orgProjects } = useApp();
@@ -57,12 +55,12 @@ export default function TeamView() {
     return map;
   }, [selectedOrg, orgProjects, phaseBlocks]);
 
-  // #10: tham gia ở mức PHASE (không drill checklist) + thống kê task mở/được giao.
+  // #10: danh sách dự án member đang tham gia + thống kê task mở/được giao (tổng).
   const involvementByMember = useMemo(() => {
-    const map = new Map<string, { items: Involvement[]; openTasks: number; assignedTasks: number }>();
+    const map = new Map<string, { items: string[]; openTasks: number; assignedTasks: number }>();
     if (!selectedOrg) return map;
     selectedOrg.members.forEach(member => {
-      const items: Involvement[] = [];
+      const items: string[] = [];
       let openTasks = 0;
       let assignedTasks = 0;
       phaseBlocks.forEach(pb => {
@@ -70,11 +68,7 @@ export default function TeamView() {
         if (!involved) return;
         const project = orgProjects.find(p => p.id === pb.projectId);
         if (!project) return;
-        let row = items.find(a => a.project === project.name);
-        if (!row) { row = { project: project.name, phases: [], open: 0, total: 0 }; items.push(row); }
-        if (!row.phases.includes(pb.phaseType)) row.phases.push(pb.phaseType);
-        row.total += pb.checklist.length;
-        row.open += pb.checklist.filter(c => !c.done).length;
+        if (!items.includes(project.name)) items.push(project.name);
         assignedTasks += pb.checklist.length;
         openTasks += pb.checklist.filter(c => !c.done).length;
       });
@@ -196,29 +190,15 @@ export default function TeamView() {
                   )}
                 </div>
 
-                {/* Tham gia (mức phase) */}
+                {/* Dự án đang tham gia */}
                 {involvement.items.length > 0 && (
                   <div className="mb-4">
-                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">Tham gia</div>
+                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">Dự án đang tham gia</div>
                     <div className="space-y-1.5">
-                      {involvement.items.slice(0, 3).map(a => (
-                        <div key={a.project} className="flex items-center gap-2">
-                          {/* Bên trái: checklist mở/tổng được giao (x/y) */}
-                          <span className="text-[10px] font-bold text-stone-500 tabular-nums flex-shrink-0 min-w-[28px]">
-                            {a.open}/{a.total}
-                          </span>
-                          <span className="text-xs text-stone-600 truncate flex-1">{a.project}</span>
-                          {/* Bên phải: phase badges căn phải */}
-                          <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-                            {a.phases.slice(0, 3).map(p => {
-                              const meta = PHASE_META[p as keyof typeof PHASE_META];
-                              return (
-                                <span key={p} className={`text-[8px] font-bold px-1 py-0.5 rounded ${meta.bg} ${meta.color}`}>
-                                  {p}
-                                </span>
-                              );
-                            })}
-                          </div>
+                      {involvement.items.slice(0, 3).map(projectName => (
+                        <div key={projectName} className="flex items-center gap-2">
+                          <FolderKanban className="w-3 h-3 text-stone-400 flex-shrink-0" />
+                          <span className="text-xs text-stone-600 truncate">{projectName}</span>
                         </div>
                       ))}
                       {involvement.items.length > 3 && (
@@ -228,13 +208,11 @@ export default function TeamView() {
                   </div>
                 )}
 
-                {/* Task stat — tổng checklist mở/được giao (x/y) bên trái, icon căn phải */}
-                <div className="mt-auto flex items-center justify-between text-[11px] text-stone-500 pt-3 border-t border-stone-100">
-                  <span className="flex items-baseline gap-1.5 min-w-0">
-                    <span className="font-bold text-ink tabular-nums">{involvement.openTasks}/{involvement.assignedTasks}</span>
-                    <span className="text-stone-400 truncate">checklist mở/được giao</span>
-                  </span>
+                {/* Task stat — icon + nhãn bên trái, x/y (tổng mở/được giao) căn phải */}
+                <div className="mt-auto flex items-center gap-1.5 text-[11px] text-stone-500 pt-3 border-t border-stone-100">
                   <ListTodo className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
+                  <span className="text-stone-400 truncate">checklist mở/được giao</span>
+                  <span className="font-bold text-ink tabular-nums ml-auto">{involvement.openTasks}/{involvement.assignedTasks}</span>
                 </div>
 
                 {/* Email thật */}
