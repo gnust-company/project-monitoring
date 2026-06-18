@@ -3,7 +3,7 @@
 Theo dõi tiến độ các issue đã verify + breakdown. Tick `[x]` khi hoàn thành.
 Repo: <https://github.com/gnust-company/project-monitoring>
 
-> Cập nhật lần cuối: 2026-06-17
+> Cập nhật lần cuối: 2026-06-18
 
 ## Quyết định nền tảng (đã chốt)
 - **Phân quyền PIC** ([#11](https://github.com/gnust-company/project-monitoring/issues/11)): bỏ hẳn cơ chế approve `change_requests`. PIC = người tạo (project đổi PIC được trong detail; phase PIC = creator). Chỉ PIC sửa/xóa **metadata** project/phase. Checklist & outcome thì người khác vẫn note được + hiện log.
@@ -15,7 +15,7 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 
 | Wave | Issue | Trạng thái |
 |---|---|---|
-| 1 | #4, #6, #16, #19, #17(phần bỏ viết tắt) | ⬜ Chưa bắt đầu |
+| 1 | #4, #6, #16, #19, #17(phần bỏ viết tắt) | ✅ Xong (#17 phần "cho sửa" còn ở Wave 3) |
 | 2 | #5, #11, #13, #20 | ⬜ Chưa bắt đầu |
 | 3 | #10, #9, #8, #12, #17 | ⬜ Chưa bắt đầu |
 | 4 | #14, #18, #15 | ⬜ Chưa bắt đầu |
@@ -26,16 +26,16 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 ## Wave 1 — Quick wins (không đụng schema)
 
-- [ ] [#4 — Đăng ký người dùng (fix "Email đã được đăng ký")](https://github.com/gnust-company/project-monitoring/issues/4)
+- [x] [#4 — Đăng ký người dùng (fix "Email đã được đăng ký")](https://github.com/gnust-company/project-monitoring/issues/4)
   - Root cause: `auth.register` lưu token OK rồi `afterAuth → orgsApi.list()` lỗi ném ngược làm UI kẹt ở form; bấm lại → email đã tồn tại.
   - Tách `afterAuth` khỏi transaction đăng ký · try/catch riêng · thêm `finally setLoading(false)` · phòng vệ 409 → auto login.
-- [ ] [#6 — View Pipeline bất đồng bộ (sidebar tick full)](https://github.com/gnust-company/project-monitoring/issues/6)
+- [x] [#6 — View Pipeline bất đồng bộ (sidebar tick full)](https://github.com/gnust-company/project-monitoring/issues/6)
   - Sidebar tick theo tập hiển thị hiệu dụng (`statusFilter` ∩ `selectedProjectIds`); nút "Tất cả" reset cả hai.
-- [ ] [#16 — Dashboard: Phân bổ Phase viết đầy đủ tên](https://github.com/gnust-company/project-monitoring/issues/16)
+- [x] [#16 — Dashboard: Phân bổ Phase viết đầy đủ tên](https://github.com/gnust-company/project-monitoring/issues/16)
   - Bổ sung tên đầy đủ vào `PHASE_META`, hiển thị "MÃ — Tên đầy đủ".
-- [ ] [#19 — Phase detail modal: click ngoài không đóng](https://github.com/gnust-company/project-monitoring/issues/19)
+- [x] [#19 — Phase detail modal: click ngoài không đóng](https://github.com/gnust-company/project-monitoring/issues/19)
   - Bỏ `onClick={closePhaseDetail}` ở backdrop; cân nhắc bỏ Esc-to-close.
-- [ ] [#17 — Cho sửa Phase Type + bỏ viết tắt](https://github.com/gnust-company/project-monitoring/issues/17) *(chỉ phần bỏ viết tắt ở Wave 1; phần cho sửa thuộc Wave 3)*
+- [x] [#17 — Cho sửa Phase Type + bỏ viết tắt](https://github.com/gnust-company/project-monitoring/issues/17) *(chỉ phần bỏ viết tắt ở Wave 1; phần cho sửa thuộc Wave 3)*
 
 ## Wave 2 — Backend nền tảng
 
