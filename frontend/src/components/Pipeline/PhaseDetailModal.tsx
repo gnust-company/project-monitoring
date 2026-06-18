@@ -93,8 +93,15 @@ export default function PhaseDetailModal() {
     setAttachments(selectedPhaseBlock.attachments);
   }, [selectedPhaseBlock]);
 
+  // #19: click backdrop KHÔNG đóng modal (chỉ nút X đóng). Esc chỉ đóng khi KHÔNG có
+  // nội dung đang soạn — tránh lỡ tay mất title/desc/checklist/comment/link đang dở.
+  const hasDraft = editingTitle || editingDesc || editingCheckId !== null
+    || commentText.trim() !== '' || linkName.trim() !== '' || linkUrl.trim() !== '';
+
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') closePhaseDetail(); };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !hasDraft) closePhaseDetail();
+    };
     if (phaseDetailOpen) {
       window.addEventListener('keydown', handleEsc);
       document.body.style.overflow = 'hidden';
@@ -103,7 +110,7 @@ export default function PhaseDetailModal() {
       window.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = '';
     };
-  }, [phaseDetailOpen, closePhaseDetail]);
+  }, [phaseDetailOpen, closePhaseDetail, hasDraft]);
 
 
   const checklistRoles = selectedPhaseBlock ? PHASE_ROLE_TASKS[selectedPhaseBlock.phaseType].map(x => x.role) : [];
@@ -238,7 +245,6 @@ export default function PhaseDetailModal() {
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/30 z-50 flex justify-end"
-        onClick={closePhaseDetail}
       >
         <motion.div
           initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
@@ -251,6 +257,9 @@ export default function PhaseDetailModal() {
             <div className="flex items-center gap-2">
               <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${meta.bg} ${meta.color} border ${meta.border}`}>
                 {selectedPhaseBlock.phaseType}
+              </span>
+              <span className="text-xs font-semibold text-gray-600 hidden sm:inline">
+                {meta.fullLabel}
               </span>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${tagMeta.bg} ${tagMeta.color} border ${tagMeta.border}`}>
                 {tagMeta.label}

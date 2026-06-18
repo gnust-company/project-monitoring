@@ -322,7 +322,10 @@ export default function DashboardView() {
                 const pct = (count / maxPhaseCount) * 100;
                 return (
                   <div key={phase} className="flex items-center gap-2.5">
-                    <span className="text-[10px] font-semibold w-7 text-muted">{phase}</span>
+                    <div className="w-48 flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${meta.bg} ${meta.color} flex-shrink-0`}>{phase}</span>
+                      <span className="text-[11px] text-body truncate" title={`${phase} — ${meta.fullLabel}`}>{meta.fullLabel}</span>
+                    </div>
                     <div className="flex-1 h-6 bg-surface-soft rounded-lg overflow-hidden relative">
                       <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
                         transition={{ duration: 0.8, delay: 0.3 + i * 0.06, ease: [0.22, 1, 0.36, 1] }}

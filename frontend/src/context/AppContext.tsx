@@ -206,13 +206,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })();
   }, [syncRegistry]);
 
+  // afterAuth: có token = đã đăng nhập/ký thành công (#4). Luôn setCurrentUser + vào app;
+  // lỗi tải orgs KHÔNG được làm user tưởng đăng nhập/ký thất bại — chỉ để danh sách rỗng/retry.
   const afterAuth = useCallback(async (me: User) => {
-    const orgs = await orgsApi.list();
     setCurrentUser(me);
-    setOrgsState(orgs);
-    syncRegistry(orgs, me);
-    // Sau đăng nhập về trang chủ (đã đăng nhập, hiện avatar góc phải)
     setState(prev => ({ ...prev, currentView: 'landing', currentUserEmail: me.email ?? null }));
+    try {
+      const orgs = await orgsApi.list();
+      setOrgsState(orgs);
+      syncRegistry(orgs, me);
+    } catch (e) {
+      // orgsApi.list() lỗi (mạng/timing) → vẫn vào app, workspace rỗng, user có thể retry.
+      console.error('Không tải được danh sách workspace sau đăng nhập:', e);
+      setOrgsState([]);
+    }
   }, [syncRegistry]);
 
   // ─── Navigation ──────────────────────────────────────────────────

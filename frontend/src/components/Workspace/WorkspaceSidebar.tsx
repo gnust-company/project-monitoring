@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard, GitBranch, Users, Layers, Plus,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { WorkspaceView } from '../../types';
 import Avatar from '../common/Avatar';
+import { computeProjectStatus } from '../../lib/projectStatus';
 
 const navItems: { view: WorkspaceView; label: string; icon: typeof LayoutDashboard }[] = [
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -25,8 +26,10 @@ export default function WorkspaceSidebar() {
     goToWorkspaceSelector, openCreateProject,
     orgProjects, phaseBlocks, currentUserEmail, currentUser, organizations,
     selectedProjectIds,
-    selectAllProjects, toggleProjectSelection,
+    toggleProjectSelection,
     sidebarCollapsed, toggleSidebar, isOwner,
+    // setStatusFilter/setSelectedProjectIds: reset filter "Tất cả" (#6)
+    statusFilter, setStatusFilter, setSelectedProjectIds,
   } = useApp();
 
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
@@ -35,6 +38,25 @@ export default function WorkspaceSidebar() {
   const wsMenuRef = useRef<HTMLDivElement>(null);
 
   const projectCount = orgProjects.length;
+
+  // ─── Status auto (derived) + tập hiển thị hiệu dụng (#6) ────────────
+  // Sidebar tick theo đúng các dự án đang thực sự hiển thị trong pipeline
+  // sau khi áp cả statusFilter lẫn selectedProjectIds (mirror PipelineTimeline).
+  const statusOf = useMemo(() => {
+    const m = new Map<string, string>();
+    orgProjects.forEach(p => m.set(p.id, computeProjectStatus(p, phaseBlocks)));
+    return m;
+  }, [orgProjects, phaseBlocks]);
+
+  const isVisible = (projectId: string): boolean => {
+    const mst = statusFilter === 'All' || statusOf.get(projectId) === statusFilter;
+    const mproj = selectedProjectIds === null || selectedProjectIds.includes(projectId);
+    return mst && mproj;
+  };
+
+  // "Tất cả" chỉ active khi KHÔNG còn filter nào (status All + không chọn lọc dự án).
+  const allActive = statusFilter === 'All' && selectedProjectIds === null;
+  const resetAllFilters = () => { setStatusFilter('All'); setSelectedProjectIds(null); };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -203,31 +225,33 @@ export default function WorkspaceSidebar() {
                   <span className="text-[10px] font-bold text-on-dark-soft uppercase tracking-wider">
                     Dự án ({projectCount})
                   </span>
-                  <button onClick={selectAllProjects}
+                  <button onClick={resetAllFilters}
                     className={`text-[9px] font-bold rounded-md px-2 py-0.5 transition-colors
-                      ${selectedProjectIds === null
+                      ${allActive
                         ? 'bg-white/[0.08] text-white'
                         : 'text-white/30 hover:text-white'}`}>
                     Tất cả
                   </button>
                 </div>
                 {orgProjects.map(project => {
-                  const isSelected = selectedProjectIds === null || selectedProjectIds.includes(project.id);
+                  // Tick phản ánh tập hiển thị hiệu dụng (#6), không phải selectedProjectIds đơn thuần.
+                  const selected = isVisible(project.id);
+                  const dot = statusOf.get(project.id) ?? project.status;
                   return (
                     <button key={project.id}
                       onClick={() => toggleProjectSelection(project.id)}
                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all group truncate
-                        ${isSelected
+                        ${selected
                           ? 'text-on-dark-soft hover:text-white hover:bg-white/[0.04]'
                           : 'text-white/20 hover:text-white/40 hover:bg-white/[0.02]'}`}>
                       <div className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 transition-all
-                        ${isSelected
+                        ${selected
                           ? 'bg-white border-white'
                           : 'border-white/20 group-hover:border-white/40'}`}>
-                        {isSelected && <Check className="w-2 h-2 text-surface-dark" />}
+                        {selected && <Check className="w-2 h-2 text-surface-dark" />}
                       </div>
-                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusColors[project.status]}`} />
-                      <span className={`truncate ${isSelected ? '' : 'line-through opacity-50'}`}>{project.name}</span>
+                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusColors[dot] ?? 'bg-stone-400'}`} />
+                      <span className={`truncate ${selected ? '' : 'line-through opacity-50'}`}>{project.name}</span>
                     </button>
                   );
                 })}

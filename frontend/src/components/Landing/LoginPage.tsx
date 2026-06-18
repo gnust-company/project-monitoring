@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { DEV_PHASES, PHASE_META } from '../../types';
 import type { UserRole } from '../../types';
 import { ROLE_LABELS } from '../../data/mockData';
+import { ApiError } from '../../api/client';
 import {
   Layers, Eye, EyeOff, ArrowRight, Mail, Lock, User,
   ChevronRight, Sparkles, Shield
@@ -52,6 +53,7 @@ export default function LoginPage() {
       await login(email, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
+    } finally {
       setLoading(false);
     }
   };
@@ -64,7 +66,21 @@ export default function LoginPage() {
     try {
       await register(regEmail, regPassword, regName, regRole);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Đăng ký thất bại');
+      // Phòng vệ #4.4: 409 = email đã tồn tại (thường do lần submit trước tạo user xong
+      // nhưng afterAuth lỗi nên UI kẹt). Tự thử login với cùng credential thay vì báo lỗi cứng.
+      if (err instanceof ApiError && err.status === 409) {
+        try {
+          await login(regEmail, regPassword);
+          return;
+        } catch (loginErr) {
+          setError(loginErr instanceof Error
+            ? loginErr.message
+            : 'Email đã được đăng ký. Vui lòng đăng nhập.');
+        }
+      } else {
+        setError(err instanceof Error ? err.message : 'Đăng ký thất bại');
+      }
+    } finally {
       setLoading(false);
     }
   };
