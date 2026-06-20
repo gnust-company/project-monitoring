@@ -24,6 +24,9 @@ interface AppState {
   statusFilter: ProjectStatus | 'All';
   zoomLevel: ZoomLevel;
   selectedProjectIds: string[] | null;
+  onlyMine: boolean;                 // #15: chỉ hiện project mình tham gia
+  rangeStart: string | null;         // #15: filter khoảng thời gian (YYYY-MM-DD)
+  rangeEnd: string | null;
   selectedPhaseBlockId: string | null;
   phaseDetailOpen: boolean;
   selectedProjectDetailId: string | null;
@@ -69,6 +72,10 @@ interface AppContextType extends AppState {
   setStatusFilter: (s: ProjectStatus | 'All') => void;
   setZoomLevel: (z: ZoomLevel) => void;
   setSelectedProjectIds: (ids: string[] | null) => void;
+  setOnlyMine: (b: boolean) => void;
+  setRangeStart: (d: string | null) => void;
+  setRangeEnd: (d: string | null) => void;
+  clearRange: () => void;
   toggleProjectSelection: (projectId: string) => void;
   selectAllProjects: () => void;
 
@@ -143,6 +150,9 @@ const INITIAL_STATE: AppState = {
   statusFilter: 'All',
   zoomLevel: 'week',
   selectedProjectIds: null,
+  onlyMine: false,
+  rangeStart: null,
+  rangeEnd: null,
   selectedPhaseBlockId: null,
   phaseDetailOpen: false,
   selectedProjectDetailId: null,
@@ -226,6 +236,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prev => ({
       ...prev, selectedOrgId: orgId, currentView: 'workspace', workspaceView: 'pipeline',
       searchQuery: '', phaseFilter: 'All', statusFilter: 'All', selectedProjectIds: null,
+      onlyMine: false, rangeStart: null, rangeEnd: null,
     }));
     try {
       const [projects, blocks] = await Promise.all([
@@ -309,6 +320,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setStatusFilter = useCallback((s: ProjectStatus | 'All') => setState(prev => ({ ...prev, statusFilter: s })), []);
   const setZoomLevel = useCallback((z: ZoomLevel) => setState(prev => ({ ...prev, zoomLevel: z })), []);
   const setSelectedProjectIds = useCallback((ids: string[] | null) => setState(prev => ({ ...prev, selectedProjectIds: ids })), []);
+  const setOnlyMine = useCallback((b: boolean) => setState(prev => ({ ...prev, onlyMine: b })), []);
+  const setRangeStart = useCallback((d: string | null) => setState(prev => ({ ...prev, rangeStart: d })), []);
+  const setRangeEnd = useCallback((d: string | null) => setState(prev => ({ ...prev, rangeEnd: d })), []);
+  const clearRange = useCallback(() => setState(prev => ({ ...prev, rangeStart: null, rangeEnd: null })), []);
   const toggleProjectSelection = useCallback((projectId: string) => {
     setState(prev => {
       const current = prev.selectedProjectIds;
@@ -618,7 +633,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       authReady, needsSetup, authError, login, register, setupSuperuser, logout,
       currentUser, updateCurrentUser, uploadAvatar, changePassword, deleteAccount,
       setSearchQuery, setPhaseFilter, setStatusFilter, setZoomLevel,
-      setSelectedProjectIds, toggleProjectSelection, selectAllProjects,
+      setSelectedProjectIds, setOnlyMine, setRangeStart, setRangeEnd, clearRange,
+      toggleProjectSelection, selectAllProjects,
       openPhaseDetail, closePhaseDetail, openProjectDetail, closeProjectDetail,
       openCreateProject, closeCreateProject, openCreatePhase, closeCreatePhase,
       openCreateWorkspace, closeCreateWorkspace, openProfileModal, closeProfileModal, toggleSidebar,

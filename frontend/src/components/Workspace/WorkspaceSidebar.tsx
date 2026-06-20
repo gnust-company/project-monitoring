@@ -7,6 +7,7 @@ import {
 import type { WorkspaceView } from '../../types';
 import Avatar from '../common/Avatar';
 import { computeProjectStatus } from '../../lib/projectStatus';
+import { useProjectFilter, isProjectVisible } from '../../lib/filterProjects';
 
 const navItems: { view: WorkspaceView; label: string; icon: typeof LayoutDashboard }[] = [
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,6 +31,8 @@ export default function WorkspaceSidebar() {
     sidebarCollapsed, toggleSidebar, isOwner,
     // setStatusFilter/setSelectedProjectIds: reset filter "Tất cả" (#6)
     statusFilter, setStatusFilter, setSelectedProjectIds,
+    // #15: reset cả filter người + khoảng thời gian
+    onlyMine, rangeStart, rangeEnd, setOnlyMine, clearRange,
   } = useApp();
 
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
@@ -48,15 +51,17 @@ export default function WorkspaceSidebar() {
     return m;
   }, [orgProjects, phaseBlocks]);
 
-  const isVisible = (projectId: string): boolean => {
-    const mst = statusFilter === 'All' || statusOf.get(projectId) === statusFilter;
-    const mproj = selectedProjectIds === null || selectedProjectIds.includes(projectId);
-    return mst && mproj;
-  };
+  // #15: dùng chung filter với Pipeline timeline → sidebar auto-đồng bộ với các
+  // project đang hiển thị (cả onlyMine lẫn khoảng thời gian hiệu dụng).
+  const { ctx: filterCtx } = useProjectFilter();
 
-  // "Tất cả" chỉ active khi KHÔNG còn filter nào (status All + không chọn lọc dự án).
-  const allActive = statusFilter === 'All' && selectedProjectIds === null;
-  const resetAllFilters = () => { setStatusFilter('All'); setSelectedProjectIds(null); };
+  // "Tất cả" chỉ active khi KHÔNG còn filter nào (status All + không chọn lọc dự án + #15).
+  const allActive = statusFilter === 'All' && selectedProjectIds === null
+    && !onlyMine && !rangeStart && !rangeEnd;
+  const resetAllFilters = () => {
+    setStatusFilter('All'); setSelectedProjectIds(null);
+    setOnlyMine(false); clearRange();
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -234,8 +239,9 @@ export default function WorkspaceSidebar() {
                   </button>
                 </div>
                 {orgProjects.map(project => {
-                  // Tick phản ánh tập hiển thị hiệu dụng (#6), không phải selectedProjectIds đơn thuần.
-                  const selected = isVisible(project.id);
+                  // Tick phản ánh tập hiển thị hiệu dụng (#6 + #15): dùng cùng filter
+                  // với timeline để sidebar luôn đồng bộ.
+                  const selected = isProjectVisible(project, filterCtx);
                   const dot = statusOf.get(project.id) ?? project.status;
                   return (
                     <button key={project.id}

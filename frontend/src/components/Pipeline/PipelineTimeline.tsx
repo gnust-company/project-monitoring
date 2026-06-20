@@ -12,6 +12,8 @@ import PhaseDetailModal from './PhaseDetailModal';
 import CreatePhaseModal from '../Modals/CreatePhaseModal';
 import Avatar from '../common/Avatar';
 import { computeProjectStatus, projectPhaseProgress, phaseBlockProgress } from '../../lib/projectStatus';
+import { filterVisibleProjects, useProjectFilter } from '../../lib/filterProjects';
+import FilterPopover from './FilterPopover';
 
 const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 52;
@@ -72,9 +74,9 @@ function assignRows(pbs: PhaseBlock[]): Map<string, number> {
 // ─── Component ──────────────────────────────────────────────────────
 export default function PipelineTimeline() {
   const {
-    orgProjects, phaseBlocks, searchQuery, statusFilter, zoomLevel,
-    selectedProjectIds,
-    setSearchQuery, setZoomLevel, openPhaseDetail, openCreatePhase,
+    orgProjects, phaseBlocks, searchQuery, zoomLevel,
+    setSearchQuery, setZoomLevel,
+    openPhaseDetail, openCreatePhase,
     openProjectDetail, updatePhaseBlock,
   } = useApp();
 
@@ -128,14 +130,13 @@ export default function PipelineTimeline() {
   }, [orgProjects, phaseBlocks]);
 
   // ─── Filtered projects ────────────────────────────────────────────
-  const filteredProjects = useMemo(() => {
-    return orgProjects.filter(p => {
-      const ms = !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const mst = statusFilter === 'All' || (statusOf.get(p.id) ?? p.status) === statusFilter;
-      const mproj = selectedProjectIds === null || selectedProjectIds.includes(p.id);
-      return ms && mst && mproj;
-    });
-  }, [orgProjects, searchQuery, statusFilter, selectedProjectIds, statusOf]);
+  // #15: useProjectFilter là nguồn sự thật chung cho sidebar + timeline.
+  // displayRange = khoảng hiệu dụng (snap tuần + mở rộng phase bị cắt) → dùng cho cột.
+  const { ctx: filterCtx, displayRange } = useProjectFilter();
+  const filteredProjects = useMemo(
+    () => filterVisibleProjects(orgProjects, filterCtx),
+    [orgProjects, filterCtx],
+  );
 
   // ─── Timeline range ───────────────────────────────────────────────
   const today = useMemo(() => new Date(), []);
@@ -143,19 +144,32 @@ export default function PipelineTimeline() {
   // Neo biên lịch vào HÔM NAY với cửa sổ rộng cố định, chỉ nới ra khi phase
   // nằm ngoài. Nhờ vậy kéo/thả phase quanh hôm nay không làm dịch columns[0]
   // → lịch đứng im (muốn ra ngày xa thì tự cuộn lịch rồi kéo).
+  // #15: khi có range filter → biên lịch = khoảng hiệu dụng (zoom đúng tuần đã
+  // chọn, mở rộng cho phase bị cắt ở 2 đầu).
   const minDate = useMemo(() => {
+    if (displayRange) return displayRange.start;
     const anchor = addDays(today, -30);
     if (phaseBlocks.length === 0) return anchor;
     const earliest = Math.min(...phaseBlocks.map(pb => parseISO(pb.startDate).getTime()));
     return earliest < anchor.getTime() ? addDays(new Date(earliest), -14) : anchor;
-  }, [phaseBlocks, today]);
+  }, [phaseBlocks, today, displayRange]);
 
   const maxDate = useMemo(() => {
+    if (displayRange) return displayRange.end;
     const anchor = addDays(today, 60);
     if (phaseBlocks.length === 0) return anchor;
     const latest = Math.max(...phaseBlocks.map(pb => parseISO(pb.endDate).getTime()));
     return latest > anchor.getTime() ? addDays(new Date(latest), 30) : anchor;
-  }, [phaseBlocks, today]);
+  }, [phaseBlocks, today, displayRange]);
+
+  // Block "trong tầm nhìn" = giao [minDate, maxDate]. Block ngoài tầm (vd bị
+  // filter thời gian) không render & không chiếm hàng → không để hàng trống.
+  const minStr = useMemo(() => format(minDate, 'yyyy-MM-dd'), [minDate]);
+  const maxStr = useMemo(() => format(maxDate, 'yyyy-MM-dd'), [maxDate]);
+  const isInView = useCallback(
+    (pb: { startDate: string; endDate: string }) => pb.endDate >= minStr && pb.startDate <= maxStr,
+    [minStr, maxStr],
+  );
 
   // ─── Columns & widths ─────────────────────────────────────────────
   const { columns, colWidth, totalWidth } = useMemo(() => {
@@ -302,9 +316,24 @@ export default function PipelineTimeline() {
         maxRow += 1;
         map.set(b.id, { startDate: b.startDate, endDate: b.endDate, row: maxRow });
       }
+
+      // ─── Nén hàng: không để hàng trống (KHÔNG dồn khi đang kéo để block
+      // không nhảy dọc giật cục — thả ra là dồn ngay). Chỉ tính block trong
+      // tầm nhìn → hàng của block bị filter thời gian cũng biến mất.
+      if (!dragPreview) {
+        const usedRows = Array.from(new Set(
+          pbs.filter(isInView).map(pb => map.get(pb.id)?.row).filter((r): r is number => r != null)
+        )).sort((a, b) => a - b);
+        const remap = new Map<number, number>();
+        usedRows.forEach((r, i) => remap.set(r, i));
+        for (const pb of pbs) {
+          const pos = map.get(pb.id);
+          if (pos && remap.has(pos.row)) map.set(pb.id, { ...pos, row: remap.get(pos.row)! });
+        }
+      }
     }
     return map;
-  }, [filteredProjects, getFilteredPbs, baseRowIndices, dragPreview]);
+  }, [filteredProjects, getFilteredPbs, baseRowIndices, dragPreview, isInView]);
   layoutMapRef.current = layoutMap;
 
   // ─── Per-project data ─────────────────────────────────────────────
@@ -315,12 +344,12 @@ export default function PipelineTimeline() {
       let rowCount = 1;
       for (const pb of pbs) {
         const pos = layoutMap.get(pb.id);
-        if (pos) rowCount = Math.max(rowCount, pos.row + 1);
+        if (pos && isInView(pb)) rowCount = Math.max(rowCount, pos.row + 1);
       }
       data.set(project.id, { rowCount, pbs });
     }
     return data;
-  }, [filteredProjects, getFilteredPbs, layoutMap]);
+  }, [filteredProjects, getFilteredPbs, layoutMap, isInView]);
 
   // ─── Scroll sync (transform-based for left panel) ───
   useEffect(() => {
@@ -661,6 +690,8 @@ export default function PipelineTimeline() {
                 </button>
               )}
             </div>
+            {/* #15: bộ lọc người + khoảng thời gian (gộp 1 nút để gọn toolbar) */}
+            <FilterPopover />
             {/* Chế độ tương tác: Xem (pan) / Tạo phase (kéo để tạo) */}
             <div className="flex items-center bg-stone-100 rounded-lg p-0.5">
               <button onClick={() => setBoardMode('view')}
@@ -815,7 +846,7 @@ export default function PipelineTimeline() {
 
                   {pbs.map(pb => {
                     const pos = layoutMap.get(pb.id);
-                    if (!pos) return null;
+                    if (!pos || !isInView(pb)) return null;
                     const meta = PHASE_META[pb.phaseType];
                     const left = getDatePos(parseISO(pos.startDate));
                     const right = getDatePos(parseISO(pos.endDate));
@@ -827,11 +858,18 @@ export default function PipelineTimeline() {
                     const assignee = getUserById(pb.createdBy); // #13: PIC = người tạo
                     return (
                       <div key={pb.id}
-                        className={`phase-block absolute rounded-lg border cursor-pointer group transition-shadow duration-150
+                        className={`phase-block absolute rounded-lg border cursor-pointer group
                           ${meta.bg} ${meta.border}
                           ${isDragging ? 'ring-2 ring-ink/30 ring-offset-1' : ''}
                           ${isHover ? 'shadow-lg z-50' : 'shadow-sm z-10'}`}
-                        style={{ left, width, top, height: ROW_HEIGHT - 12 }}
+                        style={{
+                          left, width, top, height: ROW_HEIGHT - 12,
+                          // Khi KHÔNG kéo: animate nhẹ vị trí/kích thước (mượt lúc đổi
+                          // filter/zoom). Đang kéo → chỉ shadow để phản hồi tức thì.
+                          transition: dragPreview
+                            ? 'box-shadow 150ms ease'
+                            : 'left 280ms cubic-bezier(0.22,1,0.36,1), top 280ms cubic-bezier(0.22,1,0.36,1), width 280ms cubic-bezier(0.22,1,0.36,1), box-shadow 150ms ease',
+                        }}
                         onMouseDown={e => { setHoverInfo(null); handleBlockMouseDown(e, pb, project.id); }}
                         onMouseEnter={e => setHoverInfo({ id: pb.id, x: e.clientX, y: e.clientY })}
                         onMouseMove={e => setHoverInfo({ id: pb.id, x: e.clientX, y: e.clientY })}
