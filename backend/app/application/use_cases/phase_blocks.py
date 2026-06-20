@@ -217,17 +217,19 @@ class DeletePhaseBlock:
         self._blocks = blocks
         self._activity = activity
 
-    async def execute(self, block_id: UUID, actor: User) -> None:
+    async def execute(self, block_id: UUID, actor: User, reason: str | None = None) -> None:
         block = await self._blocks.get(block_id)
         if block is None:
             raise PhaseBlockNotFoundError(str(block_id))
         # #11: chỉ PIC phase (= người tạo)/superuser mới xóa.
         if not can_edit_phase(actor, block):
             raise PhaseForbiddenError("Chỉ PIC phase mới được xóa")
-        # ghi changelog cấp dự án TRƯỚC khi xóa, phase_block_id=None để còn lại
+        # #14: ghi changelog cấp dự án TRƯỚC khi xóa (kèm lý do), phase_block_id=None
+        # để bản ghi còn lại sau khi phase bị xóa.
+        target = f"{block.title} — lý do: {reason.strip()}" if reason and reason.strip() else block.title
         await self._activity.add(ActivityEntry(
             id=uuid4(), project_id=block.project_id, user_id=actor.id,
-            action="deleted phase", target=block.title, created_at=None, phase_block_id=None,
+            action="deleted phase", target=target, created_at=None, phase_block_id=None,
         ))
         await self._blocks.delete(block_id)
 

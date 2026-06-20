@@ -2,7 +2,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.application.authz import can_access_workspace
 from app.application.use_cases.projects import (
@@ -119,10 +119,11 @@ async def delete_project(
     orgs: OrgRepoDep,
     get_uc: Annotated[GetProject, Depends(get_project_uc)],
     uc: Annotated[DeleteProject, Depends(delete_project_uc)],
+    reason: Annotated[str | None, Query(max_length=500)] = None,  # #14: lý do xóa → log
 ):
     await _require_project_access(project_id, current, orgs, get_uc)
     try:
-        await uc.execute(project_id, current)
+        await uc.execute(project_id, current, reason)
     except ProjectNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
     except ProjectForbiddenError as e:

@@ -268,8 +268,8 @@ def update_project_uc(repo: ProjectRepoDep) -> UpdateProject:
     return UpdateProject(repo)
 
 
-def delete_project_uc(repo: ProjectRepoDep) -> DeleteProject:
-    return DeleteProject(repo)
+def delete_project_uc(repo: ProjectRepoDep, activity: ActivityRepoDep) -> DeleteProject:
+    return DeleteProject(repo, activity)
 
 
 def change_project_pic_uc(repo: ProjectRepoDep, notifier: NotifierDep) -> ChangeProjectPic:

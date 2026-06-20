@@ -133,8 +133,10 @@ export const projectsApi = {
   async update(id: string, updates: Partial<Project>): Promise<Project> {
     return await api.patch<Project>(`/projects/${id}`, updates);
   },
-  async remove(id: string): Promise<void> {
-    await api.del(`/projects/${id}`);
+  // #14: xóa cần lý do → BE ghi vào activity workspace.
+  async remove(id: string, reason?: string): Promise<void> {
+    const q = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+    await api.del(`/projects/${id}${q}`);
   },
   async changePic(id: string, picUserId: string): Promise<Project> {
     return await api.patch<Project>(`/projects/${id}/pic`, { picUserId });
@@ -165,8 +167,10 @@ export const phaseBlocksApi = {
   async update(id: string, updates: Record<string, unknown>): Promise<PhaseBlock> {
     return mapPhaseBlock(await api.patch<PhaseBlockDTO>(`/phase-blocks/${id}`, updates));
   },
-  async remove(id: string): Promise<void> {
-    await api.del(`/phase-blocks/${id}`);
+  // #14: xóa cần lý do → BE ghi vào activity dự án.
+  async remove(id: string, reason?: string): Promise<void> {
+    const q = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+    await api.del(`/phase-blocks/${id}${q}`);
   },
   // items
   async addItem(blockId: string, kind: 'checklist' | 'outcome', text: string, role?: UserRole): Promise<ChecklistItem> {

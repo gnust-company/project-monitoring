@@ -98,12 +98,12 @@ interface AppContextType extends AppState {
   addProject: (project: Project) => Promise<void>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<Project>;
   changeProjectPic: (id: string, picUserId: string) => Promise<Project>; // #11
-  deleteProject: (id: string) => Promise<void>;
+  deleteProject: (id: string, reason?: string) => Promise<void>;
 
   // Phase block actions
   addPhaseBlock: (pb: PhaseBlockUI) => Promise<void>;
   updatePhaseBlock: (id: string, updates: Partial<PhaseBlockUI>) => Promise<void>;
-  deletePhaseBlock: (id: string) => Promise<void>;
+  deletePhaseBlock: (id: string, reason?: string) => Promise<void>;
   // granular phase sub-resources
   addPhaseItem: (blockId: string, kind: 'checklist' | 'outcome', text: string, role?: UserRole) => Promise<void>;
   updatePhaseItem: (blockId: string, itemId: string, updates: { text?: string; done?: boolean }) => Promise<void>;
@@ -385,8 +385,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return updated;
   }, []);
 
-  const deleteProject = useCallback(async (id: string) => {
-    await projectsApi.remove(id);
+  const deleteProject = useCallback(async (id: string, reason?: string) => {
+    await projectsApi.remove(id, reason);
     setProjectsState(prev => prev.filter(p => p.id !== id));
     setPbState(prev => prev.filter(pb => pb.projectId !== id));
     setState(prev => ({ ...prev, selectedProjectIds: prev.selectedProjectIds?.filter(pid => pid !== id) ?? null }));
@@ -450,8 +450,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   }, [syncProjectStartDate]);
 
-  const deletePhaseBlock = useCallback(async (id: string) => {
-    await phaseBlocksApi.remove(id);
+  const deletePhaseBlock = useCallback(async (id: string, reason?: string) => {
+    await phaseBlocksApi.remove(id, reason);
     setPbState(prev => {
       const removed = prev.find(pb => pb.id === id);
       const next = prev.filter(pb => pb.id !== id);

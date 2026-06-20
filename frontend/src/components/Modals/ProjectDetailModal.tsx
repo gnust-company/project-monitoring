@@ -8,11 +8,12 @@ import { PHASE_META } from '../../types';
 import type { ProjectStatus, ActivityItem } from '../../types';
 import {
   X, Calendar, Trash2, Pencil, Check, FolderKanban,
-  GitBranch, AlertTriangle, Clock, Crown, Lock,
+  GitBranch, Clock, Crown, Lock,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Avatar from '../common/Avatar';
 import Dropdown from '../common/Dropdown';
+import DeleteReasonDialog from '../ui/DeleteReasonDialog';
 import { computeProjectStatus, projectPhaseProgress, projectDateProgress, daysToNearestDeadline, isPhaseComplete } from '../../lib/projectStatus';
 
 const STATUS_META: Record<ProjectStatus, { color: string; bg: string; border: string; bar: string }> = {
@@ -31,8 +32,8 @@ export default function ProjectDetailModal() {
   // Inline editing
   const [editingName, setEditingName] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
-  const [nameDraft, setNameDraft] = useState('');
-  const [descDraft, setDescDraft] = useState('');
+  // #14: gom edit metadata vào 1 draft — chỉ áp khi bấm "Lưu".
+  const [meta, setMeta] = useState({ name: '', description: '', startDate: '', picUserId: '' });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
@@ -48,6 +49,12 @@ export default function ProjectDetailModal() {
       setEditingName(false);
       setEditingDesc(false);
       setConfirmDelete(false);
+      setMeta({
+        name: selectedProjectDetail.name,
+        description: selectedProjectDetail.description ?? '',
+        startDate: selectedProjectDetail.startDate,
+        picUserId: selectedProjectDetail.picUserId ?? selectedProjectDetail.createdBy,
+      });
       loadActivity();
     }
   }, [selectedProjectDetail?.id, loadActivity]);
@@ -94,25 +101,32 @@ export default function ProjectDetailModal() {
     return acc;
   }, {});
 
-  const saveName = () => {
-    if (!nameDraft.trim()) return;
-    doUpdate({ name: nameDraft.trim() });
-    setEditingName(false);
-  };
+  const metaDirty = meta.name !== project.name
+    || meta.description !== (project.description ?? '')
+    || meta.startDate !== project.startDate
+    || meta.picUserId !== effectivePicId;
 
-  const saveDesc = () => {
-    doUpdate({ description: descDraft.trim() });
+  const saveMeta = async () => {
+    const updates: Record<string, unknown> = {};
+    if (meta.name.trim() && meta.name !== project.name) updates.name = meta.name.trim();
+    if (meta.description !== (project.description ?? '')) updates.description = meta.description.trim();
+    if (meta.startDate !== project.startDate) updates.startDate = meta.startDate;
+    if (Object.keys(updates).length > 0) await doUpdate(updates);
+    // PIC là action riêng (endpoint /pic) — chỉ gọi khi đổi.
+    if (meta.picUserId && meta.picUserId !== effectivePicId) {
+      await changeProjectPic(project.id, meta.picUserId);
+      loadActivity();
+    }
+    setEditingName(false);
     setEditingDesc(false);
   };
-
-  const handleDelete = async () => {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    await deleteProject(project.id);
-    closeProjectDetail();
-  };
-
-  const handleChangePic = (uid: string) => {
-    changeProjectPic(project.id, uid);
+  const resetMeta = () => {
+    setMeta({
+      name: project.name, description: project.description ?? '',
+      startDate: project.startDate, picUserId: effectivePicId,
+    });
+    setEditingName(false);
+    setEditingDesc(false);
   };
 
   return (
@@ -138,11 +152,10 @@ export default function ProjectDetailModal() {
             </div>
             <div className="flex items-center gap-1">
               {canManage ? (
-                <button onClick={handleDelete}
-                  className={`p-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold
-                    ${confirmDelete ? 'bg-red-500 text-white px-2.5 hover:bg-red-600' : 'hover:bg-red-50 text-stone-400 hover:text-red-500'}`}
-                  title={confirmDelete ? 'Click lần nữa để xóa vĩnh viễn' : 'Xóa dự án'}>
-                  {confirmDelete ? (<><AlertTriangle className="w-3.5 h-3.5" /> Xác nhận xóa?</>) : <Trash2 className="w-4 h-4" />}
+                <button onClick={() => setConfirmDelete(true)}
+                  className="p-1.5 rounded-lg transition-colors hover:bg-red-50 text-stone-400 hover:text-red-500"
+                  title="Xóa dự án">
+                  <Trash2 className="w-4 h-4" />
                 </button>
               ) : (
                 <span className="flex items-center gap-1 text-[10px] text-stone-400 pr-2" title="Chỉ PIC mới sửa/xóa dự án">
@@ -160,19 +173,19 @@ export default function ProjectDetailModal() {
             {/* Name (editable nếu canManage) */}
             {editingName ? (
               <div className="flex items-center gap-2">
-                <input type="text" value={nameDraft} onChange={e => setNameDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false); }}
+                <input type="text" value={meta.name} onChange={e => setMeta(m => ({ ...m, name: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter') setEditingName(false); if (e.key === 'Escape') setEditingName(false); }}
                   autoFocus
                   className="flex-1 text-lg font-bold text-ink bg-stone-50 border border-stone-300 rounded-lg px-3 py-1
                              focus:outline-none focus:ring-2 focus:ring-ink/15" />
-                <button onClick={saveName} className="p-1.5 bg-ink text-white rounded-lg hover:bg-[#242424]">
+                <button onClick={() => setEditingName(false)} className="p-1.5 bg-ink text-white rounded-lg hover:bg-[#242424]">
                   <Check className="w-4 h-4" />
                 </button>
               </div>
             ) : (
               <div className={`flex items-start gap-2 group ${canManage ? 'cursor-pointer' : ''}`}
-                onClick={() => canManage && (setNameDraft(project.name), setEditingName(true))}>
-                <h3 className="text-lg font-bold text-ink flex-1">{project.name}</h3>
+                onClick={() => canManage && setEditingName(true)}>
+                <h3 className="text-lg font-bold text-ink flex-1">{meta.name}</h3>
                 {canManage && <Pencil className="w-4 h-4 text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity mt-1 shrink-0" />}
               </div>
             )}
@@ -180,23 +193,21 @@ export default function ProjectDetailModal() {
             {/* Description (editable nếu canManage) */}
             {editingDesc ? (
               <div className="space-y-2">
-                <textarea value={descDraft} onChange={e => setDescDraft(e.target.value)} rows={3} autoFocus
+                <textarea value={meta.description} onChange={e => setMeta(m => ({ ...m, description: e.target.value }))} rows={3} autoFocus
                   onKeyDown={e => { if (e.key === 'Escape') setEditingDesc(false); }}
                   className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-sm text-stone-700
                              focus:outline-none focus:ring-2 focus:ring-ink/15 resize-none" />
                 <div className="flex justify-end gap-2">
                   <button onClick={() => setEditingDesc(false)}
-                    className="px-3 py-1 text-xs text-stone-500 hover:text-stone-700">Hủy</button>
-                  <button onClick={saveDesc}
                     className="px-3 py-1.5 bg-ink text-white text-xs rounded-lg hover:bg-[#242424] flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Lưu
+                    <Check className="w-3 h-3" /> Xong
                   </button>
                 </div>
               </div>
             ) : (
               <div className={`group rounded-lg -mx-1 px-1 py-1 transition-colors ${canManage ? 'cursor-pointer hover:bg-stone-50' : ''}`}
-                onClick={() => canManage && (setDescDraft(project.description), setEditingDesc(true))}>
-                <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap break-words">{project.description || (canManage ? 'Thêm mô tả...' : '—')}</p>
+                onClick={() => canManage && setEditingDesc(true)}>
+                <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap break-words">{meta.description || (canManage ? 'Thêm mô tả...' : '—')}</p>
                 {canManage && (
                   <span className="text-[10px] text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
                     <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa
@@ -221,7 +232,7 @@ export default function ProjectDetailModal() {
                 <Crown className="w-3 h-3" /> Người phụ trách (PIC)
               </label>
               {canChangePic ? (
-                <Dropdown className="w-60" value={effectivePicId} onChange={handleChangePic}
+                <Dropdown className="w-60" value={meta.picUserId} onChange={uid => setMeta(m => ({ ...m, picUserId: uid }))}
                   options={orgMembers.map(m => ({
                     value: m.id, label: m.name,
                     hint: ROLE_LABELS[m.role] ?? m.role, avatar: m.avatar,
@@ -241,8 +252,8 @@ export default function ProjectDetailModal() {
               <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
                 <Calendar className="w-3 h-3" /> Ngày bắt đầu
               </label>
-              <input type="date" value={project.startDate} disabled={!canManage}
-                onChange={e => doUpdate({ startDate: e.target.value })}
+              <input type="date" value={meta.startDate} disabled={!canManage}
+                onChange={e => setMeta(m => ({ ...m, startDate: e.target.value }))}
                 className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm disabled:bg-stone-50 disabled:text-stone-400
                            focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
             </div>
@@ -364,8 +375,39 @@ export default function ProjectDetailModal() {
               )}
             </div>
           </div>
+
+          {/* #14: thanh Lưu metadata — chỉ áp khi bấm Lưu */}
+          {metaDirty && (
+            <div className="flex-shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-t border-hairline bg-amber-50/60">
+              <span className="text-xs font-semibold text-amber-700">Có thay đổi chưa lưu</span>
+              <div className="flex items-center gap-2">
+                <button onClick={resetMeta}
+                  className="px-3 py-1.5 text-xs font-semibold text-stone-500 hover:text-stone-700 rounded-lg hover:bg-stone-100 transition-colors">
+                  Hoàn tác
+                </button>
+                <button onClick={saveMeta}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-ink text-white rounded-lg hover:bg-[#242424] transition-colors">
+                  <Check className="w-3.5 h-3.5" /> Lưu
+                </button>
+              </div>
+            </div>
+          )}
         </motion.div>
       </motion.div>
+
+      {/* #14: xóa dự án cần nhập lý do → log vào activity workspace */}
+      {confirmDelete && (
+        <DeleteReasonDialog
+          title="Xóa dự án"
+          message={`Xóa dự án "${project.name}" cùng toàn bộ phase? Hành động này không thể hoàn tác.`}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={async (reason) => {
+            setConfirmDelete(false);
+            await deleteProject(project.id, reason);
+            closeProjectDetail();
+          }}
+        />
+      )}
     </AnimatePresence>
   );
 }

@@ -303,11 +303,11 @@ Lộ trình thay mock data trong `frontend/src/context/AppContext.tsx`:
 | `orgProjects` (filter local) | `GET /organizations/{orgId}/projects` |
 | `addProject` | `POST /organizations/{orgId}/projects` |
 | `updateProject(id, updates)` (Project Detail Modal) | `PATCH /projects/{id}` |
-| `deleteProject(id)` — FE xóa kèm phase blocks | `DELETE /projects/{id}` (BE cascade theo SCHEMA.md) |
+| `deleteProject(id, reason?)` — FE xóa kèm phase blocks | `DELETE /projects/{id}?reason=…` (#14: BE log "deleted project — lý do …" vào activity workspace; cascade phase theo SCHEMA.md) |
 | `orgPhaseBlocks` (filter local) | `GET /organizations/{orgId}/phase-blocks` |
 | `addPhaseBlock` | `POST /projects/{projectId}/phase-blocks` |
 | `updatePhaseBlock(id, updates)` | `PATCH /phase-blocks/{id}` hoặc endpoint con tương ứng (items/comments/attachments) |
-| `deletePhaseBlock` | `DELETE /phase-blocks/{id}` |
+| `deletePhaseBlock(id, reason?)` | `DELETE /phase-blocks/{id}?reason=…` (#14: BE log "deleted phase — lý do …" vào activity dự án) |
 | `buildDefaultChecklist/Outcomes` (types.ts) | `GET /templates/phase-tasks?phase=...` |
 | Workload (Team view) | Tính ở FE từ phase blocks; hoặc BE cấp `GET /organizations/{orgId}/members/workload` |
 

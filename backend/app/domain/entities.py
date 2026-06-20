@@ -105,14 +105,15 @@ class Attachment:
 
 @dataclass(slots=True)
 class ActivityEntry:
-    """Một dòng nhật ký. project_id luôn có (changelog dự án); phase_block_id
-    NULL với sự kiện cấp dự án (tạo/xóa phase) để còn giữ lại sau khi phase bị xóa."""
+    """Một dòng nhật ký. #14: org_id cho sự kiện cấp workspace (xóa dự án) — khi đó
+    project_id=None. phase_block_id NULL với sự kiện cấp dự án (tạo/xóa phase)."""
     id: UUID
-    project_id: UUID
     user_id: UUID
     action: str
     target: str
-    created_at: datetime
+    created_at: datetime | None = None
+    project_id: UUID | None = None
+    org_id: UUID | None = None
     phase_block_id: UUID | None = None
 
 

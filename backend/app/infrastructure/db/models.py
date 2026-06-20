@@ -219,13 +219,16 @@ class AttachmentModel(Base):
 
 
 class ActivityLogModel(Base):
-    """Nhật ký. project_id luôn có (changelog dự án). phase_block_id NULL với sự
-    kiện cấp dự án (tạo/xóa phase) và SET NULL khi phase bị xóa → vẫn giữ lịch sử."""
+    """Nhật ký. #14: org_id cho sự kiện cấp workspace (xóa dự án) — project_id SET NULL
+    khi dự án bị xóa để giữ lại lịch sử. phase_block_id SET NULL khi phase bị xóa."""
     __tablename__ = "activity_log"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), index=True
     )
     phase_block_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("phase_blocks.id", ondelete="SET NULL"), index=True

@@ -11,7 +11,7 @@ from app.infrastructure.db.models import ActivityLogModel
 
 def _to_entity(m: ActivityLogModel) -> ActivityEntry:
     return ActivityEntry(
-        id=m.id, project_id=m.project_id, user_id=m.user_id, action=m.action,
+        id=m.id, project_id=m.project_id, org_id=m.org_id, user_id=m.user_id, action=m.action,
         target=m.target, created_at=m.created_at, phase_block_id=m.phase_block_id,
     )
 
@@ -22,7 +22,8 @@ class SqlAlchemyActivityLogRepository(ActivityLogRepository):
 
     async def add(self, entry: ActivityEntry) -> ActivityEntry:
         m = ActivityLogModel(
-            id=entry.id, project_id=entry.project_id, phase_block_id=entry.phase_block_id,
+            id=entry.id, project_id=entry.project_id, org_id=entry.org_id,
+            phase_block_id=entry.phase_block_id,
             user_id=entry.user_id, action=entry.action, target=entry.target,
         )
         self._session.add(m)

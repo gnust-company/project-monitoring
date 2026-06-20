@@ -212,24 +212,28 @@ CREATE INDEX ix_attachments_outcome_item_id ON attachments(outcome_item_id);
 
 ### activity_log
 
-Một bảng phục vụ **2 changelog**: cấp phase (`WHERE phase_block_id = X`) và cấp dự án
-(`WHERE project_id = P`). `project_id` luôn có; `phase_block_id` NULL với sự kiện cấp dự
-án (tạo/xóa phase) và được `SET NULL` khi phase bị xóa → dòng "đã xóa phase Y" vẫn còn
-trong changelog dự án.
+Một bảng phục vụ **3 changelog**: cấp phase (`WHERE phase_block_id = X`), cấp dự án
+(`WHERE project_id = P`) và cấp workspace (`WHERE org_id = O`, #14). `phase_block_id`
+NULL với sự kiện cấp dự án (tạo/xóa phase) và `SET NULL` khi phase bị xóa → dòng "đã xóa
+phase Y" vẫn còn. `project_id` **nullable + SET NULL** (đổi từ CASCADE ở migration 0005):
+sự kiện "deleted project — lý do …" gắn `org_id`, `project_id=NULL` để bản ghi còn lại
+sau khi dự án bị xóa.
 
 ```sql
 CREATE TABLE activity_log (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id     UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  org_id         UUID REFERENCES organizations(id) ON DELETE CASCADE,  -- #14: sự kiện cấp workspace
+  project_id     UUID REFERENCES projects(id) ON DELETE SET NULL,      -- NULL = sự kiện cấp workspace
   phase_block_id UUID REFERENCES phase_blocks(id) ON DELETE SET NULL,  -- NULL = sự kiện cấp dự án
   user_id        UUID REFERENCES users(id) ON DELETE SET NULL,
-  action         VARCHAR(255) NOT NULL,        -- vd 'changed end date', 'created phase'
-  target         VARCHAR(255) NOT NULL DEFAULT '',  -- vd '2026-06-20 → 2026-06-24'
+  action         VARCHAR(255) NOT NULL,        -- vd 'changed end date', 'created phase', 'deleted project'
+  target         VARCHAR(255) NOT NULL DEFAULT '',  -- vd '2026-06-20 → 2026-06-24', '«tên» — lý do: …'
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_activity_project ON activity_log(project_id, created_at DESC);
 CREATE INDEX idx_activity_block   ON activity_log(phase_block_id, created_at DESC);
+CREATE INDEX idx_activity_org     ON activity_log(org_id, created_at DESC);
 ```
 
 ### phase_task_templates

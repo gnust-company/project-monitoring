@@ -2,7 +2,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 
 from app.application.use_cases.attachments import (
     AddFileAttachment,
@@ -128,10 +128,11 @@ async def update_block(
 
 @router.delete("/phase-blocks/{block_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_block(
-    block_id: UUID, access: BlockAccessDep, uc: Annotated[DeletePhaseBlock, Depends(delete_block_uc)]
+    block_id: UUID, access: BlockAccessDep, uc: Annotated[DeletePhaseBlock, Depends(delete_block_uc)],
+    reason: Annotated[str | None, Query(max_length=500)] = None,  # #14: lý do xóa → log
 ) -> None:
     try:
-        await uc.execute(block_id, access.user)
+        await uc.execute(block_id, access.user, reason)
     except PhaseBlockNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase block not found")
     except PhaseForbiddenError as e:

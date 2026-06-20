@@ -12,6 +12,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import Avatar from '../common/Avatar';
 import Dropdown from '../common/Dropdown';
+import DeleteReasonDialog from '../ui/DeleteReasonDialog';
 
 // Gom item theo role — luôn hiện đủ role chuẩn của phase (kèm ô thêm riêng),
 // thêm role lạ nếu có, cuối cùng là nhóm "Chung".
@@ -45,8 +46,13 @@ export default function PhaseDetailModal() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
-  const [descDraft, setDescDraft] = useState('');
+
+  // #14: gom mọi edit metadata vào 1 draft — chỉ áp khi bấm "Lưu" (không auto-apply).
+  const [meta, setMeta] = useState({
+    title: '', description: '', phaseType: 'PA' as DevPhase,
+    startDate: '', endDate: '', assignee: null as string | null, participants: [] as string[],
+  });
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Checklist inline edit
   const [editingCheckId, setEditingCheckId] = useState<string | null>(null);
@@ -78,6 +84,15 @@ export default function PhaseDetailModal() {
       setCommentText('');
       setCheckDrafts({});
       setOutcomeDrafts({});
+      setMeta({
+        title: selectedPhaseBlock.title,
+        description: selectedPhaseBlock.description ?? '',
+        phaseType: selectedPhaseBlock.phaseType,
+        startDate: selectedPhaseBlock.startDate,
+        endDate: selectedPhaseBlock.endDate,
+        assignee: selectedPhaseBlock.assignee ?? null,
+        participants: selectedPhaseBlock.participants,
+      });
       setEditingTitle(false);
       setEditingDesc(false);
       setEditingCheckId(null);
@@ -90,6 +105,7 @@ export default function PhaseDetailModal() {
       setOutcomeAttachId(null);
       setOLinkName('');
       setOLinkUrl('');
+      setConfirmDelete(false);
     }
   }, [selectedPhaseBlock?.id]);
 
@@ -103,9 +119,20 @@ export default function PhaseDetailModal() {
     setAttachments(selectedPhaseBlock.attachments);
   }, [selectedPhaseBlock]);
 
+  // #14: draft metadata bẩn (khác block gốc) → hiện thanh Lưu/Hoàn tác.
+  const metaDirty = !!selectedPhaseBlock && (
+    meta.title !== selectedPhaseBlock.title
+    || meta.description !== (selectedPhaseBlock.description ?? '')
+    || meta.phaseType !== selectedPhaseBlock.phaseType
+    || meta.startDate !== selectedPhaseBlock.startDate
+    || meta.endDate !== selectedPhaseBlock.endDate
+    || (meta.assignee ?? '') !== (selectedPhaseBlock.assignee ?? '')
+    || meta.participants.join(',') !== selectedPhaseBlock.participants.join(',')
+  );
+
   // #19: click backdrop KHÔNG đóng modal (chỉ nút X đóng). Esc chỉ đóng khi KHÔNG có
   // nội dung đang soạn — tránh lỡ tay mất title/desc/checklist/comment/link đang dở.
-  const hasDraft = editingTitle || editingDesc || editingCheckId !== null
+  const hasDraft = editingTitle || editingDesc || editingCheckId !== null || metaDirty
     || commentText.trim() !== '' || linkName.trim() !== '' || linkUrl.trim() !== ''
     || oLinkName.trim() !== '' || oLinkUrl.trim() !== '';
 
@@ -247,39 +274,11 @@ export default function PhaseDetailModal() {
     deletePhaseAttachment(selectedPhaseBlock.id, attId);
   };
 
-  const handleDelete = () => {
-    if (!selectedPhaseBlock) return;
-    deletePhaseBlock(selectedPhaseBlock.id);
-    closePhaseDetail();
-  };
-
-  const startEditTitle = () => {
-    if (!selectedPhaseBlock) return;
-    setTitleDraft(selectedPhaseBlock.title);
-    setEditingTitle(true);
-  };
-
-  const saveTitle = () => {
-    if (!selectedPhaseBlock || !titleDraft.trim()) return;
-    updatePhaseBlock(selectedPhaseBlock.id, { title: titleDraft.trim() });
-    setEditingTitle(false);
-  };
-
-  const startEditDesc = () => {
-    if (!selectedPhaseBlock) return;
-    setDescDraft(selectedPhaseBlock.description);
-    setEditingDesc(true);
-  };
-
-  const saveDesc = () => {
-    if (!selectedPhaseBlock) return;
-    updatePhaseBlock(selectedPhaseBlock.id, { description: descDraft.trim() });
-    setEditingDesc(false);
-  };
+  const handleDelete = () => setConfirmDelete(true);
 
   if (!selectedPhaseBlock || !phaseDetailOpen) return null;
 
-  const meta = PHASE_META[selectedPhaseBlock.phaseType];
+  const phaseMeta = PHASE_META[meta.phaseType]; // theo draft → phản ánh loại phase đang chọn
   const project = orgProjects.find(p => p.id === selectedPhaseBlock.projectId);
   const completedChecks = checklist.filter(c => c.done).length;
   const progressPct = checklist.length > 0 ? Math.round((completedChecks / checklist.length) * 100) : 0;
@@ -290,17 +289,44 @@ export default function PhaseDetailModal() {
     : 0;
   const orgMembers = selectedOrg?.members ?? [];
   // #11/#4: PIC phase = assignee (đổi được) hoặc người tạo. Chỉ PIC/superuser sửa metadata.
-  const phasePicId = selectedPhaseBlock.assignee ?? selectedPhaseBlock.createdBy;
+  // canEdit theo block GỐC (không mất quyền giữa chừng khi đang đổi PIC trong draft).
+  const origPicId = selectedPhaseBlock.assignee ?? selectedPhaseBlock.createdBy;
+  const phasePicId = meta.assignee ?? selectedPhaseBlock.createdBy; // hiển thị theo draft
   const picUser = getUserById(phasePicId);
-  const canEditPhase = !!currentUser && (currentUser.isSuperuser || phasePicId === currentUser.id);
-  const participants = selectedPhaseBlock.participants;
+  const canEditPhase = !!currentUser && (currentUser.isSuperuser || origPicId === currentUser.id);
+  const participants = meta.participants;
   const addableMembers = orgMembers.filter(m => !participants.includes(m.id));
 
-  const changePic = (uid: string) => updatePhaseBlock(selectedPhaseBlock.id, { assignee: uid });
+  // #14: control sửa → ghi vào draft, KHÔNG gọi API ngay; bấm "Lưu" mới áp dụng.
+  const changePic = (uid: string) => setMeta(m => ({ ...m, assignee: uid }));
   const addParticipant = (uid: string) =>
-    updatePhaseBlock(selectedPhaseBlock.id, { participants: Array.from(new Set([...participants, uid])) });
+    setMeta(m => ({ ...m, participants: Array.from(new Set([...m.participants, uid])) }));
   const removeParticipant = (uid: string) =>
-    updatePhaseBlock(selectedPhaseBlock.id, { participants: participants.filter(p => p !== uid) });
+    setMeta(m => ({ ...m, participants: m.participants.filter(p => p !== uid) }));
+
+  const resetMeta = () => setMeta({
+    title: selectedPhaseBlock.title,
+    description: selectedPhaseBlock.description ?? '',
+    phaseType: selectedPhaseBlock.phaseType,
+    startDate: selectedPhaseBlock.startDate,
+    endDate: selectedPhaseBlock.endDate,
+    assignee: selectedPhaseBlock.assignee ?? null,
+    participants: selectedPhaseBlock.participants,
+  });
+  const saveMeta = () => {
+    const b = selectedPhaseBlock;
+    const updates: Record<string, unknown> = {};
+    if (meta.title.trim() && meta.title !== b.title) updates.title = meta.title.trim();
+    if (meta.description !== (b.description ?? '')) updates.description = meta.description.trim();
+    if (meta.phaseType !== b.phaseType) updates.phaseType = meta.phaseType;
+    if (meta.startDate !== b.startDate) updates.startDate = meta.startDate;
+    if (meta.endDate !== b.endDate) updates.endDate = meta.endDate;
+    if ((meta.assignee ?? '') !== (b.assignee ?? '')) updates.assignee = meta.assignee;
+    if (meta.participants.join(',') !== b.participants.join(',')) updates.participants = meta.participants;
+    if (Object.keys(updates).length > 0) updatePhaseBlock(b.id, updates);
+    setEditingTitle(false);
+    setEditingDesc(false);
+  };
 
   return (
     <AnimatePresence>
@@ -319,15 +345,15 @@ export default function PhaseDetailModal() {
             <div className="flex items-center gap-2">
               {/* #17: PIC đổi được loại phase (tên đầy đủ); giữ nguyên checklist/outcome hiện có */}
               {canEditPhase ? (
-                <Dropdown className="w-52" value={selectedPhaseBlock.phaseType}
-                  onChange={v => updatePhaseBlock(selectedPhaseBlock.id, { phaseType: v as DevPhase })}
+                <Dropdown className="w-52" value={meta.phaseType}
+                  onChange={v => setMeta(m => ({ ...m, phaseType: v as DevPhase }))}
                   options={DEV_PHASES.map(p => ({
                     value: p, label: PHASE_META[p].fullLabel,
                     dotClass: PHASE_META[p].solid, labelClass: PHASE_META[p].color,
                   }))} />
               ) : (
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${meta.bg} ${meta.color} border ${meta.border}`}>
-                  {meta.fullLabel}
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${phaseMeta.bg} ${phaseMeta.color} border ${phaseMeta.border}`}>
+                  {phaseMeta.fullLabel}
                 </span>
               )}
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 border border-gray-200">
@@ -351,18 +377,18 @@ export default function PhaseDetailModal() {
             <div className="px-6 pb-3">
               {editingTitle ? (
                 <div className="flex items-center gap-2">
-                  <input type="text" value={titleDraft} onChange={e => setTitleDraft(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setEditingTitle(false); }}
+                  <input type="text" value={meta.title} onChange={e => setMeta(m => ({ ...m, title: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') setEditingTitle(false); if (e.key === 'Escape') setEditingTitle(false); }}
                     autoFocus
                     className="flex-1 text-xl font-bold text-slate-900 bg-gray-50 border border-slate-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-slate-500" />
-                  <button onClick={saveTitle} className="p-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800">
+                  <button onClick={() => setEditingTitle(false)} className="p-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800">
                     <Check className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
-                <div className="flex items-start gap-2 group cursor-pointer" onClick={startEditTitle}>
-                  <h2 className="text-xl font-bold text-slate-900 flex-1">{selectedPhaseBlock.title}</h2>
-                  <Pencil className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity mt-1.5 shrink-0" />
+                <div className="flex items-start gap-2 group cursor-pointer" onClick={() => canEditPhase && setEditingTitle(true)}>
+                  <h2 className="text-xl font-bold text-slate-900 flex-1">{meta.title}</h2>
+                  {canEditPhase && <Pencil className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity mt-1.5 shrink-0" />}
                 </div>
               )}
               <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
@@ -378,8 +404,8 @@ export default function PhaseDetailModal() {
                     <Calendar className="w-3 h-3" /> Bắt đầu
                   </label>
                   <input type="date"
-                    value={selectedPhaseBlock.startDate}
-                    onChange={e => updatePhaseBlock(selectedPhaseBlock.id, { startDate: e.target.value })}
+                    value={meta.startDate}
+                    onChange={e => setMeta(m => ({ ...m, startDate: e.target.value }))}
                     className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs
                                text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
                 </div>
@@ -388,8 +414,8 @@ export default function PhaseDetailModal() {
                     <Calendar className="w-3 h-3" /> Kết thúc
                   </label>
                   <input type="date"
-                    value={selectedPhaseBlock.endDate}
-                    onChange={e => updatePhaseBlock(selectedPhaseBlock.id, { endDate: e.target.value })}
+                    value={meta.endDate}
+                    onChange={e => setMeta(m => ({ ...m, endDate: e.target.value }))}
                     className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs
                                text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
                 </div>
@@ -400,38 +426,38 @@ export default function PhaseDetailModal() {
             <div className="px-6 pb-4">
               {editingDesc ? (
                 <div className="space-y-2">
-                  <textarea value={descDraft} onChange={e => setDescDraft(e.target.value)} rows={3} autoFocus
+                  <textarea value={meta.description} onChange={e => setMeta(m => ({ ...m, description: e.target.value }))} rows={3} autoFocus
                     onKeyDown={e => { if (e.key === 'Escape') setEditingDesc(false); }}
                     className="w-full px-3 py-2 bg-gray-50 border border-slate-300 rounded-lg text-sm text-gray-700
                                focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none" />
                   <div className="flex justify-end gap-2">
                     <button onClick={() => setEditingDesc(false)}
-                      className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700">Hủy</button>
-                    <button onClick={saveDesc}
                       className="px-3 py-1.5 bg-slate-900 text-white text-xs rounded-lg hover:bg-slate-800 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Lưu
+                      <Check className="w-3 h-3" /> Xong
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="group cursor-pointer rounded-lg -mx-1 px-1 py-1 hover:bg-gray-50 transition-colors"
-                  onClick={startEditDesc}>
-                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{selectedPhaseBlock.description || 'Thêm mô tả...'}</p>
-                  <span className="text-[10px] text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
-                    <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa
-                  </span>
+                <div className={`group rounded-lg -mx-1 px-1 py-1 transition-colors ${canEditPhase ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                  onClick={() => canEditPhase && setEditingDesc(true)}>
+                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{meta.description || 'Thêm mô tả...'}</p>
+                  {canEditPhase && (
+                    <span className="text-[10px] text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
+                      <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa
+                    </span>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Phase Info Card */}
             <div className="px-6 pb-4">
-              <div className={`${meta.bg} border ${meta.border} rounded-lg p-3`}>
+              <div className={`${phaseMeta.bg} border ${phaseMeta.border} rounded-lg p-3`}>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <HelpCircle className={`w-3.5 h-3.5 ${meta.color}`} />
-                  <span className={`text-xs font-semibold ${meta.color}`}>{meta.label}</span>
+                  <HelpCircle className={`w-3.5 h-3.5 ${phaseMeta.color}`} />
+                  <span className={`text-xs font-semibold ${phaseMeta.color}`}>{phaseMeta.label}</span>
                 </div>
-                <p className="text-xs text-gray-600">{meta.desc}</p>
+                <p className="text-xs text-gray-600">{phaseMeta.desc}</p>
               </div>
             </div>
 
@@ -465,10 +491,11 @@ export default function PhaseDetailModal() {
                     <Users className="w-3.5 h-3.5" /> Người tham gia
                   </span>
                   <div className="flex items-center">
-                    {participants.map(uid => {
+                    {participants.map((uid, idx) => {
                       const u = getUserById(uid);
                       return (
                         <div key={uid}
+                          style={{ zIndex: participants.length - idx }}
                           className="relative -ml-2 first:ml-0 transition-all duration-200 group-hover/parts:ml-0 group/member">
                           <Avatar name={u?.name} src={u?.avatar}
                             className="w-6 h-6 border-2 border-white ring-1 ring-gray-200 cursor-default" />
@@ -910,8 +937,39 @@ export default function PhaseDetailModal() {
               )}
             </div>
           </div>
+
+          {/* #14: thanh Lưu metadata — chỉ áp khi bấm Lưu (không auto-apply) */}
+          {metaDirty && (
+            <div className="flex-shrink-0 flex items-center justify-between gap-3 px-6 py-3 border-t border-gray-200 bg-amber-50/60">
+              <span className="text-xs font-semibold text-amber-700">Có thay đổi chưa lưu</span>
+              <div className="flex items-center gap-2">
+                <button onClick={resetMeta}
+                  className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+                  Hoàn tác
+                </button>
+                <button onClick={saveMeta}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors">
+                  <Check className="w-3.5 h-3.5" /> Lưu
+                </button>
+              </div>
+            </div>
+          )}
         </motion.div>
       </motion.div>
+
+      {/* #14: xóa phase cần nhập lý do → log vào activity dự án */}
+      {confirmDelete && (
+        <DeleteReasonDialog
+          title="Xóa phase"
+          message={`Xóa phase "${selectedPhaseBlock.title}"? Hành động này không thể hoàn tác.`}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={(reason) => {
+            deletePhaseBlock(selectedPhaseBlock.id, reason);
+            setConfirmDelete(false);
+            closePhaseDetail();
+          }}
+        />
+      )}
     </AnimatePresence>
   );
 }

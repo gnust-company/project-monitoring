@@ -10,8 +10,8 @@ from uuid import UUID, uuid4
 
 from app.application.authz import can_edit_project, effective_project_pic
 from app.application.notifications import NotificationService
-from app.application.ports import ProjectRepository
-from app.domain.entities import Membership, Project, User
+from app.application.ports import ActivityLogRepository, ProjectRepository
+from app.domain.entities import ActivityEntry, Membership, Project, User
 from app.domain.value_objects import ProjectStatus
 
 
@@ -105,12 +105,14 @@ class UpdateProject:
 
 
 class DeleteProject:
-    """Xóa project — chỉ PIC (hiệu dụng)/superuser (#11)."""
+    """Xóa project — chỉ PIC (hiệu dụng)/superuser (#11). #14: ghi changelog cấp
+    workspace (kèm lý do) trước khi xóa để bản ghi còn lại."""
 
-    def __init__(self, projects: ProjectRepository) -> None:
+    def __init__(self, projects: ProjectRepository, activity: ActivityLogRepository) -> None:
         self._projects = projects
+        self._activity = activity
 
-    async def execute(self, project_id: UUID, actor: User) -> None:
+    async def execute(self, project_id: UUID, actor: User, reason: str | None = None) -> None:
         project = await self._projects.get(project_id)
         if project is None:
             raise ProjectNotFoundError(str(project_id))
@@ -118,6 +120,11 @@ class DeleteProject:
             raise ProjectForbiddenError(
                 "Chỉ PIC (hoặc admin) mới được xóa dự án này"
             )
+        target = f"{project.name} — lý do: {reason.strip()}" if reason and reason.strip() else project.name
+        await self._activity.add(ActivityEntry(
+            id=uuid4(), org_id=project.org_id, project_id=None, user_id=actor.id,
+            action="deleted project", target=target, created_at=None,
+        ))
         await self._projects.delete(project_id)
 
 
