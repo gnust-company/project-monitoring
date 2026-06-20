@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { PHASE_META, DEV_PHASES } from '../../types';
 import type { PhaseBlock } from '../../types';
 import { getUserById } from '../../data/mockData';
-import { Search, X, MousePointer2, Hand, SquarePen } from 'lucide-react';
+import { Search, X, MousePointer2, Hand, SquarePen, Eye, Save, RotateCcw } from 'lucide-react';
 import {
   format, parseISO, differenceInDays, addDays, addMonths,
   eachWeekOfInterval, eachMonthOfInterval, startOfQuarter, getQuarter
@@ -74,7 +74,7 @@ function assignRows(pbs: PhaseBlock[]): Map<string, number> {
 // ─── Component ──────────────────────────────────────────────────────
 export default function PipelineTimeline() {
   const {
-    orgProjects, phaseBlocks, searchQuery, zoomLevel,
+    orgProjects, phaseBlocks, searchQuery, zoomLevel, selectedOrgId,
     setSearchQuery, setZoomLevel,
     openPhaseDetail, openCreatePhase,
     openProjectDetail, updatePhaseBlock,
@@ -85,8 +85,14 @@ export default function PipelineTimeline() {
   // Tooltip hover: bám theo tọa độ con trỏ (viewport)
   const [hoverInfo, setHoverInfo] = useState<{ id: string; x: number; y: number } | null>(null);
   const [manualRows, setManualRows] = useState<Map<string, number>>(new Map());
-  // 'view': kéo chuột trên vùng trống = pan lịch; 'edit': kéo ngang trên hàng dự án = tạo phase
-  const [boardMode, setBoardMode] = useState<'view' | 'edit'>('view');
+  // #18: 3 chế độ — 'readonly': chỉ pan + click mở chi tiết (không kéo/giãn/tạo);
+  // 'layout': kéo/giãn phase (staged → cần bấm Lưu); 'create': kéo ngang để tạo phase.
+  const [boardMode, setBoardMode] = useState<'readonly' | 'layout' | 'create'>('readonly');
+
+  // #18: staged-save — kéo/giãn ghi vào draft (không gọi API ngay). Bấm "Lưu" mới
+  // flush qua updatePhaseBlock; "Hủy" bỏ draft. start/end + displayRow của block đổi chỗ.
+  const [pendingLayout, setPendingLayout] = useState<Map<string, { startDate: string; endDate: string; displayRow: number }>>(new Map());
+  const [savingLayout, setSavingLayout] = useState(false);
 
   // Drag preview state (di chuyển hoặc resize block)
   const [dragPreview, setDragPreview] = useState<{
@@ -244,9 +250,13 @@ export default function PipelineTimeline() {
   const todayPos = getDatePos(today);
 
   // ─── Helper: get pbs for a project ───────────────────────
+  // #18: áp draft kéo/giãn (pendingLayout) lên ngày để render khi chưa Lưu.
   const getFilteredPbs = useCallback((projectId: string) => {
-    return phaseBlocks.filter(pb => pb.projectId === projectId);
-  }, [phaseBlocks]);
+    return phaseBlocks.filter(pb => pb.projectId === projectId).map(pb => {
+      const pend = pendingLayout.get(pb.id);
+      return pend ? { ...pb, startDate: pend.startDate, endDate: pend.endDate } : pb;
+    });
+  }, [phaseBlocks, pendingLayout]);
 
   // ─── Row indices (auto + lưu + manual) ─────────────────────────────
   // Ưu tiên: override trong session (manualRows, đang kéo) > displayRow đã lưu
@@ -363,32 +373,62 @@ export default function PipelineTimeline() {
     return () => right.removeEventListener('scroll', onScroll);
   }, []);
 
-  // ─── Commit layout sau khi kéo/resize ─────────────────────────────
+  // ─── Commit layout sau khi kéo/resize → ghi vào DRAFT (#18) ───────
+  // KHÔNG gọi API ngay: chỉ ghi pendingLayout (ngày của block kéo + displayRow của
+  // mọi block đổi hàng) + manualRows để hiển thị. Bấm "Lưu" mới flush qua API.
   const commitLayout = useCallback((projectId: string, draggedId: string) => {
     const currentLayout = layoutMapRef.current;
     const pbs = getFilteredPbs(projectId);
-    const dragged = pbs.find(p => p.id === draggedId);
-    const draggedPos = currentLayout.get(draggedId);
-    // Chỉ block được kéo mới đổi ngày — các block khác giữ nguyên lịch
-    if (dragged && draggedPos &&
-        (draggedPos.startDate !== dragged.startDate || draggedPos.endDate !== dragged.endDate)) {
-      updatePhaseBlock(draggedId, { startDate: draggedPos.startDate, endDate: draggedPos.endDate });
-    }
-    // #bug A/B: lưu displayRow cho mọi block đổi hàng → giữ bố cục qua reload.
-    const rowUpdates: Array<[string, number]> = [];
+    const entries: Array<[string, { startDate: string; endDate: string; displayRow: number }]> = [];
     for (const pb of pbs) {
       const pos = currentLayout.get(pb.id);
-      if (pos && pb.displayRow !== pos.row) rowUpdates.push([pb.id, pos.row]);
+      if (!pos) continue;
+      const datesChanged = pb.id === draggedId &&
+        (pos.startDate !== pb.startDate || pos.endDate !== pb.endDate);
+      const rowChanged = pb.displayRow !== pos.row;
+      if (datesChanged || rowChanged) {
+        entries.push([pb.id, { startDate: pos.startDate, endDate: pos.endDate, displayRow: pos.row }]);
+      }
     }
-    if (rowUpdates.length > 0) {
-      setManualRows(prev => {
-        const next = new Map(prev);
-        for (const [id, row] of rowUpdates) next.set(id, row);
-        return next;
-      });
-      for (const [id, row] of rowUpdates) updatePhaseBlock(id, { displayRow: row });
-    }
-  }, [getFilteredPbs, updatePhaseBlock]);
+    if (entries.length === 0) return;
+    setManualRows(prev => {
+      const next = new Map(prev);
+      for (const [id, e] of entries) next.set(id, e.displayRow);
+      return next;
+    });
+    setPendingLayout(prev => {
+      const next = new Map(prev);
+      for (const [id, e] of entries) next.set(id, e);
+      return next;
+    });
+  }, [getFilteredPbs]);
+
+  // #18: Lưu tất cả draft kéo/giãn qua API (tái dùng updatePhaseBlock — optimistic +
+  // sync ngày bắt đầu dự án). Lỗi giữ pending để thử lại.
+  const saveLayout = useCallback(async () => {
+    const entries = Array.from(pendingLayout.entries());
+    if (entries.length === 0) return;
+    setSavingLayout(true);
+    try {
+      for (const [id, e] of entries) {
+        await updatePhaseBlock(id, { startDate: e.startDate, endDate: e.endDate, displayRow: e.displayRow });
+      }
+      setPendingLayout(new Map());
+      setManualRows(new Map());
+    } catch { /* giữ lại draft để user thử lại */ }
+    finally { setSavingLayout(false); }
+  }, [pendingLayout, updatePhaseBlock]);
+
+  const discardLayout = useCallback(() => {
+    setPendingLayout(new Map());
+    setManualRows(new Map());
+  }, []);
+
+  // #18: đổi workspace → bỏ draft kéo/giãn đang treo (tránh áp nhầm sang org khác).
+  useEffect(() => {
+    setPendingLayout(new Map());
+    setManualRows(new Map());
+  }, [selectedOrgId]);
 
   // ─── Board mousedown: pan (kéo dọc) hoặc tạo phase (kéo ngang) ────
   const handleBoardMouseDown = useCallback((e: React.MouseEvent) => {
@@ -431,8 +471,8 @@ export default function PipelineTimeline() {
 
       if (mode === 'pending') {
         if (Math.abs(dx) <= DRAG_THRESHOLD && Math.abs(dy) <= DRAG_THRESHOLD) return;
-        // Chế độ Xem: luôn pan. Chế độ Tạo phase: kéo ngang trong hàng dự án → tạo, còn lại → pan
-        mode = boardMode === 'edit' && targetProject && Math.abs(dx) >= Math.abs(dy) ? 'create' : 'pan';
+        // Chỉ chế độ "Tạo phase" mới kéo ngang trong hàng dự án để tạo; còn lại pan.
+        mode = boardMode === 'create' && targetProject && Math.abs(dx) >= Math.abs(dy) ? 'create' : 'pan';
         if (mode === 'pan') board.style.cursor = 'grabbing';
       }
 
@@ -482,6 +522,19 @@ export default function PipelineTimeline() {
   const handleBlockMouseDown = useCallback((e: React.MouseEvent, pb: PhaseBlock, projectId: string) => {
     e.stopPropagation();
     e.preventDefault();
+
+    // #18: ngoài chế độ "Sắp xếp" → không kéo/giãn, chỉ click mở chi tiết.
+    if (boardMode !== 'layout') {
+      const sx = e.clientX, sy = e.clientY;
+      const up = (ev: MouseEvent) => {
+        window.removeEventListener('mouseup', up);
+        if (Math.abs(ev.clientX - sx) < DRAG_THRESHOLD && Math.abs(ev.clientY - sy) < DRAG_THRESHOLD) {
+          openPhaseDetail(pb.id);
+        }
+      };
+      window.addEventListener('mouseup', up);
+      return;
+    }
 
     const startX = e.clientX;
     const startY = e.clientY;
@@ -570,7 +623,7 @@ export default function PipelineTimeline() {
 
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
-  }, [getDatePos, getPosDate, baseRowIndices, projectRowData, commitLayout, openPhaseDetail]);
+  }, [getDatePos, getPosDate, baseRowIndices, projectRowData, commitLayout, openPhaseDetail, boardMode]);
 
   // ─── Resize 2 đầu block ───────────────────────────────────────────
   const handleResizeMouseDown = useCallback((
@@ -578,6 +631,7 @@ export default function PipelineTimeline() {
   ) => {
     e.stopPropagation();
     e.preventDefault();
+    if (boardMode !== 'layout') return; // #18: chỉ giãn được ở chế độ "Sắp xếp"
 
     const startX = e.clientX;
     const row = baseRowIndices.get(pb.id) ?? 0;
@@ -629,7 +683,7 @@ export default function PipelineTimeline() {
 
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
-  }, [getDatePos, getPosDate, baseRowIndices, commitLayout]);
+  }, [getDatePos, getPosDate, baseRowIndices, commitLayout, boardMode]);
 
   // ─── Scroll to today ──────────────────────────────────────────────
   const hasScrolled = useRef(false);
@@ -673,7 +727,9 @@ export default function PipelineTimeline() {
           <div className="flex items-center gap-2">
             <span className="hidden lg:flex items-center gap-1.5 text-[11px] text-stone-400 font-light">
               <MousePointer2 className="w-3 h-3" />
-              {boardMode === 'edit' ? 'Kéo thả trên hàng dự án để tạo phase' : 'Kéo chuột để di chuyển lịch'}
+              {boardMode === 'create' ? 'Kéo ngang trên hàng dự án để tạo phase'
+                : boardMode === 'layout' ? 'Kéo/giãn phase — bấm Lưu để áp dụng'
+                : 'Kéo chuột để di chuyển lịch'}
             </span>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
@@ -692,18 +748,24 @@ export default function PipelineTimeline() {
             </div>
             {/* #15: bộ lọc người + khoảng thời gian (gộp 1 nút để gọn toolbar) */}
             <FilterPopover />
-            {/* Chế độ tương tác: Xem (pan) / Tạo phase (kéo để tạo) */}
+            {/* Chế độ tương tác: Chỉ xem (pan) / Sắp xếp (kéo-giãn) / Tạo phase (#18) */}
             <div className="flex items-center bg-stone-100 rounded-lg p-0.5">
-              <button onClick={() => setBoardMode('view')}
-                title="Chế độ xem — kéo chuột để di chuyển lịch"
+              <button onClick={() => setBoardMode('readonly')}
+                title="Chỉ xem — chỉ di chuyển lịch, không kéo/giãn/tạo phase"
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors
-                  ${boardMode === 'view' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
-                <Hand className="w-3.5 h-3.5" /> Xem
+                  ${boardMode === 'readonly' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+                <Eye className="w-3.5 h-3.5" /> Chỉ xem
               </button>
-              <button onClick={() => setBoardMode('edit')}
-                title="Chế độ tạo phase — kéo ngang trên hàng dự án để tạo phase"
+              <button onClick={() => setBoardMode('layout')}
+                title="Sắp xếp — kéo/giãn phase rồi bấm Lưu để áp dụng"
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors
-                  ${boardMode === 'edit' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+                  ${boardMode === 'layout' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+                <Hand className="w-3.5 h-3.5" /> Sắp xếp
+              </button>
+              <button onClick={() => setBoardMode('create')}
+                title="Tạo phase — kéo ngang trên hàng dự án để tạo phase"
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors
+                  ${boardMode === 'create' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
                 <SquarePen className="w-3.5 h-3.5" /> Tạo phase
               </button>
             </div>
@@ -770,7 +832,7 @@ export default function PipelineTimeline() {
 
         {/* Right - Timeline scrollable area */}
         <div ref={boardRef}
-          className={`flex-1 overflow-auto relative select-none ${boardMode === 'edit' ? 'cursor-crosshair' : 'cursor-grab'}`}
+          className={`flex-1 overflow-auto relative select-none ${boardMode === 'create' ? 'cursor-crosshair' : 'cursor-grab'}`}
           onMouseDown={handleBoardMouseDown}>
           <div className="relative min-h-full" style={{ width: totalWidth + 200 }}>
             {/* Sticky header: column labels only — z-20 covers blocks */}
@@ -896,17 +958,19 @@ export default function PipelineTimeline() {
                         <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/[0.06] rounded-b-lg overflow-hidden">
                           <div className={`h-full ${meta.solid} transition-all`} style={{ width: `${pct}%` }} />
                         </div>
-                        {/* Resize handles */}
-                        <div
-                          className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                          onMouseDown={e => handleResizeMouseDown(e, pb, project.id, 'left')}>
-                          <div className="w-1 h-5 rounded-full bg-ink/30" />
-                        </div>
-                        <div
-                          className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                          onMouseDown={e => handleResizeMouseDown(e, pb, project.id, 'right')}>
-                          <div className="w-1 h-5 rounded-full bg-ink/30" />
-                        </div>
+                        {/* Resize handles — chỉ ở chế độ "Sắp xếp" (#18) */}
+                        {boardMode === 'layout' && (<>
+                          <div
+                            className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            onMouseDown={e => handleResizeMouseDown(e, pb, project.id, 'left')}>
+                            <div className="w-1 h-5 rounded-full bg-ink/30" />
+                          </div>
+                          <div
+                            className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                            onMouseDown={e => handleResizeMouseDown(e, pb, project.id, 'right')}>
+                            <div className="w-1 h-5 rounded-full bg-ink/30" />
+                          </div>
+                        </>)}
                       </div>
                     );
                   })}
@@ -933,6 +997,29 @@ export default function PipelineTimeline() {
             })}
           </div>
         </div>
+
+        {/* #18: thanh draft kéo/giãn — bấm Lưu mới áp dụng, Hủy để hoàn tác */}
+        {pendingLayout.size > 0 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3
+                          bg-surface-dark text-white rounded-xl shadow-xl shadow-black/20 pl-4 pr-2 py-2
+                          animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <span className="text-xs font-semibold whitespace-nowrap">
+              {pendingLayout.size} thay đổi chưa lưu
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button onClick={discardLayout} disabled={savingLayout}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg
+                           text-white/80 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-40">
+                <RotateCcw className="w-3.5 h-3.5" /> Hủy
+              </button>
+              <button onClick={saveLayout} disabled={savingLayout}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg
+                           bg-white text-ink hover:bg-stone-100 transition-colors disabled:opacity-60">
+                <Save className="w-3.5 h-3.5" /> {savingLayout ? 'Đang lưu…' : 'Lưu'}
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
 
