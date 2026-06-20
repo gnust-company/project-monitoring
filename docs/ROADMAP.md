@@ -18,13 +18,13 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | 1 | #4, #6, #16, #19, #17(phần bỏ viết tắt) | ✅ Xong (#17 phần "cho sửa" còn ở Wave 3) |
 | 2 | #5, #11, #13, #20 | ✅ Xong |
 | 3 | #10, #9, #8, #12, #17 | ✅ Xong |
-| 4 | #15, #25, #23 | ✅ Xong · còn #14, #18 (staged-save) ⬜ |
+| 4 | #15, #25, #23, #14, #18 | ✅ Xong |
 | 5 | #21, #22, #24, #26 | ⬜ Chưa bắt đầu (issue mới từ user) |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
-> **Trạng thái GitHub**: #8, #9, #10, #12, #15, #17, #23, #25 đã đóng (2026-06-20).
-> Còn OPEN: #14, #18 (staged-save) + Wave 5 (#21, #22, #24, #26).
+> **Trạng thái GitHub**: #8, #9, #10, #12, #14, #15, #17, #18, #23, #25 đã đóng (2026-06-20).
+> Còn OPEN: Wave 5 (#21, #22, #24, #26).
 
 ---
 
@@ -74,10 +74,12 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
   - Nén hàng (row compaction) ở `layoutMap` + `rowCount`: chỉ tính block trong tầm nhìn, remap row về liên tục `0,1,2…`; không dồn khi đang kéo (thả tay mới dồn). Kèm animation 280ms khi đổi filter/zoom.
 - [x] [#23 — Pipeline: default view kéo về hôm nay](https://github.com/gnust-company/project-monitoring/issues/23)
   - Đã có sẵn: lần load đầu/đổi zoom tự scroll về `todayPos` (`hasScrolled` ref ở PipelineTimeline).
-- [ ] [#14 — Nút Save cho mọi edit + lý do & log khi xóa](https://github.com/gnust-company/project-monitoring/issues/14)
-  - Edit metadata → draft + Save; xóa cần lý do; log vào thành phần cha (phase→project, project→workspace).
-- [ ] [#18 — View mode: kéo-thả cần Save mới áp dụng](https://github.com/gnust-company/project-monitoring/issues/18) *(dùng chung cơ chế staged-save với #14)*
-  - Kéo/resize/tạo phase là draft; thanh "N thay đổi chưa lưu — Lưu / Hủy".
+- [x] [#14 — Nút Save cho mọi edit + lý do & log khi xóa](https://github.com/gnust-company/project-monitoring/issues/14)
+  - Modal phase/project: gom mọi edit metadata (title, desc, dates, phaseType, PIC, participants) vào 1 draft `meta`, chỉ áp khi bấm Lưu (bỏ auto-apply).
+  - `DeleteReasonDialog`: xóa phase/project bắt nhập lý do (≥3 ký tự). BE log activity vào cha kèm lý do (phase→project, project→workspace) trước khi xóa.
+  - Migration 0005: `activity_log.org_id` (FK orgs CASCADE, indexed) + `project_id` → nullable/SET NULL để giữ log workspace sau khi xóa dự án. UI xem changelog workspace để [#26].
+- [x] [#18 — View mode: kéo-thả cần Save mới áp dụng](https://github.com/gnust-company/project-monitoring/issues/18) *(dùng chung cơ chế staged-save với #14)*
+  - Pipeline 3 mode: **Chỉ xem** (chỉ pan) · **Sắp xếp** (kéo/giãn) · **Tạo phase**. Kéo/resize là draft trong `pendingLayout`; thanh "N thay đổi chưa lưu — Lưu / Hủy", Lưu mới persist.
 
 ## Wave 5 — Issue mới từ user (#21–#26)
 
