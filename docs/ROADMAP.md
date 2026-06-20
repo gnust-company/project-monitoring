@@ -23,8 +23,8 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
-> **Lưu ý**: nhiều issue đã hoàn thành & commit nhưng **vẫn OPEN trên GitHub**
-> (#8, #9, #10, #12, #15, #17 + #25). Cần đóng thủ công hoặc qua commit `Closes #N`.
+> **Trạng thái GitHub**: #8, #9, #10, #12, #15, #17, #23, #25 đã đóng (2026-06-20).
+> Còn OPEN: #14, #18 (staged-save) + Wave 5 (#21, #22, #24, #26).
 
 ---
 
