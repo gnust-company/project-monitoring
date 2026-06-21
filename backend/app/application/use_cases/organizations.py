@@ -25,8 +25,8 @@ class CreateOrganization:
     def __init__(self, orgs: OrganizationRepository) -> None:
         self._orgs = orgs
 
-    async def execute(self, name: str, creator_id: UUID) -> Organization:
-        org = await self._orgs.create(Organization(id=uuid4(), name=name))
+    async def execute(self, name: str, creator_id: UUID, description: str = "") -> Organization:
+        org = await self._orgs.create(Organization(id=uuid4(), name=name, description=description))
         await self._orgs.add_member(org.id, creator_id, WorkspaceRole.OWNER)
         org.member_ids = [creator_id]
         return org
@@ -55,11 +55,14 @@ class GetOrganization:
 
 
 class RenameOrganization:
+    """#26: cập nhật name và/hoặc description workspace."""
     def __init__(self, orgs: OrganizationRepository) -> None:
         self._orgs = orgs
 
-    async def execute(self, org_id: UUID, name: str) -> Organization:
-        org = await self._orgs.rename(org_id, name)
+    async def execute(
+        self, org_id: UUID, name: str | None = None, description: str | None = None
+    ) -> Organization:
+        org = await self._orgs.update(org_id, name, description)
         if org is None:
             raise OrgNotFoundError(str(org_id))
         return org

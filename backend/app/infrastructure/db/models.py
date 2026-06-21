@@ -62,6 +62,7 @@ class OrganizationModel(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")  # #26: mô tả workspace
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     members: Mapped[list["OrganizationMemberModel"]] = relationship(back_populates="organization")

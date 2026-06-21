@@ -80,8 +80,9 @@ class GetProject:
 
 
 class CreateProject:
-    def __init__(self, projects: ProjectRepository) -> None:
+    def __init__(self, projects: ProjectRepository, activity: ActivityLogRepository) -> None:
         self._projects = projects
+        self._activity = activity
 
     async def execute(self, data: CreateProjectInput) -> Project:
         project = Project(
@@ -90,14 +91,22 @@ class CreateProject:
             pic_user_id=data.pic_user_id or data.created_by,
             target_date=data.target_date, progress=0,
         )
-        return await self._projects.create(project)
+        created = await self._projects.create(project)
+        # #26: log cấp workspace (project_id=None để chỉ hiện ở nhật ký Overview,
+        # không lẫn vào feed vận hành Dashboard — giống "deleted project").
+        await self._activity.add(ActivityEntry(
+            id=uuid4(), org_id=created.org_id, project_id=None, user_id=data.created_by,
+            action="created project", target=created.name, created_at=None,
+        ))
+        return created
 
 
 class UpdateProject:
     """Sửa metadata project — chỉ PIC (hiệu dụng)/superuser (#11)."""
 
-    def __init__(self, projects: ProjectRepository) -> None:
+    def __init__(self, projects: ProjectRepository, activity: ActivityLogRepository) -> None:
         self._projects = projects
+        self._activity = activity
 
     async def execute(self, project_id: UUID, payload: dict[str, Any], actor: User) -> Project:
         project = await self._projects.get(project_id)
@@ -107,7 +116,16 @@ class UpdateProject:
             raise ProjectForbiddenError(
                 "Chỉ PIC (hoặc admin) mới được sửa dự án này"
             )
-        return await self._projects.update(_apply_updates(project, payload))
+        old_name = project.name
+        updated = await self._projects.update(_apply_updates(project, payload))
+        # #26: đổi tên dự án là sự kiện cấp workspace → log vào nhật ký Overview
+        # (project_id=None để không lẫn vào feed vận hành Dashboard).
+        if "name" in payload and updated.name != old_name:
+            await self._activity.add(ActivityEntry(
+                id=uuid4(), org_id=updated.org_id, project_id=None, user_id=actor.id,
+                action="renamed project", target=f"{old_name} → {updated.name}", created_at=None,
+            ))
+        return updated
 
 
 class DeleteProject:

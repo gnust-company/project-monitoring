@@ -183,3 +183,46 @@ async def test_owner_deletes_project_directly(client: AsyncClient, make_user):
     resp = await client.delete(f"{API}/projects/{proj['id']}", headers=auth(o_token))
     assert resp.status_code == 204
     assert (await client.get(f"{API}/projects/{proj['id']}", headers=auth(o_token))).status_code == 404
+
+
+# ─── #26: mô tả workspace + changelog cấp workspace ──────────────────
+async def test_org_description_persists(client: AsyncClient, make_user):
+    token, _ = await make_user("desc@hub.io")
+    resp = await client.post(f"{API}/organizations",
+                             json={"name": "WS", "description": "Mô tả\nnhiều dòng"},
+                             headers=auth(token))
+    assert resp.status_code == 201, resp.text
+    org = resp.json()
+    assert org["description"] == "Mô tả\nnhiều dòng"
+
+    # GET trả lại description
+    detail = await client.get(f"{API}/organizations/{org['id']}", headers=auth(token))
+    assert detail.json()["description"] == "Mô tả\nnhiều dòng"
+
+    # PATCH chỉ description, giữ nguyên name
+    patched = await client.patch(f"{API}/organizations/{org['id']}",
+                                 json={"description": "Mới"}, headers=auth(token))
+    assert patched.status_code == 200
+    assert patched.json()["description"] == "Mới"
+    assert patched.json()["name"] == "WS"
+
+
+async def test_dashboard_feed_logs_project_lifecycle(client: AsyncClient, make_user):
+    o_token, _ = await make_user("act@hub.io")
+    org = await _make_org(client, o_token)
+    proj = await _make_project(client, o_token, org["id"])
+
+    # tạo dự án → feed Dashboard có "created project"
+    after_create = await client.get(f"{API}/organizations/{org['id']}/recent-activity", headers=auth(o_token))
+    assert after_create.status_code == 200
+    assert "created project" in [a["action"] for a in after_create.json()]
+
+    # đổi tên dự án → log "renamed project"
+    await client.patch(f"{API}/projects/{proj['id']}", json={"name": "Đổi tên"}, headers=auth(o_token))
+    after_rename = await client.get(f"{API}/organizations/{org['id']}/recent-activity", headers=auth(o_token))
+    assert "renamed project" in [a["action"] for a in after_rename.json()]
+
+    # xóa dự án kèm lý do → log "deleted project" (project_id=NULL nhưng org_id còn)
+    await client.delete(f"{API}/projects/{proj['id']}?reason=dọn dẹp", headers=auth(o_token))
+    after_delete = await client.get(f"{API}/organizations/{org['id']}/recent-activity", headers=auth(o_token))
+    assert "deleted project" in [a["action"] for a in after_delete.json()]

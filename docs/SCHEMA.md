@@ -72,9 +72,10 @@ CREATE TABLE users (
 
 ```sql
 CREATE TABLE organizations (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       VARCHAR(255) NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL DEFAULT '',   -- #26: mô tả workspace (migration 0007)
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE organization_members (

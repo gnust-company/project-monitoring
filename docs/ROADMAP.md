@@ -93,8 +93,10 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 - [x] [#24 — Rà soát changelog (ẩn UUID, format dễ đọc)](https://github.com/gnust-company/project-monitoring/issues/24)
   - Helper chung `lib/formatActivity.ts` biến `(action, target)` thô của BE → câu tiếng Việt: dịch hành động, UUID→tên người (`getUserById`), ISO date→dd/MM/yyyy, PhaseTag code→nhãn (`PHASE_TAG_META`); lớp phòng vệ quét & thay mọi UUID lẻ.
   - Tên người gộp vào động từ ("đã thêm người tham gia Nguyễn A") để bỏ dấu "—" lửng. Áp dụng ở PhaseDetailModal, ProjectDetailModal, DashboardView (recent activity). FE-only, không đụng schema/BE.
-- [ ] [#26 — Mở rộng người dùng: phase tùy biến theo workspace](https://github.com/gnust-company/project-monitoring/issues/26) ⚠️ *lớn — đổi schema*
-  - Phase (tên/màu/role/checklist/outcome) thành **default sửa được** theo workspace (không hard-code 7 phase). Tạo workspace 2 step (mời thành viên + tùy chỉnh phase); view Overview (description + changelog workspace-level); cảnh báo block khi xóa phase đang dùng.
+- [ ] [#26 — Mở rộng người dùng](https://github.com/gnust-company/project-monitoring/issues/26) ⚠️ *lớn — chia 3 mảng C→A→B (mỗi mảng 1 commit)*
+  - **Mảng C (xong một phần — changelog gộp Dashboard)**: thêm cột `organizations.description` (migration 0007, backend + sửa trong Settings; chưa hiển thị riêng — user tạm để kệ). Bỏ ý tưởng view Overview → **gộp toàn bộ changelog vào Dashboard "Hoạt động gần đây"** qua `GET /organizations/{id}/recent-activity` (union: sự kiện vận hành thuộc dự án của org + vòng đời dự án). Sửa bug feed Dashboard cũ chỉ đọc `activityLog` nạp lười (rỗng tới khi mở modal) → giờ fetch từ server. Bổ sung log **created/renamed/deleted project** ở cấp workspace.
+  - **Mảng A (chưa làm)**: phase động hoàn toàn theo workspace (thêm/xóa/đổi tên/màu/role/checklist) — thay enum `DevPhase` bằng bảng `phase_definitions` per-org; FE `PHASE_META` động; cảnh báo block khi xóa phase đang dùng.
+  - **Mảng B (chưa làm)**: wizard tạo workspace 2 bước; mời thành viên cần accept/từ chối + revoke; rời workspace (owner rời phải chuyển quyền chủ, người mới nhận thông báo).
 
 ---
 

@@ -276,12 +276,12 @@ def get_project_uc(repo: ProjectRepoDep) -> GetProject:
     return GetProject(repo)
 
 
-def create_project_uc(repo: ProjectRepoDep) -> CreateProject:
-    return CreateProject(repo)
+def create_project_uc(repo: ProjectRepoDep, activity: ActivityRepoDep) -> CreateProject:
+    return CreateProject(repo, activity)
 
 
-def update_project_uc(repo: ProjectRepoDep) -> UpdateProject:
-    return UpdateProject(repo)
+def update_project_uc(repo: ProjectRepoDep, activity: ActivityRepoDep) -> UpdateProject:
+    return UpdateProject(repo, activity)
 
 
 def delete_project_uc(

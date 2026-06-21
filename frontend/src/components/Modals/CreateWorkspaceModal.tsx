@@ -22,7 +22,7 @@ export default function CreateWorkspaceModal() {
     setBusy(true);
     setError(null);
     try {
-      await addOrganization(name.trim());
+      await addOrganization(name.trim(), description.trim());
       resetAndClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tạo workspace thất bại');

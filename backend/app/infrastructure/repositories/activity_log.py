@@ -1,12 +1,12 @@
 """SqlAlchemy cài đặt ActivityLogRepository."""
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.ports import ActivityLogRepository
 from app.domain.entities import ActivityEntry
-from app.infrastructure.db.models import ActivityLogModel
+from app.infrastructure.db.models import ActivityLogModel, ProjectModel
 
 
 def _to_entity(m: ActivityLogModel) -> ActivityEntry:
@@ -41,5 +41,18 @@ class SqlAlchemyActivityLogRepository(ActivityLogRepository):
         rows = await self._session.scalars(
             select(ActivityLogModel).where(ActivityLogModel.project_id == project_id)
             .order_by(ActivityLogModel.created_at.desc())
+        )
+        return [_to_entity(m) for m in rows]
+
+    async def list_recent_for_org(self, org_id: UUID, limit: int = 50) -> list[ActivityEntry]:
+        """#26: toàn bộ hoạt động của workspace cho Dashboard — gồm sự kiện vận hành
+        (thuộc dự án của org) lẫn sự kiện vòng đời dự án (org_id set, project_id NULL
+        sau khi xóa). outerjoin để giữ cả dòng project_id=NULL."""
+        rows = await self._session.scalars(
+            select(ActivityLogModel)
+            .outerjoin(ProjectModel, ActivityLogModel.project_id == ProjectModel.id)
+            .where(or_(ProjectModel.org_id == org_id, ActivityLogModel.org_id == org_id))
+            .order_by(ActivityLogModel.created_at.desc())
+            .limit(limit)
         )
         return [_to_entity(m) for m in rows]

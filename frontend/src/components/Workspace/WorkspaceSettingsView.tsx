@@ -23,6 +23,7 @@ export default function WorkspaceSettingsView() {
   } = useApp();
 
   const [nameDraft, setNameDraft] = useState(selectedOrg?.name ?? '');
+  const [descDraft, setDescDraft] = useState(selectedOrg?.description ?? '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -30,6 +31,7 @@ export default function WorkspaceSettingsView() {
 
   useEffect(() => {
     setNameDraft(selectedOrg?.name ?? '');
+    setDescDraft(selectedOrg?.description ?? '');
     setConfirmDelete(false);
   }, [selectedOrg?.id]);
 
@@ -47,6 +49,7 @@ export default function WorkspaceSettingsView() {
   }
 
   const nameDirty = nameDraft.trim() !== selectedOrg.name && nameDraft.trim().length > 0;
+  const descDirty = descDraft !== (selectedOrg.description ?? '');
 
   const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -96,6 +99,23 @@ export default function WorkspaceSettingsView() {
               className="px-4 py-2 bg-ink text-white text-sm font-semibold rounded-lg hover:bg-[#242424]
                          disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5" /> Lưu
+            </button>
+          </div>
+
+          {/* #26: mô tả workspace */}
+          <label className="text-xs font-semibold text-stone-700 mb-1 mt-4 block">Mô tả</label>
+          <textarea value={descDraft} onChange={e => setDescDraft(e.target.value)} rows={3}
+            disabled={!isOwner}
+            placeholder="Mô tả ngắn về workspace (hiển thị ở trang Tổng quan)…"
+            className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm resize-none disabled:bg-stone-50 disabled:text-stone-400
+                       focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
+          <div className="flex justify-end mt-2">
+            <button
+              onClick={() => updateOrganization(selectedOrg.id, { description: descDraft })}
+              disabled={!descDirty || !isOwner}
+              className="px-4 py-2 bg-ink text-white text-sm font-semibold rounded-lg hover:bg-[#242424]
+                         disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" /> Lưu mô tả
             </button>
           </div>
         </motion.div>

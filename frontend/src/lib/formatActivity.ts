@@ -34,6 +34,8 @@ const VERB: Record<string, string> = {
   'removed document': 'đã gỡ tài liệu',
   'attached link': 'đã đính kèm link',
   'uploaded file': 'đã tải lên file',
+  'created project': 'đã tạo dự án',
+  'renamed project': 'đã đổi tên dự án',
   'deleted project': 'đã xóa dự án',
 };
 

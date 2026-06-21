@@ -236,3 +236,18 @@ async def test_change_phase_type(client: AsyncClient, make_user):
                               json={"phaseType": "ST"}, headers=auth(token))
     assert resp.status_code == 200
     assert resp.json()["phaseType"] == "ST"
+
+
+# ─── #26 feed Dashboard gộp: vận hành (phase) + vòng đời dự án ────────
+async def test_dashboard_feed_merges_phase_and_project_events(client: AsyncClient, make_user):
+    token, _, org, proj = await _setup(client, make_user)
+    block = await _make_block(client, token, proj["id"])
+    await client.post(f"{API}/phase-blocks/{block['id']}/comments",
+                      json={"content": "Nhìn ổn"}, headers=auth(token))
+
+    # feed Dashboard gộp cả sự kiện cấp phase ("commented") lẫn vòng đời dự án ("created project")
+    feed = await client.get(f"{API}/organizations/{org['id']}/recent-activity", headers=auth(token))
+    assert feed.status_code == 200
+    actions = [a["action"] for a in feed.json()]
+    assert "commented" in actions
+    assert "created project" in actions

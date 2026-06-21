@@ -81,7 +81,9 @@ class OrganizationRepository(ABC):
     async def create(self, org: Organization) -> Organization: ...
 
     @abstractmethod
-    async def rename(self, org_id: UUID, name: str) -> Organization | None: ...
+    async def update(
+        self, org_id: UUID, name: str | None = None, description: str | None = None
+    ) -> Organization | None: ...
 
     @abstractmethod
     async def delete(self, org_id: UUID) -> None: ...
@@ -243,6 +245,9 @@ class ActivityLogRepository(ABC):
 
     @abstractmethod
     async def list_by_project(self, project_id: UUID) -> list[ActivityEntry]: ...
+
+    @abstractmethod
+    async def list_recent_for_org(self, org_id: UUID, limit: int = 50) -> list[ActivityEntry]: ...
 
 
 class PhaseTaskTemplateRepository(ABC):

@@ -36,7 +36,8 @@ class SqlAlchemyOrganizationRepository(OrganizationRepository):
         if m is None:
             return None
         return Organization(
-            id=m.id, name=m.name, member_ids=await self._member_ids(org_id), created_at=m.created_at
+            id=m.id, name=m.name, description=m.description,
+            member_ids=await self._member_ids(org_id), created_at=m.created_at,
         )
 
     async def list_all(self) -> list[Organization]:
@@ -45,7 +46,7 @@ class SqlAlchemyOrganizationRepository(OrganizationRepository):
         )
         return [
             Organization(
-                id=m.id, name=m.name,
+                id=m.id, name=m.name, description=m.description,
                 member_ids=await self._member_ids(m.id), created_at=m.created_at,
             )
             for m in rows
@@ -70,18 +71,29 @@ class SqlAlchemyOrganizationRepository(OrganizationRepository):
         return result
 
     async def create(self, org: Organization) -> Organization:
-        m = OrganizationModel(id=org.id, name=org.name)
+        m = OrganizationModel(id=org.id, name=org.name, description=org.description)
         self._session.add(m)
         await self._session.flush()
-        return Organization(id=m.id, name=m.name, member_ids=[], created_at=m.created_at)
+        return Organization(
+            id=m.id, name=m.name, description=m.description, member_ids=[], created_at=m.created_at
+        )
 
-    async def rename(self, org_id: UUID, name: str) -> Organization | None:
+    async def update(
+        self, org_id: UUID, name: str | None = None, description: str | None = None
+    ) -> Organization | None:
+        """#26: cập nhật name và/hoặc description (chỉ field được truyền)."""
         m = await self._session.get(OrganizationModel, org_id)
         if m is None:
             return None
-        m.name = name
+        if name is not None:
+            m.name = name
+        if description is not None:
+            m.description = description
         await self._session.flush()
-        return Organization(id=m.id, name=m.name, member_ids=await self._member_ids(org_id))
+        return Organization(
+            id=m.id, name=m.name, description=m.description,
+            member_ids=await self._member_ids(org_id),
+        )
 
     async def delete(self, org_id: UUID) -> None:
         await self._session.execute(delete(OrganizationModel).where(OrganizationModel.id == org_id))

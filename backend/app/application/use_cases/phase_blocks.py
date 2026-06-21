@@ -368,3 +368,6 @@ class ListActivity:
 
     async def by_project(self, project_id: UUID) -> list[ActivityEntry]:
         return await self._activity.list_by_project(project_id)
+
+    async def recent_for_org(self, org_id: UUID, limit: int = 50) -> list[ActivityEntry]:
+        return await self._activity.list_recent_for_org(org_id, limit)

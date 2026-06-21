@@ -114,7 +114,7 @@ interface AppContextType extends AppState {
   deletePhaseAttachment: (blockId: string, attachmentId: string) => Promise<void>;
 
   // Org actions
-  addOrganization: (name: string) => Promise<void>;
+  addOrganization: (name: string, description?: string) => Promise<void>;
   updateOrganization: (id: string, updates: Partial<Organization>) => Promise<void>;
   deleteOrganization: (id: string) => Promise<void>;
   addOrgMember: (orgId: string, email: string) => Promise<void>;
@@ -533,9 +533,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [patchBlock]);
 
   // ─── Organizations ────────────────────────────────────────────────
-  const addOrganization = useCallback(async (name: string) => {
+  const addOrganization = useCallback(async (name: string, description = '') => {
     // Dùng org trả về trực tiếp (tránh race với commit-after-response của BE)
-    const created = await orgsApi.create(name);
+    const created = await orgsApi.create(name, description);
     setOrgsState(prev => {
       const next = [...prev, created];
       syncRegistry(next, currentUser);
@@ -544,10 +544,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [syncRegistry, currentUser]);
 
   const updateOrganization = useCallback(async (id: string, updates: Partial<Organization>) => {
-    if (updates.name) {
-      const updated = await orgsApi.rename(id, updates.name);
-      setOrgsState(prev => prev.map(o => o.id === id ? updated : o));
-    }
+    // #26: gửi name và/hoặc description (chỉ field có trong updates).
+    const patch: { name?: string; description?: string } = {};
+    if (updates.name !== undefined) patch.name = updates.name;
+    if (updates.description !== undefined) patch.description = updates.description;
+    if (Object.keys(patch).length === 0) return;
+    const updated = await orgsApi.update(id, patch);
+    setOrgsState(prev => prev.map(o => o.id === id ? updated : o));
   }, []);
 
   const deleteOrganization = useCallback(async (id: string) => {

@@ -8,7 +8,7 @@ import type {
 
 // ─── DTO shapes (chỉ field cần dùng) ─────────────────────────────────
 interface UserDTO { id: string; email: string; name: string; role: UserRole; avatar: string | null; isSuperuser: boolean; }
-interface OrgDTO { id: string; name: string; members: UserDTO[]; myRole: 'owner' | 'member' | null; }
+interface OrgDTO { id: string; name: string; description: string; members: UserDTO[]; myRole: 'owner' | 'member' | null; }
 interface PhaseItemDTO { id: string; text: string; done: boolean; role: UserRole | null; }
 interface PhaseBlockDTO {
   id: string; projectId: string; phaseType: DevPhase; tag: PhaseTag; title: string; description: string;
@@ -19,14 +19,14 @@ interface PhaseBlockDTO {
 }
 interface CommentDTO { id: string; authorId: string | null; content: string; createdAt: string; }
 interface AttachmentDTO { id: string; kind: 'file' | 'link'; fileName: string; url: string; outcomeItemId: string | null; uploadedAt: string; }
-interface ActivityDTO { id: string; projectId: string; phaseBlockId: string | null; userId: string | null; action: string; target: string; createdAt: string; }
+interface ActivityDTO { id: string; projectId: string | null; phaseBlockId: string | null; userId: string | null; action: string; target: string; createdAt: string; }
 
 // ─── Mappers ─────────────────────────────────────────────────────────
 export function mapUser(d: UserDTO): User {
   return { id: d.id, name: d.name, avatar: d.avatar || '', role: d.role, email: d.email, isSuperuser: d.isSuperuser };
 }
 function mapOrg(d: OrgDTO): Organization {
-  return { id: d.id, name: d.name, members: (d.members ?? []).map(mapUser), myRole: d.myRole ?? undefined };
+  return { id: d.id, name: d.name, description: d.description ?? '', members: (d.members ?? []).map(mapUser), myRole: d.myRole ?? undefined };
 }
 function mapItem(d: PhaseItemDTO): ChecklistItem {
   return { id: d.id, text: d.text, done: d.done, role: d.role ?? undefined };
@@ -104,14 +104,19 @@ export const orgsApi = {
   async list(): Promise<Organization[]> {
     return (await api.get<OrgDTO[]>('/organizations')).map(mapOrg);
   },
-  async create(name: string): Promise<Organization> {
-    return mapOrg(await api.post<OrgDTO>('/organizations', { name }));
+  async create(name: string, description = ''): Promise<Organization> {
+    return mapOrg(await api.post<OrgDTO>('/organizations', { name, description }));
   },
-  async rename(id: string, name: string): Promise<Organization> {
-    return mapOrg(await api.patch<OrgDTO>(`/organizations/${id}`, { name }));
+  // #26: PATCH cập nhật name và/hoặc description.
+  async update(id: string, updates: { name?: string; description?: string }): Promise<Organization> {
+    return mapOrg(await api.patch<OrgDTO>(`/organizations/${id}`, updates));
   },
   async remove(id: string): Promise<void> {
     await api.del(`/organizations/${id}`);
+  },
+  // #26: toàn bộ hoạt động workspace (vận hành + vòng đời dự án) — cho Dashboard changelog
+  async recentActivity(id: string): Promise<ActivityItem[]> {
+    return (await api.get<ActivityDTO[]>(`/organizations/${id}/recent-activity`)).map(mapActivity);
   },
   async addMember(id: string, email: string): Promise<User> {
     return mapUser(await api.post<UserDTO>(`/organizations/${id}/members`, { email }));

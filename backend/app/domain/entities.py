@@ -46,6 +46,7 @@ class Membership:
 class Organization:
     id: UUID
     name: str
+    description: str = ""  # #26: mô tả workspace
     member_ids: list[UUID] = field(default_factory=list)
     created_at: datetime | None = None
 

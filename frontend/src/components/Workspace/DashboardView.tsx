@@ -1,6 +1,7 @@
 import { useApp } from '../../context/AppContext';
+import { orgsApi } from '../../api';
 import { PHASE_META, DEV_PHASES } from '../../types';
-import type { ProjectStatus } from '../../types';
+import type { ProjectStatus, ActivityItem } from '../../types';
 import {
   FolderKanban, CheckCircle2, AlertTriangle, Clock,
   Users, ArrowUpRight, GitBranch, Activity, ChevronRight, Gauge,
@@ -132,13 +133,18 @@ export default function DashboardView() {
       .slice(0, 5);
   }, [phaseBlocks, orgProjects]);
 
-  // Recent activity — aggregate from all phase blocks
-  const recentActivity = useMemo(() => {
-    return phaseBlocks
-      .flatMap(pb => pb.activityLog.map(log => ({ ...log, phaseTitle: pb.title })))
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 5);
-  }, [phaseBlocks]);
+  // #26: feed vận hành toàn workspace — lấy từ server (mọi sự kiện trong phase/dự án),
+  // KHÔNG dựa vào activityLog nạp lười theo từng block (trước đây rỗng cho tới khi mở modal).
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const orgId = selectedOrg?.id;
+  useEffect(() => {
+    if (!orgId) return;
+    let alive = true;
+    orgsApi.recentActivity(orgId)
+      .then(rows => { if (alive) setRecentActivity(rows.slice(0, 6)); })
+      .catch(() => { if (alive) setRecentActivity([]); });
+    return () => { alive = false; };
+  }, [orgId]);
 
   // Recent projects with more detail
   const recentProjects = useMemo(() => {
@@ -174,7 +180,7 @@ export default function DashboardView() {
         <motion.div custom={0} variants={fadeUp} initial="hidden" animate="visible"
           className="flex items-end justify-between flex-wrap gap-2 mb-6">
           <div>
-            <h1 className="text-xl font-semibold text-ink tracking-tight">Tổng quan — {selectedOrg.name}</h1>
+            <h1 className="text-xl font-semibold text-ink tracking-tight">Dashboard — {selectedOrg.name}</h1>
             <p className="text-sm text-stone-500 mt-0.5 font-light">
               {format(new Date(), 'EEEE, dd/MM/yyyy')} · {stats.dueIn7 > 0
                 ? <span className="text-amber-600 font-medium">{stats.dueIn7} dự án đến hạn trong 7 ngày tới</span>
@@ -385,16 +391,21 @@ export default function DashboardView() {
         <div className="grid lg:grid-cols-3 gap-6">
           <motion.div custom={8} variants={fadeUp} initial="hidden" animate="visible"
             className="bg-surface-card rounded-xl border border-hairline p-6">
-            <h2 className="text-sm font-semibold text-ink flex items-center gap-2 mb-5">
-              <Activity className="w-4 h-4 text-ink" />
-              Hoạt động gần đây
-            </h2>
+            <div className="mb-5">
+              <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
+                <Activity className="w-4 h-4 text-ink" />
+                Hoạt động gần đây
+              </h2>
+              <p className="text-[11px] text-muted-soft mt-0.5 ml-6">Dự án, phase, checklist, bình luận, tài liệu…</p>
+            </div>
             {recentActivity.length === 0 ? (
               <div className="text-sm text-muted text-center py-6">Chưa có hoạt động</div>
             ) : (
               <div className="space-y-3">
                 {recentActivity.map(act => {
-                  const user = selectedOrg.members.find(m => m.id === act.userId);
+                  const user = getUserById(act.userId);
+                  const phaseTitle = phaseBlocks.find(pb => pb.id === act.phaseBlockId)?.title;
+                  const { verb, detail } = formatActivity(act.action, act.target, getUserById);
                   const timeAgo = (() => {
                     const diff = differenceInDays(new Date(), new Date(act.timestamp));
                     if (diff === 0) return 'Hôm nay';
@@ -407,14 +418,15 @@ export default function DashboardView() {
                         <Avatar name={user.name} src={user.avatar} className="w-7 h-7 flex-shrink-0 mt-0.5" />
                       ) : (
                         <div className="w-7 h-7 rounded-full bg-surface-card flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-[10px] font-semibold text-muted">{act.userId.charAt(0).toUpperCase()}</span>
+                          <span className="text-[10px] font-semibold text-muted">?</span>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-body leading-relaxed">
-                          <span className="font-medium text-ink">{user?.name || act.userId}</span>
-                          {' '}{formatActivity(act.action, act.target, getUserById).verb}
-                          <span className="text-muted-soft"> — {act.phaseTitle}</span>
+                          <span className="font-medium text-ink">{user?.name || 'Người dùng'}</span>
+                          {' '}{verb}
+                          {phaseTitle && <span className="text-muted-soft"> — {phaseTitle}</span>}
+                          {detail && !phaseTitle && <span className="text-muted-soft"> — {detail}</span>}
                         </p>
                         <p className="text-[10px] text-muted-soft mt-0.5">{timeAgo}</p>
                       </div>

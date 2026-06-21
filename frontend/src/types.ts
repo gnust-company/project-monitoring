@@ -16,6 +16,7 @@ export type WorkspaceRole = 'owner' | 'member';
 export interface Organization {
   id: string;
   name: string;
+  description?: string; // #26: mô tả workspace
   members: User[];
   myRole?: WorkspaceRole; // cấp quyền của user hiện tại trong workspace
 }

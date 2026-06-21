@@ -115,16 +115,20 @@ class PasswordChange(CamelModel):
 class OrganizationOut(CamelModel):
     id: UUID
     name: str
+    description: str = ""  # #26: mô tả workspace
     members: list[UserOut] = []
     my_role: str | None = None  # cấp quyền của user hiện tại trong workspace (owner|member)
 
 
 class OrgCreate(CamelModel):
     name: str = Field(min_length=1, max_length=255)
+    description: str = ""  # #26
 
 
 class OrgRename(CamelModel):
-    name: str = Field(min_length=1, max_length=255)
+    # #26: PATCH cập nhật name và/hoặc description (gửi field nào cập nhật field đó).
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
 
 
 class MemberAdd(CamelModel):
@@ -261,7 +265,7 @@ class LinkAttachmentCreate(CamelModel):
 # ─── Activity (changelog) ────────────────────────────────────────────
 class ActivityOut(CamelModel):
     id: UUID
-    project_id: UUID
+    project_id: UUID | None = None  # #26: None với sự kiện cấp workspace (dự án đã bị xóa)
     phase_block_id: UUID | None = None
     user_id: UUID | None = None
     action: str
