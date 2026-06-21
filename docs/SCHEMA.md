@@ -104,7 +104,7 @@ CREATE TABLE projects (
   start_date  DATE NOT NULL,
   target_date DATE,                       -- #20: NULL = dự án không có ngày kết thúc (deadline theo phase)
   progress    INTEGER NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
-  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,  -- #21 audit: NULLABLE (migration 0006) để SET NULL chạy khi xóa người tạo
   pic_user_id UUID REFERENCES users(id) ON DELETE SET NULL,  -- #11: PIC (mặc định = created_by, đổi được)
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -129,7 +129,7 @@ CREATE TABLE phase_blocks (
   end_date        DATE NOT NULL,
   actual_end_date DATE,                -- ngày kết thúc thực tế (nếu có)
   display_row     INTEGER,             -- hàng hiển thị trên timeline (NULL = auto-layout)
-  created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by      UUID REFERENCES users(id) ON DELETE SET NULL,  -- #21 audit: NULLABLE (migration 0006)
   assignee        UUID REFERENCES users(id) ON DELETE SET NULL,  -- #13: chỉ là "note" (NULL ok); PIC phase = created_by
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -176,7 +176,7 @@ CREATE INDEX idx_phase_items_block ON phase_items(phase_block_id, kind);
 CREATE TABLE comments (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phase_block_id UUID NOT NULL REFERENCES phase_blocks(id) ON DELETE CASCADE,
-  author_id      UUID REFERENCES users(id) ON DELETE SET NULL,
+  author_id      UUID REFERENCES users(id) ON DELETE SET NULL,  -- #21 audit: NULLABLE (migration 0006)
   content        TEXT NOT NULL,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -326,7 +326,11 @@ CREATE INDEX idx_notif_user ON notifications(user_id, read, created_at DESC);
 
 - **UUID** làm PK toàn bộ (FE đang dùng id chuỗi `pb-123` → thay bằng UUID khi tích hợp).
 - **ON DELETE CASCADE** cho quan hệ cha-con (xóa phase block kéo theo items/comments/attachments); **SET NULL** cho tham chiếu người dùng để không mất lịch sử khi xóa user.
+  - **#21 audit**: mọi cột FK người dùng đặt `SET NULL` PHẢI nullable. Migration **0006_creator_nullable** sửa `projects.created_by`, `phase_blocks.created_by`, `comments.author_id` (trước đó NOT NULL → xóa user từng tạo/comment bị `NotNullViolation`, không xóa được).
 - `updated_at` cập nhật qua trigger hoặc ORM `onupdate` (backend hiện dùng ORM).
 - File upload thực tế lưu **MinIO** (S3-compatible): bucket `attachments` cho document,
   `avatars` cho ảnh đại diện. `attachments.url` / `users.avatar_url` lưu public URL.
   Bucket tạo sẵn bởi service `minio-setup` trong `docker-compose.yml`.
+  - **#21**: FK CASCADE chỉ dọn **hàng DB**, KHÔNG dọn object MinIO. Use case xóa
+    phase/dự án/workspace/user thu thập URL file (kind=`file`) / avatar **trước** khi xóa
+    hàng rồi gọi `ObjectStorage.delete` (best-effort) để tránh leak disk.

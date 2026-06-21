@@ -10,7 +10,13 @@ from uuid import UUID, uuid4
 
 from app.application.authz import can_edit_project, effective_project_pic
 from app.application.notifications import NotificationService
-from app.application.ports import ActivityLogRepository, ProjectRepository
+from app.application.ports import (
+    ActivityLogRepository,
+    ObjectStorage,
+    PhaseBlockRepository,
+    ProjectRepository,
+)
+from app.application.use_cases.storage_cleanup import purge_object_urls
 from app.domain.entities import ActivityEntry, Membership, Project, User
 from app.domain.value_objects import ProjectStatus
 
@@ -108,9 +114,15 @@ class DeleteProject:
     """Xóa project — chỉ PIC (hiệu dụng)/superuser (#11). #14: ghi changelog cấp
     workspace (kèm lý do) trước khi xóa để bản ghi còn lại."""
 
-    def __init__(self, projects: ProjectRepository, activity: ActivityLogRepository) -> None:
+    def __init__(
+        self, projects: ProjectRepository, activity: ActivityLogRepository,
+        blocks: PhaseBlockRepository, storage: ObjectStorage, attachments_bucket: str,
+    ) -> None:
         self._projects = projects
         self._activity = activity
+        self._blocks = blocks
+        self._storage = storage
+        self._bucket = attachments_bucket
 
     async def execute(self, project_id: UUID, actor: User, reason: str | None = None) -> None:
         project = await self._projects.get(project_id)
@@ -125,7 +137,10 @@ class DeleteProject:
             id=uuid4(), org_id=project.org_id, project_id=None, user_id=actor.id,
             action="deleted project", target=target, created_at=None,
         ))
+        # #21: gom URL file của mọi phase trong dự án TRƯỚC khi xóa (cascade).
+        file_urls = await self._blocks.file_attachment_urls_by_project(project_id)
         await self._projects.delete(project_id)
+        await purge_object_urls(self._storage, self._bucket, file_urls)
 
 
 class ChangeProjectPic:

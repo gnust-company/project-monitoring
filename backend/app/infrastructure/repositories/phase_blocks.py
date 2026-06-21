@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.application.ports import PhaseBlockRepository
 from app.domain.entities import Attachment, Comment, PhaseBlock, PhaseItem
+from app.domain.value_objects import AttachmentKind
 from app.infrastructure.db.models import (
     AttachmentModel,
     CommentModel,
@@ -198,3 +199,26 @@ class SqlAlchemyPhaseBlockRepository(PhaseBlockRepository):
         await self._session.execute(
             delete(AttachmentModel).where(AttachmentModel.id == attachment_id)
         )
+
+    async def file_attachment_urls_by_project(self, project_id: UUID) -> list[str]:
+        rows = await self._session.scalars(
+            select(AttachmentModel.url)
+            .join(PhaseBlockModel, AttachmentModel.phase_block_id == PhaseBlockModel.id)
+            .where(
+                PhaseBlockModel.project_id == project_id,
+                AttachmentModel.kind == AttachmentKind.FILE,
+            )
+        )
+        return list(rows)
+
+    async def file_attachment_urls_by_org(self, org_id: UUID) -> list[str]:
+        rows = await self._session.scalars(
+            select(AttachmentModel.url)
+            .join(PhaseBlockModel, AttachmentModel.phase_block_id == PhaseBlockModel.id)
+            .join(ProjectModel, PhaseBlockModel.project_id == ProjectModel.id)
+            .where(
+                ProjectModel.org_id == org_id,
+                AttachmentModel.kind == AttachmentKind.FILE,
+            )
+        )
+        return list(rows)

@@ -66,6 +66,64 @@ async def test_delete_file_attachment(client: AsyncClient, make_user):
     assert (await client.get(f"{API}/phase-blocks/{block['id']}/attachments", headers=auth(token))).json() == []
 
 
+async def _upload(client, token, block_id, name=b"x.txt", content=b"file body"):
+    resp = await client.post(
+        f"{API}/phase-blocks/{block_id}/attachments/file",
+        files={"file": ("x.txt", content, "text/plain")},
+        headers=auth(token),
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["url"]
+
+
+async def _is_gone(url: str) -> bool:
+    async with httpx.AsyncClient() as real:
+        return (await real.get(url)).status_code == 404
+
+
+async def test_delete_phase_purges_minio_file(client: AsyncClient, make_user):
+    # #21: xóa phase → object file của phase phải biến mất khỏi MinIO.
+    token, _, block = await _block(client, make_user)
+    url = await _upload(client, token, block["id"])
+    async with httpx.AsyncClient() as real:
+        assert (await real.get(url)).status_code == 200
+
+    dele = await client.delete(
+        f"{API}/phase-blocks/{block['id']}?reason=dọn dẹp", headers=auth(token)
+    )
+    assert dele.status_code == 204
+    assert await _is_gone(url)
+
+
+async def test_delete_project_purges_all_phase_files(client: AsyncClient, make_user):
+    # #21: xóa dự án → file của mọi phase con phải biến mất.
+    token, _, block = await _block(client, make_user)
+    url = await _upload(client, token, block["id"])
+    # project_id lấy gián tiếp: tạo block trả về projectId
+    proj_id = block["projectId"]
+
+    dele = await client.delete(f"{API}/projects/{proj_id}?reason=hủy dự án", headers=auth(token))
+    assert dele.status_code == 204
+    assert await _is_gone(url)
+
+
+async def test_delete_account_purges_avatar(client: AsyncClient, make_user):
+    # #21: xóa tài khoản → avatar trên MinIO phải biến mất.
+    token, _, _ = await _block(client, make_user)
+    avatar = await client.post(
+        f"{API}/users/me/avatar",
+        files={"file": ("me.png", b"\x89PNG\r\n", "image/png")},
+        headers=auth(token),
+    )
+    url = avatar.json()["avatar"]
+    async with httpx.AsyncClient() as real:
+        assert (await real.get(url)).status_code == 200
+
+    dele = await client.delete(f"{API}/users/me", headers=auth(token))
+    assert dele.status_code == 204
+    assert await _is_gone(url)
+
+
 async def test_update_profile_and_avatar(client: AsyncClient, make_user):
     token, user, _ = await _block(client, make_user)
 

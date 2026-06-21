@@ -8,11 +8,13 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from app.application.ports import (
+    ObjectStorage,
     OrganizationRepository,
     PhaseBlockRepository,
     ProjectRepository,
     UserRepository,
 )
+from app.application.use_cases.storage_cleanup import purge_object_urls
 from app.domain.entities import Organization, User
 from app.domain.value_objects import WorkspaceRole
 
@@ -153,12 +155,17 @@ class DeleteUser:
     qua FK CASCADE / SET NULL đã định nghĩa trong schema.
     """
 
-    def __init__(self, users: UserRepository) -> None:
+    def __init__(self, users: UserRepository, storage: ObjectStorage, avatars_bucket: str) -> None:
         self._users = users
+        self._storage = storage
+        self._bucket = avatars_bucket
 
     async def execute(self, acting_user_id: UUID, target_user_id: UUID) -> None:
         if acting_user_id == target_user_id:
             raise CannotModifySelfError()
-        if await self._users.get(target_user_id) is None:
+        target = await self._users.get(target_user_id)
+        if target is None:
             raise UserNotFoundError(str(target_user_id))
         await self._users.delete(target_user_id)
+        # #21: xóa avatar trên MinIO.
+        await purge_object_urls(self._storage, self._bucket, [target.avatar_url or ""])

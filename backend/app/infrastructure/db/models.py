@@ -103,7 +103,8 @@ class ProjectModel(Base):
     start_date: Mapped[date] = mapped_column(Date)
     target_date: Mapped[date | None] = mapped_column(Date)  # #20: nullable (dự án không định hạn)
     progress: Mapped[int] = mapped_column(Integer, default=0)
-    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # nullable: SET NULL khi user tạo bị xóa (dự án thuộc workspace, không mất theo người).
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     # #11: PIC — mặc định = created_by, đổi được. NULL khi user bị xóa.
     pic_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
@@ -134,7 +135,8 @@ class PhaseBlockModel(Base):
     end_date: Mapped[date] = mapped_column(Date)
     actual_end_date: Mapped[date | None] = mapped_column(Date)
     display_row: Mapped[int | None] = mapped_column(Integer)
-    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # nullable: SET NULL khi user tạo bị xóa (phase thuộc dự án, không mất theo người).
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     # #13: assignee nullable (chỉ là note). PIC phase = created_by.
     assignee: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -193,7 +195,8 @@ class CommentModel(Base):
     phase_block_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("phase_blocks.id", ondelete="CASCADE"), index=True
     )
-    author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # nullable: SET NULL khi tác giả bị xóa (giữ lại comment trong lịch sử phase).
+    author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

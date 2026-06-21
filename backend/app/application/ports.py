@@ -221,6 +221,16 @@ class PhaseBlockRepository(ABC):
     @abstractmethod
     async def delete_attachment(self, attachment_id: UUID) -> None: ...
 
+    @abstractmethod
+    async def file_attachment_urls_by_project(self, project_id: UUID) -> list[str]:
+        """URL của mọi attachment kind=FILE thuộc dự án (để xóa object MinIO, #21)."""
+        ...
+
+    @abstractmethod
+    async def file_attachment_urls_by_org(self, org_id: UUID) -> list[str]:
+        """URL của mọi attachment kind=FILE thuộc workspace (#21)."""
+        ...
+
 
 class ActivityLogRepository(ABC):
     """Nhật ký — phase changelog (theo block) và project changelog (theo project)."""

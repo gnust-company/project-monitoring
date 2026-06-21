@@ -7,12 +7,14 @@ from uuid import UUID, uuid4
 from app.application.notifications import NotificationService
 from app.application.ports import (
     ActivityLogRepository,
+    ObjectStorage,
     PhaseBlockRepository,
     PhaseTaskTemplateRepository,
 )
 from app.application.authz import can_edit_phase
+from app.application.use_cases.storage_cleanup import purge_object_urls
 from app.domain.entities import ActivityEntry, Comment, PhaseBlock, PhaseItem, User
-from app.domain.value_objects import DevPhase, PhaseItemKind, PhaseTag, UserRole
+from app.domain.value_objects import AttachmentKind, DevPhase, PhaseItemKind, PhaseTag, UserRole
 
 
 class PhaseBlockNotFoundError(Exception):
@@ -213,9 +215,14 @@ class UpdatePhaseBlock:
 
 
 class DeletePhaseBlock:
-    def __init__(self, blocks: PhaseBlockRepository, activity: ActivityLogRepository) -> None:
+    def __init__(
+        self, blocks: PhaseBlockRepository, activity: ActivityLogRepository,
+        storage: ObjectStorage, attachments_bucket: str,
+    ) -> None:
         self._blocks = blocks
         self._activity = activity
+        self._storage = storage
+        self._bucket = attachments_bucket
 
     async def execute(self, block_id: UUID, actor: User, reason: str | None = None) -> None:
         block = await self._blocks.get(block_id)
@@ -231,7 +238,10 @@ class DeletePhaseBlock:
             id=uuid4(), project_id=block.project_id, user_id=actor.id,
             action="deleted phase", target=target, created_at=None, phase_block_id=None,
         ))
+        # #21: thu thập URL file TRƯỚC khi xóa (attachments cascade theo phase).
+        file_urls = [a.url for a in block.attachments if a.kind == AttachmentKind.FILE]
         await self._blocks.delete(block_id)
+        await purge_object_urls(self._storage, self._bucket, file_urls)
 
 
 async def _log(activity: ActivityLogRepository, project_id: UUID, block_id: UUID | None,

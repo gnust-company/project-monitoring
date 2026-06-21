@@ -4,6 +4,7 @@ from collections.abc import Callable
 from uuid import uuid4
 
 from app.application.ports import ObjectStorage, UserRepository
+from app.application.use_cases.storage_cleanup import purge_object_urls
 from app.domain.entities import User
 from app.domain.value_objects import UserRole
 
@@ -56,8 +57,12 @@ class ChangePassword:
 
 
 class DeleteAccount:
-    def __init__(self, users: UserRepository) -> None:
+    def __init__(self, users: UserRepository, storage: ObjectStorage, avatars_bucket: str) -> None:
         self._users = users
+        self._storage = storage
+        self._bucket = avatars_bucket
 
     async def execute(self, user: User) -> None:
         await self._users.delete(user.id)
+        # #21: xóa avatar trên MinIO (avatar_url có thể None → purge bỏ qua).
+        await purge_object_urls(self._storage, self._bucket, [user.avatar_url or ""])

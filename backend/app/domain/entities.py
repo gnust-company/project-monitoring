@@ -58,7 +58,7 @@ class Project:
     description: str
     status: ProjectStatus
     start_date: date
-    created_by: UUID
+    created_by: UUID | None  # SET NULL khi người tạo bị xóa (#21 audit)
     # #11: PIC (person-in-charge). Mặc định = created_by; chủ workspace/PIC có thể đổi.
     pic_user_id: UUID | None = None
     # #20: dự án không bắt buộc có ngày kết thúc.
@@ -86,7 +86,7 @@ class PhaseItem:
 @dataclass(slots=True)
 class Comment:
     id: UUID
-    author_id: UUID
+    author_id: UUID | None  # SET NULL khi tác giả bị xóa (#21 audit)
     content: str
     created_at: datetime
 
@@ -128,7 +128,7 @@ class PhaseBlock:
     description: str
     start_date: date
     end_date: date
-    created_by: UUID
+    created_by: UUID | None  # SET NULL khi người tạo bị xóa (#21 audit)
     # #13: assignee giờ chỉ là "note" (không tác dụng quyền). PIC phase = created_by.
     assignee: UUID | None = None
     actual_end_date: date | None = None

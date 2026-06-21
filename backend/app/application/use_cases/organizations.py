@@ -2,7 +2,13 @@
 from uuid import UUID, uuid4
 
 from app.application.notifications import NotificationService
-from app.application.ports import OrganizationRepository, UserRepository
+from app.application.ports import (
+    ObjectStorage,
+    OrganizationRepository,
+    PhaseBlockRepository,
+    UserRepository,
+)
+from app.application.use_cases.storage_cleanup import purge_object_urls
 from app.domain.entities import Organization, User
 from app.domain.value_objects import WorkspaceRole
 
@@ -60,11 +66,20 @@ class RenameOrganization:
 
 
 class DeleteOrganization:
-    def __init__(self, orgs: OrganizationRepository) -> None:
+    def __init__(
+        self, orgs: OrganizationRepository, blocks: PhaseBlockRepository,
+        storage: ObjectStorage, attachments_bucket: str,
+    ) -> None:
         self._orgs = orgs
+        self._blocks = blocks
+        self._storage = storage
+        self._bucket = attachments_bucket
 
     async def execute(self, org_id: UUID) -> None:
+        # #21: gom URL file của mọi phase trong workspace TRƯỚC khi xóa (cascade).
+        file_urls = await self._blocks.file_attachment_urls_by_org(org_id)
         await self._orgs.delete(org_id)
+        await purge_object_urls(self._storage, self._bucket, file_urls)
 
 
 class AddMember:

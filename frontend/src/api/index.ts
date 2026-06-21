@@ -13,7 +13,7 @@ interface PhaseItemDTO { id: string; text: string; done: boolean; role: UserRole
 interface PhaseBlockDTO {
   id: string; projectId: string; phaseType: DevPhase; tag: PhaseTag; title: string; description: string;
   startDate: string; endDate: string; actualEndDate: string | null; displayRow: number | null;
-  createdBy: string; assignee: string; participantIds: string[]; progressPct: number;
+  createdBy: string | null; assignee: string; participantIds: string[]; progressPct: number;
   checklist: PhaseItemDTO[]; outcomes: PhaseItemDTO[];
   comments?: CommentDTO[] | null; attachments?: AttachmentDTO[] | null;
 }
@@ -45,7 +45,7 @@ export function mapPhaseBlock(d: PhaseBlockDTO): PhaseBlock {
   return {
     id: d.id, projectId: d.projectId, phaseType: d.phaseType, tag: d.tag, title: d.title,
     description: d.description, startDate: d.startDate, endDate: d.endDate,
-    actualEndDate: d.actualEndDate ?? undefined, createdBy: d.createdBy, assignee: d.assignee,
+    actualEndDate: d.actualEndDate ?? undefined, createdBy: d.createdBy ?? '', assignee: d.assignee,
     participants: d.participantIds ?? [], checklist: (d.checklist ?? []).map(mapItem),
     outcomes: (d.outcomes ?? []).map(mapItem),
     comments: (d.comments ?? []).map(mapComment), attachments: (d.attachments ?? []).map(mapAttachment),

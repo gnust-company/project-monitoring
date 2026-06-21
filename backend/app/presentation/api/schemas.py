@@ -173,7 +173,7 @@ class ProjectOut(CamelModel):
     start_date: date
     target_date: date | None = None  # #20: optional
     progress: int
-    created_by: UUID
+    created_by: UUID | None = None  # SET NULL khi người tạo bị xóa (#21 audit)
     pic_user_id: UUID | None = None  # #11: PIC (mặc định = created_by)
     created_at: datetime | None = None
 
@@ -281,7 +281,7 @@ class PhaseBlockOut(CamelModel):
     end_date: date
     actual_end_date: date | None = None
     display_row: int | None = None
-    created_by: UUID
+    created_by: UUID | None = None  # SET NULL khi người tạo bị xóa (#21 audit)
     assignee: UUID | None = None  # #13: chỉ là note; PIC phase = created_by
     participant_ids: list[UUID] = []
     progress_pct: int = 0

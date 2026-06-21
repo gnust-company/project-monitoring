@@ -132,6 +132,22 @@ ActivityRepoDep = Annotated[SqlAlchemyActivityLogRepository, Depends(get_activit
 TemplateRepoDep = Annotated[SqlAlchemyPhaseTaskTemplateRepository, Depends(get_template_repo)]
 
 
+# ─── Object storage (MinIO) ──────────────────────────────────────────
+def get_storage() -> MinioStorage:
+    return MinioStorage(get_settings())
+
+
+StorageDep = Annotated[MinioStorage, Depends(get_storage)]
+
+
+def _attachments_bucket() -> str:
+    return get_settings().minio_bucket_attachments
+
+
+def _avatars_bucket() -> str:
+    return get_settings().minio_bucket_avatars
+
+
 def get_notifier(repo: NotificationRepoDep) -> NotificationService:
     return NotificationService(repo)
 
@@ -239,8 +255,8 @@ def rename_org_uc(repo: OrgRepoDep) -> RenameOrganization:
     return RenameOrganization(repo)
 
 
-def delete_org_uc(repo: OrgRepoDep) -> DeleteOrganization:
-    return DeleteOrganization(repo)
+def delete_org_uc(repo: OrgRepoDep, blocks: BlockRepoDep, storage: StorageDep) -> DeleteOrganization:
+    return DeleteOrganization(repo, blocks, storage, _attachments_bucket())
 
 
 def add_member_uc(repo: OrgRepoDep, users: UserRepoDep, notifier: NotifierDep) -> AddMember:
@@ -268,8 +284,10 @@ def update_project_uc(repo: ProjectRepoDep) -> UpdateProject:
     return UpdateProject(repo)
 
 
-def delete_project_uc(repo: ProjectRepoDep, activity: ActivityRepoDep) -> DeleteProject:
-    return DeleteProject(repo, activity)
+def delete_project_uc(
+    repo: ProjectRepoDep, activity: ActivityRepoDep, blocks: BlockRepoDep, storage: StorageDep
+) -> DeleteProject:
+    return DeleteProject(repo, activity, blocks, storage, _attachments_bucket())
 
 
 def change_project_pic_uc(repo: ProjectRepoDep, notifier: NotifierDep) -> ChangeProjectPic:
@@ -346,8 +364,8 @@ def update_block_uc(
     return UpdatePhaseBlock(blocks, activity, notifier)
 
 
-def delete_block_uc(blocks: BlockRepoDep, activity: ActivityRepoDep) -> DeletePhaseBlock:
-    return DeletePhaseBlock(blocks, activity)
+def delete_block_uc(blocks: BlockRepoDep, activity: ActivityRepoDep, storage: StorageDep) -> DeletePhaseBlock:
+    return DeletePhaseBlock(blocks, activity, storage, _attachments_bucket())
 
 
 def add_item_uc(blocks: BlockRepoDep, activity: ActivityRepoDep) -> AddPhaseItem:
@@ -376,22 +394,6 @@ def list_activity_uc(activity: ActivityRepoDep) -> ListActivity:
 
 def get_phase_tasks_uc(templates: TemplateRepoDep) -> GetPhaseTasks:
     return GetPhaseTasks(templates)
-
-
-# ─── Object storage (MinIO) ──────────────────────────────────────────
-def get_storage() -> MinioStorage:
-    return MinioStorage(get_settings())
-
-
-StorageDep = Annotated[MinioStorage, Depends(get_storage)]
-
-
-def _attachments_bucket() -> str:
-    return get_settings().minio_bucket_attachments
-
-
-def _avatars_bucket() -> str:
-    return get_settings().minio_bucket_avatars
 
 
 # ─── Attachment use cases ────────────────────────────────────────────
@@ -445,8 +447,8 @@ def set_superuser_uc(users: UserRepoDep) -> SetSuperuser:
     return SetSuperuser(users)
 
 
-def delete_user_uc(users: UserRepoDep) -> DeleteUser:
-    return DeleteUser(users)
+def delete_user_uc(users: UserRepoDep, storage: StorageDep) -> DeleteUser:
+    return DeleteUser(users, storage, _avatars_bucket())
 
 
 # ─── Profile self-service (issue #3) ─────────────────────────────────
@@ -454,5 +456,5 @@ def change_password_uc(repo: UserRepoDep) -> ChangePassword:
     return ChangePassword(repo, verify_password, hash_password)
 
 
-def delete_account_uc(repo: UserRepoDep) -> DeleteAccount:
-    return DeleteAccount(repo)
+def delete_account_uc(repo: UserRepoDep, storage: StorageDep) -> DeleteAccount:
+    return DeleteAccount(repo, storage, _avatars_bucket())

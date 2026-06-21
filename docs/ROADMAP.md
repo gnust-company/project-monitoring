@@ -19,12 +19,12 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | 2 | #5, #11, #13, #20 | ✅ Xong |
 | 3 | #10, #9, #8, #12, #17 | ✅ Xong |
 | 4 | #15, #25, #23, #14, #18 | ✅ Xong |
-| 5 | #21, #22, #24, #26 | 🟡 Đang làm (#24 xong) |
+| 5 | #21, #22, #24, #26 | 🟡 Đang làm (#21, #24 xong) |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
-> **Trạng thái GitHub**: #8, #9, #10, #12, #14, #15, #17, #18, #23, #24, #25 đã đóng (#24 đóng 2026-06-21).
-> Còn OPEN: Wave 5 (#21, #22, #26).
+> **Trạng thái GitHub**: #8, #9, #10, #12, #14, #15, #17, #18, #21, #23, #24, #25 đã đóng (#21, #24 đóng 2026-06-21).
+> Còn OPEN: Wave 5 (#22, #26).
 
 ---
 
@@ -83,8 +83,10 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 ## Wave 5 — Issue mới từ user (#21–#26)
 
-- [ ] [#21 — Dư thừa artifact (xóa kéo theo file MinIO)](https://github.com/gnust-company/project-monitoring/issues/21)
-  - Xóa phase/dự án/workspace → xóa luôn object trên MinIO (tránh phình store). Rà cascade ở BE storage layer.
+- [x] [#21 — Dư thừa artifact (xóa kéo theo file MinIO)](https://github.com/gnust-company/project-monitoring/issues/21)
+  - Helper `use_cases/storage_cleanup.py` (`purge_object_urls`, best-effort): xóa phase/dự án/workspace → xóa object `attachments` (kind=file); xóa user → xóa avatar. Thu thập URL **trước** khi xóa hàng DB (FK CASCADE chỉ dọn row). Repo query `file_attachment_urls_by_project/_org`.
+  - **Audit lỗ hổng "xóa cha → con kẹt/leak"**: phát hiện 3 cột FK người dùng `ON DELETE SET NULL` nhưng cột NOT NULL (`projects.created_by`, `phase_blocks.created_by`, `comments.author_id`) → xóa user từng tạo dự án/phase/comment bị `NotNullViolation` (không xóa được). Sửa nullable qua **migration 0006** + ORM models + domain entities + DTOs + FE mapper. Các quan hệ cha-con khác (org→project→phase→items/comments/attachments) đã CASCADE đầy đủ, không orphan row.
+  - Test: `test_attachments.py` thêm 3 ca (xóa phase/dự án/account → object MinIO trả 404).
 - [ ] [#22 — Tăng cường upload file (progress + multi-file modal)](https://github.com/gnust-company/project-monitoring/issues/22)
   - Modal kéo-thả/chọn nhiều file, progress bar từng file, thêm/sửa/xóa trước khi confirm mới upload.
 - [x] [#24 — Rà soát changelog (ẩn UUID, format dễ đọc)](https://github.com/gnust-company/project-monitoring/issues/24)
