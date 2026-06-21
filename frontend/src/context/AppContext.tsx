@@ -1,16 +1,17 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type {
-  Organization, Project, PhaseBlock, WorkspaceView, DevPhase, ProjectStatus, ZoomLevel,
-  User, UserRole, Notification, ChecklistItem,
+  Organization, Project, PhaseBlock, WorkspaceView, ProjectStatus, ZoomLevel,
+  User, UserRole, Notification, ChecklistItem, PhaseDefinition, PhaseMeta,
 } from '../types';
+import { resolvePhaseMeta } from '../types';
 import {
-  auth, usersApi, orgsApi, projectsApi, phaseBlocksApi, notificationsApi,
-  type CreatePhaseBody,
+  auth, usersApi, orgsApi, projectsApi, phaseBlocksApi, notificationsApi, phaseDefsApi,
+  type CreatePhaseBody, type PhaseDefBody,
 } from '../api';
 import { getToken } from '../api/client';
 import { registerUsers } from '../data/mockData';
 
-export interface PhaseBlockUI extends PhaseBlock {}
+export type PhaseBlockUI = PhaseBlock;
 
 type AppView = 'landing' | 'login' | 'setup' | 'workspace-selector' | 'workspace' | 'admin';
 
@@ -20,7 +21,7 @@ interface AppState {
   workspaceView: WorkspaceView;
   currentUserEmail: string | null;
   searchQuery: string;
-  phaseFilter: DevPhase | 'All';
+  phaseFilter: string | 'All';  // #26: code phase (động) hoặc 'All'
   statusFilter: ProjectStatus | 'All';
   zoomLevel: ZoomLevel;
   selectedProjectIds: string[] | null;
@@ -68,7 +69,7 @@ interface AppContextType extends AppState {
 
   // Filters
   setSearchQuery: (q: string) => void;
-  setPhaseFilter: (p: DevPhase | 'All') => void;
+  setPhaseFilter: (p: string | 'All') => void;
   setStatusFilter: (s: ProjectStatus | 'All') => void;
   setZoomLevel: (z: ZoomLevel) => void;
   setSelectedProjectIds: (ids: string[] | null) => void;
@@ -113,8 +114,16 @@ interface AppContextType extends AppState {
   uploadPhaseFile: (blockId: string, file: File, outcomeItemId?: string | null, onProgress?: (pct: number) => void) => Promise<void>;
   deletePhaseAttachment: (blockId: string, attachmentId: string) => Promise<void>;
 
+  // Phase definitions (#26 mảng A — phase động per-workspace)
+  phaseDefs: PhaseDefinition[];
+  getPhaseMeta: (code: string) => PhaseMeta;
+  addPhaseDef: (body: PhaseDefBody) => Promise<PhaseDefinition>;
+  updatePhaseDef: (id: string, body: Partial<PhaseDefBody>) => Promise<void>;
+  deletePhaseDef: (id: string, force?: boolean) => Promise<void>;
+  reorderPhaseDefs: (orderedIds: string[]) => Promise<void>;
+
   // Org actions
-  addOrganization: (name: string, description?: string) => Promise<void>;
+  addOrganization: (name: string, description?: string) => Promise<Organization>;
   updateOrganization: (id: string, updates: Partial<Organization>) => Promise<void>;
   deleteOrganization: (id: string) => Promise<void>;
   addOrgMember: (orgId: string, email: string) => Promise<void>;
@@ -170,6 +179,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pbState, setPbState] = useState<PhaseBlockUI[]>([]);
   const [projectsState, setProjectsState] = useState<Project[]>([]);
   const [orgsState, setOrgsState] = useState<Organization[]>([]);
+  const [phaseDefs, setPhaseDefs] = useState<PhaseDefinition[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -239,12 +249,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       onlyMine: false, rangeStart: null, rangeEnd: null,
     }));
     try {
-      const [projects, blocks] = await Promise.all([
+      const [projects, blocks, defs] = await Promise.all([
         projectsApi.listByOrg(orgId),
         phaseBlocksApi.listByOrg(orgId),
+        phaseDefsApi.list(orgId),
       ]);
       setProjectsState(projects);
       setPbState(blocks);
+      setPhaseDefs(defs);
     } catch { /* ignore */ }
   }, []);
 
@@ -276,6 +288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOrgsState([]);
     setProjectsState([]);
     setPbState([]);
+    setPhaseDefs([]);
     setNotifications([]);
     setUnreadCount(0);
     setState({ ...INITIAL_STATE, currentView: 'login' });
@@ -309,6 +322,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOrgsState([]);
     setProjectsState([]);
     setPbState([]);
+    setPhaseDefs([]);
     setNotifications([]);
     setUnreadCount(0);
     setState({ ...INITIAL_STATE, currentView: 'landing' });
@@ -316,7 +330,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ─── Filters / selection ─────────────────────────────────────────
   const setSearchQuery = useCallback((q: string) => setState(prev => ({ ...prev, searchQuery: q })), []);
-  const setPhaseFilter = useCallback((p: DevPhase | 'All') => setState(prev => ({ ...prev, phaseFilter: p })), []);
+  const setPhaseFilter = useCallback((p: string | 'All') => setState(prev => ({ ...prev, phaseFilter: p })), []);
   const setStatusFilter = useCallback((s: ProjectStatus | 'All') => setState(prev => ({ ...prev, statusFilter: s })), []);
   const setZoomLevel = useCallback((z: ZoomLevel) => setState(prev => ({ ...prev, zoomLevel: z })), []);
   const setSelectedProjectIds = useCallback((ids: string[] | null) => setState(prev => ({ ...prev, selectedProjectIds: ids })), []);
@@ -532,8 +546,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await phaseBlocksApi.deleteAttachment(blockId, attachmentId);
   }, [patchBlock]);
 
+  // ─── Phase definitions (#26 mảng A) ───────────────────────────────
+  const getPhaseMeta = useCallback(
+    (code: string): PhaseMeta => resolvePhaseMeta(phaseDefs, code),
+    [phaseDefs],
+  );
+
+  const addPhaseDef = useCallback(async (body: PhaseDefBody): Promise<PhaseDefinition> => {
+    if (!state.selectedOrgId) throw new Error('Chưa chọn workspace');
+    const created = await phaseDefsApi.create(state.selectedOrgId, body);
+    setPhaseDefs(prev => [...prev, created].sort((a, b) => a.position - b.position));
+    return created;
+  }, [state.selectedOrgId]);
+
+  const updatePhaseDef = useCallback(async (id: string, body: Partial<PhaseDefBody>) => {
+    if (!state.selectedOrgId) return;
+    const updated = await phaseDefsApi.update(state.selectedOrgId, id, body);
+    setPhaseDefs(prev => prev.map(p => p.id === id ? updated : p).sort((a, b) => a.position - b.position));
+  }, [state.selectedOrgId]);
+
+  // BE trả 409 (ApiError) nếu phase đang dùng và chưa force — ném ra để UI cảnh báo.
+  const deletePhaseDef = useCallback(async (id: string, force = false) => {
+    if (!state.selectedOrgId) return;
+    await phaseDefsApi.remove(state.selectedOrgId, id, force);
+    setPhaseDefs(prev => prev.filter(p => p.id !== id));
+  }, [state.selectedOrgId]);
+
+  const reorderPhaseDefs = useCallback(async (orderedIds: string[]) => {
+    if (!state.selectedOrgId) return;
+    const fresh = await phaseDefsApi.reorder(state.selectedOrgId, orderedIds);
+    setPhaseDefs(fresh);
+  }, [state.selectedOrgId]);
+
   // ─── Organizations ────────────────────────────────────────────────
-  const addOrganization = useCallback(async (name: string, description = '') => {
+  const addOrganization = useCallback(async (name: string, description = ''): Promise<Organization> => {
     // Dùng org trả về trực tiếp (tránh race với commit-after-response của BE)
     const created = await orgsApi.create(name, description);
     setOrgsState(prev => {
@@ -541,6 +587,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       syncRegistry(next, currentUser);
       return next;
     });
+    return created;
   }, [syncRegistry, currentUser]);
 
   const updateOrganization = useCallback(async (id: string, updates: Partial<Organization>) => {
@@ -645,6 +692,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addPhaseBlock, updatePhaseBlock, deletePhaseBlock,
       addPhaseItem, updatePhaseItem, deletePhaseItem,
       addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,
+      phaseDefs, getPhaseMeta, addPhaseDef, updatePhaseDef, deletePhaseDef, reorderPhaseDefs,
       addOrganization, updateOrganization, deleteOrganization, addOrgMember, removeOrgMember,
       notifications, unreadCount, loadNotifications, markNotificationRead, markAllNotificationsRead,
       selectedOrg, organizations: orgsState, orgProjects, orgPhaseBlocks,

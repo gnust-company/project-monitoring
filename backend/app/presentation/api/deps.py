@@ -30,6 +30,13 @@ from app.application.use_cases.organizations import (
     RemoveMember,
     RenameOrganization,
 )
+from app.application.use_cases.phase_definitions import (
+    CreatePhaseDef,
+    DeletePhaseDef,
+    ListPhaseDefs,
+    ReorderPhaseDefs,
+    UpdatePhaseDef,
+)
 from app.application.use_cases.phase_blocks import (
     AddComment,
     AddPhaseItem,
@@ -65,7 +72,6 @@ from app.application.use_cases.attachments import (
     DeleteAttachment,
     ListAttachments,
 )
-from app.application.use_cases.templates import GetPhaseTasks
 from app.application.use_cases.users import (
     ChangePassword,
     DeleteAccount,
@@ -81,8 +87,8 @@ from app.infrastructure.repositories.change_requests import SqlAlchemyChangeRequ
 from app.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository
 from app.infrastructure.repositories.organizations import SqlAlchemyOrganizationRepository
 from app.infrastructure.repositories.phase_blocks import SqlAlchemyPhaseBlockRepository
+from app.infrastructure.repositories.phase_definitions import SqlAlchemyPhaseDefinitionRepository
 from app.infrastructure.repositories.projects import SqlAlchemyProjectRepository
-from app.infrastructure.repositories.templates import SqlAlchemyPhaseTaskTemplateRepository
 from app.infrastructure.repositories.users import SqlAlchemyUserRepository
 from app.infrastructure.storage.minio_storage import MinioStorage
 
@@ -118,8 +124,8 @@ def get_activity_repo(session: SessionDep) -> SqlAlchemyActivityLogRepository:
     return SqlAlchemyActivityLogRepository(session)
 
 
-def get_template_repo(session: SessionDep) -> SqlAlchemyPhaseTaskTemplateRepository:
-    return SqlAlchemyPhaseTaskTemplateRepository(session)
+def get_phase_def_repo(session: SessionDep) -> SqlAlchemyPhaseDefinitionRepository:
+    return SqlAlchemyPhaseDefinitionRepository(session)
 
 
 UserRepoDep = Annotated[SqlAlchemyUserRepository, Depends(get_user_repo)]
@@ -129,7 +135,7 @@ ChangeRequestRepoDep = Annotated[SqlAlchemyChangeRequestRepository, Depends(get_
 NotificationRepoDep = Annotated[SqlAlchemyNotificationRepository, Depends(get_notification_repo)]
 BlockRepoDep = Annotated[SqlAlchemyPhaseBlockRepository, Depends(get_block_repo)]
 ActivityRepoDep = Annotated[SqlAlchemyActivityLogRepository, Depends(get_activity_repo)]
-TemplateRepoDep = Annotated[SqlAlchemyPhaseTaskTemplateRepository, Depends(get_template_repo)]
+PhaseDefRepoDep = Annotated[SqlAlchemyPhaseDefinitionRepository, Depends(get_phase_def_repo)]
 
 
 # ─── Object storage (MinIO) ──────────────────────────────────────────
@@ -239,8 +245,8 @@ ManageDep = Annotated[Access, Depends(workspace_manage)]
 
 
 # ─── Organization use cases ──────────────────────────────────────────
-def create_org_uc(repo: OrgRepoDep) -> CreateOrganization:
-    return CreateOrganization(repo)
+def create_org_uc(repo: OrgRepoDep, phases: PhaseDefRepoDep) -> CreateOrganization:
+    return CreateOrganization(repo, phases)
 
 
 def list_orgs_uc(repo: OrgRepoDep) -> ListOrganizations:
@@ -345,9 +351,9 @@ BlockAccessDep = Annotated[ProjectAccess, Depends(block_access)]
 
 # ─── Phase block use cases ───────────────────────────────────────────
 def create_block_uc(
-    blocks: BlockRepoDep, templates: TemplateRepoDep, activity: ActivityRepoDep, notifier: NotifierDep
+    blocks: BlockRepoDep, phases: PhaseDefRepoDep, activity: ActivityRepoDep, notifier: NotifierDep
 ) -> CreatePhaseBlock:
-    return CreatePhaseBlock(blocks, templates, activity, notifier)
+    return CreatePhaseBlock(blocks, phases, activity, notifier)
 
 
 def get_block_uc(blocks: BlockRepoDep) -> GetPhaseBlock:
@@ -392,8 +398,25 @@ def list_activity_uc(activity: ActivityRepoDep) -> ListActivity:
     return ListActivity(activity)
 
 
-def get_phase_tasks_uc(templates: TemplateRepoDep) -> GetPhaseTasks:
-    return GetPhaseTasks(templates)
+# ─── Phase definition use cases (#26 mảng A) ─────────────────────────
+def list_phase_defs_uc(phases: PhaseDefRepoDep) -> ListPhaseDefs:
+    return ListPhaseDefs(phases)
+
+
+def create_phase_def_uc(phases: PhaseDefRepoDep) -> CreatePhaseDef:
+    return CreatePhaseDef(phases)
+
+
+def update_phase_def_uc(phases: PhaseDefRepoDep) -> UpdatePhaseDef:
+    return UpdatePhaseDef(phases)
+
+
+def delete_phase_def_uc(phases: PhaseDefRepoDep) -> DeletePhaseDef:
+    return DeletePhaseDef(phases)
+
+
+def reorder_phase_defs_uc(phases: PhaseDefRepoDep) -> ReorderPhaseDefs:
+    return ReorderPhaseDefs(phases)
 
 
 # ─── Attachment use cases ────────────────────────────────────────────

@@ -9,12 +9,19 @@ from app.application.ports import (
     ActivityLogRepository,
     ObjectStorage,
     PhaseBlockRepository,
-    PhaseTaskTemplateRepository,
+    PhaseDefinitionRepository,
 )
 from app.application.authz import can_edit_phase
 from app.application.use_cases.storage_cleanup import purge_object_urls
-from app.domain.entities import ActivityEntry, Comment, PhaseBlock, PhaseItem, User
-from app.domain.value_objects import AttachmentKind, DevPhase, PhaseItemKind, PhaseTag, UserRole
+from app.domain.entities import (
+    ActivityEntry,
+    Comment,
+    PhaseBlock,
+    PhaseDefinitionItem,
+    PhaseItem,
+    User,
+)
+from app.domain.value_objects import AttachmentKind, PhaseItemKind, PhaseTag, UserRole
 
 
 class PhaseBlockNotFoundError(Exception):
@@ -36,11 +43,12 @@ class OutcomeAttachmentRequiredError(Exception):
 @dataclass(slots=True)
 class CreatePhaseBlockInput:
     project_id: UUID
-    phase_type: DevPhase
+    phase_type: str  # #26: code của phase definition (per-org)
     title: str
     start_date: date
     end_date: date
     created_by: UUID
+    org_id: UUID | None = None  # #26: để seed checklist mặc định từ phase definition
     tag: PhaseTag = PhaseTag.TODO
     description: str = ""
     assignee: UUID | None = None
@@ -56,9 +64,8 @@ def _role(value: Any) -> UserRole | None:
     return UserRole(value) if value else None
 
 
-async def _seed_items(
-    templates: PhaseTaskTemplateRepository, phase: DevPhase,
-    provided: list[dict[str, Any]] | None, kind: PhaseItemKind,
+def _items_from(
+    provided: list[dict[str, Any]] | None, defaults: list[PhaseDefinitionItem], kind: PhaseItemKind,
 ) -> list[PhaseItem]:
     if provided is not None:
         return [
@@ -66,26 +73,35 @@ async def _seed_items(
                       role=_role(d.get("role")), position=i)
             for i, d in enumerate(provided)
         ]
-    tmpls = [t for t in await templates.list_by_phase(phase) if t.kind == kind]
     return [
         PhaseItem(id=uuid4(), kind=kind, text=t.text, done=False, role=t.role, position=i)
-        for i, t in enumerate(tmpls)
+        for i, t in enumerate(defaults)
     ]
 
 
 class CreatePhaseBlock:
     def __init__(
-        self, blocks: PhaseBlockRepository, templates: PhaseTaskTemplateRepository,
+        self, blocks: PhaseBlockRepository, phases: PhaseDefinitionRepository,
         activity: ActivityLogRepository, notifier: NotificationService,
     ) -> None:
         self._blocks = blocks
-        self._templates = templates
+        self._phases = phases
         self._activity = activity
         self._notifier = notifier
 
     async def execute(self, data: CreatePhaseBlockInput) -> PhaseBlock:
-        items = await _seed_items(self._templates, data.phase_type, data.checklist, PhaseItemKind.CHECKLIST)
-        items += await _seed_items(self._templates, data.phase_type, data.outcomes, PhaseItemKind.OUTCOME)
+        # Seed checklist/outcome mặc định từ phase definition của workspace nếu FE
+        # không gửi sẵn (provided=None). Tìm theo (org_id, code).
+        default_chk: list[PhaseDefinitionItem] = []
+        default_out: list[PhaseDefinitionItem] = []
+        if (data.checklist is None or data.outcomes is None) and data.org_id is not None:
+            defs = await self._phases.list_by_org(data.org_id)
+            phase_def = next((p for p in defs if p.code == data.phase_type), None)
+            if phase_def is not None:
+                default_chk = [i for i in phase_def.items if i.kind == PhaseItemKind.CHECKLIST]
+                default_out = [i for i in phase_def.items if i.kind == PhaseItemKind.OUTCOME]
+        items = _items_from(data.checklist, default_chk, PhaseItemKind.CHECKLIST)
+        items += _items_from(data.outcomes, default_out, PhaseItemKind.OUTCOME)
         assignee = data.assignee or data.created_by
         block = PhaseBlock(
             id=uuid4(), project_id=data.project_id, phase_type=data.phase_type, tag=data.tag,
@@ -160,7 +176,7 @@ def _apply_block_updates(block: PhaseBlock, payload: dict[str, Any]) -> PhaseBlo
     if "tag" in payload:
         block.tag = PhaseTag(payload["tag"])
     if "phase_type" in payload:
-        block.phase_type = DevPhase(payload["phase_type"])
+        block.phase_type = payload["phase_type"]
     if payload.get("start_date"):
         block.start_date = date.fromisoformat(payload["start_date"])
     if payload.get("end_date"):

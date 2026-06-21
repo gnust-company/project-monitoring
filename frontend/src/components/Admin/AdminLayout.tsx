@@ -172,8 +172,8 @@ export default function AdminLayout() {
         )}
       </main>
 
-      <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} onDone={load} />
-      <GrantAdminModal user={adminTarget} onClose={() => setAdminTarget(null)} onDone={load} />
+      <ResetPasswordModal key={resetTarget?.id ?? 'none'} user={resetTarget} onClose={() => setResetTarget(null)} onDone={load} />
+      <GrantAdminModal key={adminTarget?.id ?? 'none'} user={adminTarget} onClose={() => setAdminTarget(null)} onDone={load} />
 
       {/* Confirm xóa người dùng */}
       <AnimatePresence>

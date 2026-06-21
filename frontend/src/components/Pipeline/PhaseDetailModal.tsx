@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById, ROLE_LABELS } from '../../data/mockData';
-import { PHASE_META, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES, DEV_PHASES } from '../../types';
-import type { ChecklistItem, UserRole, DevPhase } from '../../types';
+import type { ChecklistItem, UserRole } from '../../types';
 import {
   X, CheckSquare, Square, MessageSquare, Paperclip, Clock,
   Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check,
@@ -32,7 +31,7 @@ export default function PhaseDetailModal() {
     updatePhaseBlock, deletePhaseBlock, orgProjects,
     addPhaseItem, updatePhaseItem, deletePhaseItem,
     addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,
-    currentUser, selectedOrg,
+    currentUser, selectedOrg, phaseDefs, getPhaseMeta,
   } = useApp();
 
   const [commentText, setCommentText] = useState('');
@@ -50,7 +49,7 @@ export default function PhaseDetailModal() {
 
   // #14: gom mọi edit metadata vào 1 draft — chỉ áp khi bấm "Lưu" (không auto-apply).
   const [meta, setMeta] = useState({
-    title: '', description: '', phaseType: 'PA' as DevPhase,
+    title: '', description: '', phaseType: '',
     startDate: '', endDate: '', assignee: null as string | null, participants: [] as string[],
   });
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -154,8 +153,11 @@ export default function PhaseDetailModal() {
   }, [phaseDetailOpen, closePhaseDetail, hasDraft]);
 
 
-  const checklistRoles = selectedPhaseBlock ? PHASE_ROLE_TASKS[selectedPhaseBlock.phaseType].map(x => x.role) : [];
-  const outcomeRoles = selectedPhaseBlock ? PHASE_ROLE_OUTCOMES[selectedPhaseBlock.phaseType].map(x => x.role) : [];
+  const _distinctRoles = (items: { role?: UserRole }[]): UserRole[] =>
+    [...new Set(items.map(i => i.role).filter((r): r is UserRole => !!r))];
+  const _curDef = selectedPhaseBlock ? phaseDefs.find(p => p.code === selectedPhaseBlock.phaseType) : undefined;
+  const checklistRoles = _distinctRoles(_curDef?.checklist ?? []);
+  const outcomeRoles = _distinctRoles(_curDef?.outcomes ?? []);
   const checklistGroups = useMemo(() => buildGroups(checklist, checklistRoles), [checklist, checklistRoles]);
   const outcomeGroups = useMemo(() => buildGroups(outcomes, outcomeRoles), [outcomes, outcomeRoles]);
 
@@ -274,7 +276,7 @@ export default function PhaseDetailModal() {
 
   if (!selectedPhaseBlock || !phaseDetailOpen) return null;
 
-  const phaseMeta = PHASE_META[meta.phaseType]; // theo draft → phản ánh loại phase đang chọn
+  const phaseMeta = getPhaseMeta(meta.phaseType); // theo draft → phản ánh loại phase đang chọn
   const project = orgProjects.find(p => p.id === selectedPhaseBlock.projectId);
   const completedChecks = checklist.filter(c => c.done).length;
   const progressPct = checklist.length > 0 ? Math.round((completedChecks / checklist.length) * 100) : 0;
@@ -342,11 +344,11 @@ export default function PhaseDetailModal() {
               {/* #17: PIC đổi được loại phase (tên đầy đủ); giữ nguyên checklist/outcome hiện có */}
               {canEditPhase ? (
                 <Dropdown className="w-52" value={meta.phaseType}
-                  onChange={v => setMeta(m => ({ ...m, phaseType: v as DevPhase }))}
-                  options={DEV_PHASES.map(p => ({
-                    value: p, label: PHASE_META[p].fullLabel,
-                    dotClass: PHASE_META[p].solid, labelClass: PHASE_META[p].color,
-                  }))} />
+                  onChange={v => setMeta(m => ({ ...m, phaseType: v }))}
+                  options={phaseDefs.map(def => {
+                    const dm = getPhaseMeta(def.code);
+                    return { value: def.code, label: dm.fullLabel, dotClass: dm.solid, labelClass: dm.color };
+                  })} />
               ) : (
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${phaseMeta.bg} ${phaseMeta.color} border ${phaseMeta.border}`}>
                   {phaseMeta.fullLabel}

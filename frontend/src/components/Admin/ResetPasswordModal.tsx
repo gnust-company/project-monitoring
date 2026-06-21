@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { KeyRound, X, AlertTriangle, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import type { AdminUserInfo } from '../../types';
@@ -24,11 +24,7 @@ export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
   const [show, setShow] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // reset state mỗi lần mở cho user mới
-  useEffect(() => {
-    if (user) { setPassword(''); setConfirm(false); setShow(false); setError(null); }
-  }, [user]);
+  // State reset tự nhiên nhờ remount theo key={user.id} ở nơi mount (AdminLayout).
 
   const tooShort = password.length > 0 && password.length < 6;
   const canProceed = password.length >= 6 && !submitting;

@@ -89,6 +89,7 @@ async def create_block(
 ) -> PhaseBlockOut:
     block = await uc.execute(CreatePhaseBlockInput(
         project_id=project_id, phase_type=body.phase_type, title=body.title,
+        org_id=access.project.org_id,  # #26: để seed checklist mặc định từ phase definition
         start_date=body.start_date, end_date=body.end_date, created_by=access.user.id,
         tag=body.tag, description=body.description, assignee=body.assignee,
         actual_end_date=body.actual_end_date, display_row=body.display_row,

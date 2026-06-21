@@ -13,7 +13,6 @@ from app.domain.entities import User
 from app.domain.value_objects import (
     ChangeRequestAction,
     ChangeRequestStatus,
-    DevPhase,
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
@@ -273,11 +272,72 @@ class ActivityOut(CamelModel):
     created_at: datetime | None = None
 
 
+# ─── Phase definitions (#26 mảng A — phase động per-workspace) ────────
+class PhaseDefItemOut(CamelModel):
+    id: UUID
+    kind: PhaseItemKind
+    text: str
+    role: UserRole | None = None
+    position: int = 0
+
+
+class PhaseDefinitionOut(CamelModel):
+    id: UUID
+    org_id: UUID
+    code: str
+    name: str
+    full_name: str = ""
+    description: str = ""
+    color: str = "gray"
+    position: int = 0
+    checklist: list[PhaseDefItemOut] = []
+    outcomes: list[PhaseDefItemOut] = []
+
+    @classmethod
+    def from_entity(cls, p) -> "PhaseDefinitionOut":
+        chk = [PhaseDefItemOut.model_validate(i) for i in p.items if i.kind == PhaseItemKind.CHECKLIST]
+        out = [PhaseDefItemOut.model_validate(i) for i in p.items if i.kind == PhaseItemKind.OUTCOME]
+        return cls(
+            id=p.id, org_id=p.org_id, code=p.code, name=p.name, full_name=p.full_name,
+            description=p.description, color=p.color, position=p.position,
+            checklist=chk, outcomes=out,
+        )
+
+
+class PhaseDefItemIn(CamelModel):
+    text: str = Field(min_length=1)
+    role: UserRole | None = None
+
+
+class PhaseDefCreate(CamelModel):
+    code: str | None = Field(default=None, max_length=32)
+    name: str = Field(min_length=1, max_length=255)
+    full_name: str = ""
+    description: str = ""
+    color: str = "gray"
+    checklist: list[PhaseDefItemIn] = []
+    outcomes: list[PhaseDefItemIn] = []
+
+
+class PhaseDefUpdate(CamelModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    full_name: str | None = None
+    description: str | None = None
+    color: str | None = None
+    position: int | None = None
+    checklist: list[PhaseDefItemIn] | None = None
+    outcomes: list[PhaseDefItemIn] | None = None
+
+
+class PhaseReorderIn(CamelModel):
+    ordered_ids: list[UUID]
+
+
 # ─── Phase blocks ────────────────────────────────────────────────────
 class PhaseBlockOut(CamelModel):
     id: UUID
     project_id: UUID
-    phase_type: DevPhase
+    phase_type: str  # #26: code của phase definition (per-org)
     tag: PhaseTag
     title: str
     description: str
@@ -313,7 +373,7 @@ class PhaseBlockOut(CamelModel):
 
 
 class PhaseBlockCreate(CamelModel):
-    phase_type: DevPhase
+    phase_type: str = Field(min_length=1, max_length=32)
     title: str = Field(min_length=1, max_length=255)
     start_date: date
     end_date: date
@@ -331,7 +391,7 @@ class PhaseBlockUpdate(CamelModel):
     title: str | None = None
     description: str | None = None
     tag: PhaseTag | None = None
-    phase_type: DevPhase | None = None
+    phase_type: str | None = Field(default=None, max_length=32)
     start_date: date | None = None
     end_date: date | None = None
     actual_end_date: date | None = None

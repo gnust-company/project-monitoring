@@ -1,6 +1,5 @@
 import { useApp } from '../../context/AppContext';
 import { orgsApi } from '../../api';
-import { PHASE_META, DEV_PHASES } from '../../types';
 import type { ProjectStatus, ActivityItem } from '../../types';
 import {
   FolderKanban, CheckCircle2, AlertTriangle, Clock,
@@ -73,7 +72,7 @@ function ProgressRing({ pct, size = 150, stroke = 11 }: { pct: number; size?: nu
 export default function DashboardView() {
   const {
     selectedOrg, orgProjects, phaseBlocks, getUserById,
-    setWorkspaceView, openProjectDetail, setStatusFilter,
+    setWorkspaceView, openProjectDetail, setStatusFilter, phaseDefs, getPhaseMeta,
   } = useApp();
 
   // Trạng thái & tiến độ auto (derived) cho từng dự án
@@ -111,12 +110,12 @@ export default function DashboardView() {
   }, [orgProjects, phaseBlocks, statusOf, progressOf]);
 
   const phaseDistribution = useMemo(() => {
-    return DEV_PHASES.map(phase => ({
-      phase,
-      meta: PHASE_META[phase],
-      count: phaseBlocks.filter(pb => pb.phaseType === phase).length,
+    return phaseDefs.map(def => ({
+      phase: def.code,
+      meta: getPhaseMeta(def.code),
+      count: phaseBlocks.filter(pb => pb.phaseType === def.code).length,
     }));
-  }, [phaseBlocks]);
+  }, [phaseBlocks, phaseDefs, getPhaseMeta]);
 
   const maxPhaseCount = Math.max(1, ...phaseDistribution.map(p => p.count));
 
@@ -295,7 +294,7 @@ export default function DashboardView() {
                     warning: { text: `Còn ${pb.daysLeft} ngày`, class: 'text-amber-600' },
                     ok: { text: `Còn ${pb.daysLeft} ngày`, class: 'text-muted-soft' },
                   };
-                  const meta = PHASE_META[pb.phaseType];
+                  const meta = getPhaseMeta(pb.phaseType);
                   const uText = urgencyText[urgency];
                   return (
                     <motion.div key={pb.id}
@@ -303,7 +302,7 @@ export default function DashboardView() {
                       transition={{ delay: 0.4 + i * 0.07, duration: 0.35 }}
                       className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${urgencyStyles[urgency]}`}>
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${meta.bg} ${meta.color} flex-shrink-0`}>
-                        {pb.phaseType}
+                        {meta.label}
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-ink truncate">{pb.title}</div>
@@ -458,7 +457,7 @@ export default function DashboardView() {
                 const latestPhase = phaseBlocks
                   .filter(pb => pb.projectId === project.id)
                   .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
-                const latestPhaseMeta = latestPhase ? PHASE_META[latestPhase.phaseType] : null;
+                const latestPhaseMeta = latestPhase ? getPhaseMeta(latestPhase.phaseType) : null;
                 return (
                   <div key={project.id}
                     onClick={() => openProjectDetail(project.id)}
@@ -475,7 +474,7 @@ export default function DashboardView() {
                     <div className="flex items-center gap-2 mb-4">
                       {latestPhaseMeta && (
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${latestPhaseMeta.bg} ${latestPhaseMeta.color}`}>
-                          {latestPhase?.phaseType}
+                          {latestPhaseMeta.label}
                         </span>
                       )}
                       <span className="text-[10px] text-muted-soft">{pbCount} phase</span>

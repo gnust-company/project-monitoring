@@ -5,7 +5,6 @@ import { getUserById } from '../../data/mockData';
 import { ROLE_LABELS } from '../../data/mockData';
 import { projectsApi } from '../../api';
 import { formatActivity } from '../../lib/formatActivity';
-import { PHASE_META } from '../../types';
 import type { ProjectStatus, ActivityItem } from '../../types';
 import {
   X, Calendar, Trash2, Pencil, Check, FolderKanban,
@@ -27,7 +26,7 @@ export default function ProjectDetailModal() {
   const {
     selectedProjectDetail, projectDetailOpen, closeProjectDetail,
     updateProject, deleteProject, changeProjectPic, phaseBlocks,
-    currentUser, selectedOrg, isOwner,
+    currentUser, selectedOrg, isOwner, getPhaseMeta,
   } = useApp();
 
   // Inline editing
@@ -315,11 +314,11 @@ export default function ProjectDetailModal() {
                 <label className="text-xs font-semibold text-stone-700 mb-1.5 block">Phân bố phase</label>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(phaseCounts).map(([phase, count]) => {
-                    const meta = PHASE_META[phase as keyof typeof PHASE_META];
+                    const meta = getPhaseMeta(phase);
                     return (
                       <span key={phase}
                         className={`text-[10px] font-semibold px-2 py-1 rounded-md border ${meta.bg} ${meta.color} ${meta.border}`}>
-                        {phase} × {count}
+                        {meta.label} × {count}
                       </span>
                     );
                   })}

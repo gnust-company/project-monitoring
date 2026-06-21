@@ -158,6 +158,50 @@ export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; co
   },
 };
 
+// ─── #26 (mảng A): phase động per-workspace ────────────────────────
+// Bảng màu cố định (an toàn với Tailwind — class tĩnh). DB lưu khóa màu (vd "cyan").
+export const PHASE_PALETTE: Record<string, { label: string; color: string; bg: string; border: string; solid: string }> = {
+  gray:    { label: 'Xám',           color: 'text-gray-600',    bg: 'bg-gray-100',    border: 'border-gray-200',    solid: 'bg-gray-400' },
+  cyan:    { label: 'Lục lam',       color: 'text-cyan-700',    bg: 'bg-cyan-50',     border: 'border-cyan-200',    solid: 'bg-cyan-500' },
+  violet:  { label: 'Tím',           color: 'text-violet-600',  bg: 'bg-violet-50',   border: 'border-violet-200',  solid: 'bg-violet-500' },
+  blue:    { label: 'Xanh dương',    color: 'text-blue-600',    bg: 'bg-blue-50',     border: 'border-blue-200',    solid: 'bg-blue-500' },
+  orange:  { label: 'Cam',           color: 'text-orange-600',  bg: 'bg-orange-50',   border: 'border-orange-200',  solid: 'bg-orange-500' },
+  emerald: { label: 'Lục',           color: 'text-emerald-600', bg: 'bg-emerald-50',  border: 'border-emerald-200', solid: 'bg-emerald-500' },
+  slate:   { label: 'Đá',            color: 'text-slate-600',   bg: 'bg-slate-100',   border: 'border-slate-300',   solid: 'bg-slate-500' },
+  rose:    { label: 'Hồng',          color: 'text-rose-600',    bg: 'bg-rose-50',     border: 'border-rose-200',    solid: 'bg-rose-500' },
+  amber:   { label: 'Hổ phách',      color: 'text-amber-600',   bg: 'bg-amber-50',    border: 'border-amber-200',   solid: 'bg-amber-500' },
+  teal:    { label: 'Xanh mòng két', color: 'text-teal-600',    bg: 'bg-teal-50',     border: 'border-teal-200',    solid: 'bg-teal-500' },
+};
+
+export const PHASE_COLOR_KEYS = Object.keys(PHASE_PALETTE);
+
+export interface PhaseDefinition {
+  id: string;
+  orgId: string;
+  code: string;
+  name: string;        // nhãn ngắn (VN)
+  fullName: string;    // nhãn đầy đủ
+  description: string;
+  color: string;       // khóa palette
+  position: number;
+  checklist: { role?: UserRole; text: string }[];  // checklist mặc định
+  outcomes: { role?: UserRole; text: string }[];    // outcome mặc định
+}
+
+// Style + nhãn của 1 phase code, resolve từ danh sách phase definition của workspace.
+// Fallback PHASE_META (7 phase mặc định) rồi tới màu xám nếu code lạ.
+export interface PhaseMeta { label: string; fullLabel: string; desc: string; color: string; bg: string; border: string; solid: string; }
+export function resolvePhaseMeta(defs: PhaseDefinition[], code: string): PhaseMeta {
+  const def = defs.find(p => p.code === code);
+  if (def) {
+    const pal = PHASE_PALETTE[def.color] ?? PHASE_PALETTE.gray;
+    return { ...pal, label: def.name, fullLabel: def.fullName || def.name, desc: def.description };
+  }
+  const fallback = (PHASE_META as Record<string, typeof PHASE_META[DevPhase]>)[code];
+  if (fallback) return fallback;
+  return { ...PHASE_PALETTE.gray, label: code, fullLabel: code, desc: '' };
+}
+
 // ─── Role-based task & outcome sources per phase ───────────────────
 // Nguồn checklist/outcome chuẩn cho từng phase, gắn với role tương ứng.
 export const PHASE_ROLE_TASKS: Record<DevPhase, Array<{ role: UserRole; tasks: string[] }>> = {
@@ -281,7 +325,7 @@ export interface ChecklistItem {
 export interface PhaseBlock {
   id: string;
   projectId: string;
-  phaseType: DevPhase;
+  phaseType: string;  // #26: code của phase definition (per-org), không còn enum cứng
   tag: PhaseTag;
   title: string;
   description: string;

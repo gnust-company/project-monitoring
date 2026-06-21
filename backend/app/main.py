@@ -12,7 +12,6 @@ from app.presentation.api.routers import (
     organizations,
     phase_blocks,
     projects,
-    templates,
     users,
 )
 
@@ -39,6 +38,5 @@ app.include_router(projects.router)
 app.include_router(change_requests.router)
 app.include_router(notifications.router)
 app.include_router(phase_blocks.router)
-app.include_router(templates.router)
 app.include_router(users.router)
 app.include_router(admin.router)

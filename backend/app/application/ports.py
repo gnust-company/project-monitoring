@@ -15,12 +15,12 @@ from app.domain.entities import (
     Notification,
     Organization,
     PhaseBlock,
+    PhaseDefinition,
     PhaseItem,
-    PhaseTaskTemplate,
     Project,
     User,
 )
-from app.domain.value_objects import DevPhase, WorkspaceRole
+from app.domain.value_objects import WorkspaceRole
 
 
 class UserRepository(ABC):
@@ -250,11 +250,33 @@ class ActivityLogRepository(ABC):
     async def list_recent_for_org(self, org_id: UUID, limit: int = 50) -> list[ActivityEntry]: ...
 
 
-class PhaseTaskTemplateRepository(ABC):
-    """Nguồn checklist/outcome mặc định theo phase — thay PHASE_ROLE_TASKS ở FE."""
+class PhaseDefinitionRepository(ABC):
+    """#26 (mảng A): định nghĩa phase theo từng workspace (thay enum dev_phase + templates)."""
 
     @abstractmethod
-    async def list_by_phase(self, phase: DevPhase) -> list[PhaseTaskTemplate]: ...
+    async def list_by_org(self, org_id: UUID) -> list[PhaseDefinition]: ...
+
+    @abstractmethod
+    async def get(self, phase_id: UUID) -> PhaseDefinition | None: ...
+
+    @abstractmethod
+    async def create(self, phase: PhaseDefinition) -> PhaseDefinition: ...
+
+    @abstractmethod
+    async def update(self, phase: PhaseDefinition, *, replace_items: bool = False) -> PhaseDefinition: ...
+
+    @abstractmethod
+    async def delete(self, phase_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def count_blocks_using(self, org_id: UUID, code: str) -> int:
+        """Số phase_block trong workspace đang dùng phase code này (cảnh báo trước khi xóa)."""
+        ...
+
+    @abstractmethod
+    async def seed_defaults(self, org_id: UUID) -> None:
+        """Seed 7 phase mặc định cho 1 workspace mới."""
+        ...
 
 
 class ObjectStorage(ABC):

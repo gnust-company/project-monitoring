@@ -91,11 +91,35 @@ Nguồn cho **Workspace Settings view** (FE: trang Cài đặt mở từ sidebar
 | GET | `/organizations` | Workspace mà user hiện tại là thành viên |
 | POST | `/organizations` | Tạo workspace. Body: `{ name }`. Người tạo tự thành member |
 | GET | `/organizations/{orgId}` | Chi tiết + members |
-| PATCH | `/organizations/{orgId}` | Đổi tên workspace. Body: `{ name }` |
+| PATCH | `/organizations/{orgId}` | Cập nhật `{ name?, description? }` (gửi field nào cập nhật field đó) — owner-only |
 | DELETE | `/organizations/{orgId}` | Xóa workspace → 204. **Cascade**: xóa toàn bộ projects + phase blocks bên trong (xem SCHEMA.md) |
 | GET | `/organizations/{orgId}/members` | Danh sách thành viên |
 | POST | `/organizations/{orgId}/members` | Mời thành viên. Body: `{ email }` (BE tạo/ghép user rồi thêm vào) |
 | DELETE | `/organizations/{orgId}/members/{userId}` | Xóa thành viên khỏi workspace → 204 |
+| GET | `/organizations/{orgId}/recent-activity` | #26: feed hoạt động workspace (vận hành + vòng đời dự án) cho Dashboard |
+
+#### Phase definitions (#26 mảng A — phase động per-workspace)
+
+Mọi member **đọc** được (FE render timeline/dashboard theo phase của workspace); thêm/sửa/xóa/sắp xếp là **owner-only**.
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/organizations/{orgId}/phases` | Danh sách phase definition (kèm `checklist`/`outcomes` mặc định), sắp theo `position` |
+| POST | `/organizations/{orgId}/phases` | Tạo phase. Body: `{ name, code?, fullName?, description?, color?, checklist?, outcomes? }`. `code` tự sinh (slug) nếu thiếu, duy nhất trong org → 201 |
+| PATCH | `/organizations/{orgId}/phases/{phaseId}` | Cập nhật `{ name?, fullName?, description?, color?, position?, checklist?, outcomes? }`. Gửi `checklist`/`outcomes` = thay-toàn-bộ items |
+| DELETE | `/organizations/{orgId}/phases/{phaseId}?force=false` | Xóa phase. Nếu đang được block dùng và `force=false` → **409** `{ detail: { message, count } }`; `?force=true` để xóa (block giữ nguyên, hiển thị màu trung tính) → 204 |
+| POST | `/organizations/{orgId}/phases/reorder` | Sắp xếp lại. Body: `{ orderedIds: [phaseId…] }` → trả danh sách mới |
+
+```json
+{
+  "id": "uuid", "orgId": "uuid", "code": "SD", "name": "Thiết kế Phần mềm",
+  "fullName": "Software Design", "description": "...", "color": "violet", "position": 2,
+  "checklist": [ { "id": "...", "kind": "checklist", "text": "Create HLD", "role": "SW_Architect", "position": 0 } ],
+  "outcomes":  [ { "id": "...", "kind": "outcome", "text": "SRS", "role": "BA", "position": 0 } ]
+}
+```
+
+`color` ∈ `gray | cyan | violet | blue | orange | emerald | slate | rose | amber | teal` (FE map sang class Tailwind).
 
 ```json
 {
@@ -147,7 +171,7 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
 | PATCH | `/phase-blocks/{blockId}` | Partial update: `title, description, tag, phaseType, startDate, endDate, actualEndDate, displayRow, assignee, participantIds` — dùng cho cả kéo-thả/resize trên timeline |
 | DELETE | `/phase-blocks/{blockId}` | → 204 |
 
-**POST body** — nếu không gửi `checklist`/`outcomes`, BE tự sinh từ `phase_task_templates` theo `phaseType`; `assignee` mặc định = người tạo:
+**POST body** — `phaseType` là `code` của một phase definition trong workspace (#26 mảng A). Nếu không gửi `checklist`/`outcomes`, BE tự sinh từ checklist/outcome mặc định của phase definition đó; `assignee` mặc định = người tạo:
 
 ```json
 {
@@ -187,7 +211,7 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
 }
 ```
 
-`phaseType` ∈ `PA | SA | SD | SI | ST | DEP | OM` · `tag` ∈ `Backlog | Todo | Inprogress | Complete | Canceled`
+`phaseType` = `code` của phase definition trong workspace (động, #26 mảng A — không còn enum cố định; xem `GET /organizations/{orgId}/phases`) · `tag` ∈ `Backlog | Todo | Inprogress | Complete | Canceled`
 
 ### Phase Items (checklist & outcomes)
 
@@ -271,19 +295,9 @@ FE poll định kỳ + badge chưa đọc. BE tự sinh khi có sự kiện.
   "action": "changed end date", "target": "2026-06-20 → 2026-06-24", "createdAt": "..." }
 ```
 
-### Templates
+### Templates (đã bỏ — #26 mảng A)
 
-| Method | Path | Mô tả |
-|---|---|---|
-| GET | `/templates/phase-tasks?phase=SD` | Checklist + outcome mặc định theo phase, nhóm theo role — thay `PHASE_ROLE_TASKS`/`PHASE_ROLE_OUTCOMES` hard-code ở FE |
-
-```json
-{
-  "phase": "SD",
-  "checklist": [ { "role": "UI_Designer", "tasks": ["Design wireframes"] } ],
-  "outcomes":  [ { "role": "BA", "outcomes": ["SRS"] } ]
-}
-```
+> Endpoint `GET /templates/phase-tasks` và bảng global `phase_task_templates` đã bị xóa. Checklist/outcome mặc định nay thuộc từng **phase definition** của workspace — xem `GET /organizations/{orgId}/phases` (mỗi phase trả kèm `checklist`/`outcomes`).
 
 ## Mapping AppContext → API
 
@@ -308,7 +322,8 @@ Lộ trình thay mock data trong `frontend/src/context/AppContext.tsx`:
 | `addPhaseBlock` | `POST /projects/{projectId}/phase-blocks` |
 | `updatePhaseBlock(id, updates)` | `PATCH /phase-blocks/{id}` hoặc endpoint con tương ứng (items/comments/attachments) |
 | `deletePhaseBlock(id, reason?)` | `DELETE /phase-blocks/{id}?reason=…` (#14: BE log "deleted phase — lý do …" vào activity dự án) |
-| `buildDefaultChecklist/Outcomes` (types.ts) | `GET /templates/phase-tasks?phase=...` |
+| Checklist/outcome mặc định khi tạo phase | `GET /organizations/{orgId}/phases` (mỗi phase definition kèm `checklist`/`outcomes`) |
+| Quản lý phase per-workspace (Settings) | `GET/POST/PATCH/DELETE /organizations/{orgId}/phases` + `POST …/phases/reorder` |
 | Workload (Team view) | Tính ở FE từ phase blocks; hoặc BE cấp `GET /organizations/{orgId}/members/workload` |
 
 ## Công thức derived (FE và BE phải khớp)

@@ -2,7 +2,7 @@
 import { api, setToken, clearToken } from './client';
 import type {
   User, Organization, Project, PhaseBlock, ChecklistItem, Comment, Attachment,
-  ActivityItem, Notification, UserRole, DevPhase, PhaseTag, ProjectStatus,
+  ActivityItem, Notification, UserRole, PhaseTag, ProjectStatus, PhaseDefinition,
   AdminStats, AdminUserInfo, AdminWorkspaceInfo,
 } from '../types';
 
@@ -10,8 +10,13 @@ import type {
 interface UserDTO { id: string; email: string; name: string; role: UserRole; avatar: string | null; isSuperuser: boolean; }
 interface OrgDTO { id: string; name: string; description: string; members: UserDTO[]; myRole: 'owner' | 'member' | null; }
 interface PhaseItemDTO { id: string; text: string; done: boolean; role: UserRole | null; }
+interface PhaseDefItemDTO { id: string; kind: 'checklist' | 'outcome'; text: string; role: UserRole | null; position: number; }
+interface PhaseDefDTO {
+  id: string; orgId: string; code: string; name: string; fullName: string; description: string;
+  color: string; position: number; checklist: PhaseDefItemDTO[]; outcomes: PhaseDefItemDTO[];
+}
 interface PhaseBlockDTO {
-  id: string; projectId: string; phaseType: DevPhase; tag: PhaseTag; title: string; description: string;
+  id: string; projectId: string; phaseType: string; tag: PhaseTag; title: string; description: string;
   startDate: string; endDate: string; actualEndDate: string | null; displayRow: number | null;
   createdBy: string | null; assignee: string; participantIds: string[]; progressPct: number;
   checklist: PhaseItemDTO[]; outcomes: PhaseItemDTO[];
@@ -40,6 +45,14 @@ function mapAttachment(d: AttachmentDTO): Attachment {
 }
 export function mapActivity(d: ActivityDTO): ActivityItem {
   return { id: d.id, userId: d.userId ?? '', action: d.action, target: d.target, timestamp: d.createdAt, phaseBlockId: d.phaseBlockId };
+}
+export function mapPhaseDef(d: PhaseDefDTO): PhaseDefinition {
+  const mi = (i: PhaseDefItemDTO) => ({ role: i.role ?? undefined, text: i.text });
+  return {
+    id: d.id, orgId: d.orgId, code: d.code, name: d.name, fullName: d.fullName ?? '',
+    description: d.description ?? '', color: d.color ?? 'gray', position: d.position,
+    checklist: (d.checklist ?? []).map(mi), outcomes: (d.outcomes ?? []).map(mi),
+  };
 }
 export function mapPhaseBlock(d: PhaseBlockDTO): PhaseBlock {
   return {
@@ -153,7 +166,7 @@ export const projectsApi = {
 
 // ─── Phase blocks ────────────────────────────────────────────────────
 export interface CreatePhaseBody {
-  phaseType: DevPhase; title: string; startDate: string; endDate: string;
+  phaseType: string; title: string; startDate: string; endDate: string;
   tag?: PhaseTag; description?: string; assignee?: string | null; participantIds?: string[];
   checklist?: { text: string; role?: UserRole; done?: boolean }[] | null;
   outcomes?: { text: string; role?: UserRole; done?: boolean }[] | null;
@@ -262,14 +275,32 @@ export const adminApi = {
   },
 };
 
-// ─── Templates ───────────────────────────────────────────────────────
-export interface PhaseTasksDTO {
-  phase: DevPhase;
-  checklist: { role: UserRole; tasks: string[] }[];
-  outcomes: { role: UserRole; outcomes: string[] }[];
+// ─── Phase definitions (#26 mảng A — phase động per-workspace) ────────
+export interface PhaseDefBody {
+  code?: string;
+  name: string;
+  fullName?: string;
+  description?: string;
+  color?: string;
+  checklist?: { role?: UserRole; text: string }[];
+  outcomes?: { role?: UserRole; text: string }[];
 }
-export const templatesApi = {
-  async phaseTasks(phase: DevPhase): Promise<PhaseTasksDTO> {
-    return await api.get<PhaseTasksDTO>(`/templates/phase-tasks?phase=${phase}`);
+
+export const phaseDefsApi = {
+  async list(orgId: string): Promise<PhaseDefinition[]> {
+    return (await api.get<PhaseDefDTO[]>(`/organizations/${orgId}/phases`)).map(mapPhaseDef);
+  },
+  async create(orgId: string, body: PhaseDefBody): Promise<PhaseDefinition> {
+    return mapPhaseDef(await api.post<PhaseDefDTO>(`/organizations/${orgId}/phases`, body));
+  },
+  async update(orgId: string, id: string, body: Partial<PhaseDefBody>): Promise<PhaseDefinition> {
+    return mapPhaseDef(await api.patch<PhaseDefDTO>(`/organizations/${orgId}/phases/${id}`, body));
+  },
+  // BE trả 409 (ApiError) nếu phase đang được dùng và chưa force.
+  async remove(orgId: string, id: string, force = false): Promise<void> {
+    await api.del(`/organizations/${orgId}/phases/${id}${force ? '?force=true' : ''}`);
+  },
+  async reorder(orgId: string, orderedIds: string[]): Promise<PhaseDefinition[]> {
+    return (await api.post<PhaseDefDTO[]>(`/organizations/${orgId}/phases/reorder`, { orderedIds })).map(mapPhaseDef);
   },
 };

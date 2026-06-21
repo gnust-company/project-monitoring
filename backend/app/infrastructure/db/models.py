@@ -27,7 +27,6 @@ from app.domain.value_objects import (
     AttachmentKind,
     ChangeRequestAction,
     ChangeRequestStatus,
-    DevPhase,
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
@@ -123,9 +122,8 @@ class PhaseBlockModel(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
-    phase_type: Mapped[DevPhase] = mapped_column(
-        Enum(DevPhase, name="dev_phase", values_callable=lambda e: [m.value for m in e])
-    )
+    # #26 (mảng A): code của phase definition (per-org). Không còn enum cứng.
+    phase_type: Mapped[str] = mapped_column(String(32))
     tag: Mapped[PhaseTag] = mapped_column(
         Enum(PhaseTag, name="phase_tag", values_callable=lambda e: [m.value for m in e]),
         default=PhaseTag.TODO,
@@ -293,21 +291,42 @@ class NotificationModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PhaseTaskTemplateModel(Base):
-    """Nguồn checklist/outcome mặc định theo (phase, role) — seed từ PHASE_ROLE_TASKS."""
-    __tablename__ = "phase_task_templates"
+class PhaseDefinitionModel(Base):
+    """#26 (mảng A): định nghĩa phase theo từng workspace (thay enum dev_phase cứng)."""
+    __tablename__ = "phase_definitions"
+    __table_args__ = (UniqueConstraint("org_id", "code"),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    phase_type: Mapped[DevPhase] = mapped_column(
-        Enum(DevPhase, name="dev_phase", values_callable=lambda e: [m.value for m in e],
-             create_type=False)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
     )
-    role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e],
-             create_type=False)
+    code: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(255))
+    full_name: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    color: Mapped[str] = mapped_column(String(32), default="gray", server_default="gray")
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    items: Mapped[list["PhaseDefinitionItemModel"]] = relationship(
+        cascade="all, delete-orphan", order_by="PhaseDefinitionItemModel.position"
+    )
+
+
+class PhaseDefinitionItemModel(Base):
+    """Checklist/outcome mặc định của 1 phase definition (per-org, thay phase_task_templates)."""
+    __tablename__ = "phase_definition_items"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    phase_def_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("phase_definitions.id", ondelete="CASCADE"), index=True
     )
     kind: Mapped[PhaseItemKind] = mapped_column(
         Enum(PhaseItemKind, name="phase_item_kind", values_callable=lambda e: [m.value for m in e],
+             create_type=False)
+    )
+    role: Mapped[UserRole | None] = mapped_column(
+        Enum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e],
              create_type=False)
     )
     text: Mapped[str] = mapped_column(Text)

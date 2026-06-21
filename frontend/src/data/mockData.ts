@@ -131,7 +131,7 @@ function makePb(project: Project, phaseType: string, title: string, startOffset:
   return {
     id: `pb-${pbIdCounter}`,
     projectId: project.id,
-    phaseType: phaseType as any,
+    phaseType,
     tag: chosenTag,
     title,
     description: `${title} phase for ${project.name}.`,
@@ -217,7 +217,7 @@ export function getOrgById(orgId: string): Organization | undefined {
 }
 
 export function getPhaseIndex(phase: string): number {
-  return DEV_PHASES.indexOf(phase as any);
+  return (DEV_PHASES as readonly string[]).indexOf(phase);
 }
 
 // Role labels

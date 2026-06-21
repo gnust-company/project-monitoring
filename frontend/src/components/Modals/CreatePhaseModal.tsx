@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { PHASE_META, DEV_PHASES, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../../types';
-import type { DevPhase, PhaseBlock, UserRole } from '../../types';
+import type { PhaseBlock, UserRole, PhaseDefinition } from '../../types';
 import { ROLE_LABELS } from '../../data/mockData';
 import { X, Plus, Calendar, Users, Trash2, Target, CheckSquare } from 'lucide-react';
 import { format, addDays } from 'date-fns';
@@ -10,15 +9,9 @@ import Dropdown from '../common/Dropdown';
 
 type DraftItem = { text: string; done: boolean; role?: UserRole };
 
-function defaultChecklist(phase: DevPhase): DraftItem[] {
-  return PHASE_ROLE_TASKS[phase].flatMap(({ role, tasks }) =>
-    tasks.map(text => ({ text, done: false, role }))
-  );
-}
-function defaultOutcomes(phase: DevPhase): DraftItem[] {
-  return PHASE_ROLE_OUTCOMES[phase].flatMap(({ role, outcomes }) =>
-    outcomes.map(text => ({ text, done: false, role }))
-  );
+// #26: checklist/outcome mặc định lấy từ phase definition của workspace.
+function draftFromDef(def: PhaseDefinition | undefined, kind: 'checklist' | 'outcomes'): DraftItem[] {
+  return (def?.[kind] ?? []).map(i => ({ text: i.text, done: false, role: i.role }));
 }
 
 // Section checklist/outcome — gom theo role, mỗi role có sẵn ô thêm riêng
@@ -100,43 +93,47 @@ function DraftSection({ items, setItems, roles, icon, label }: {
 export default function CreatePhaseModal() {
   const {
     createPhaseOpen, closeCreatePhase, createPhaseProjectId, createPhaseDates,
-    orgProjects, addPhaseBlock, selectedOrg, currentUser,
+    orgProjects, addPhaseBlock, selectedOrg, currentUser, phaseDefs, getPhaseMeta,
   } = useApp();
 
   const meId = currentUser?.id ?? '';
+  const defaultCode = phaseDefs[0]?.code ?? '';
 
   const [projectId, setProjectId] = useState(createPhaseProjectId || (orgProjects[0]?.id ?? ''));
-  const [phaseType, setPhaseType] = useState<DevPhase>('PA');
+  const [phaseType, setPhaseType] = useState<string>(defaultCode);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(addDays(new Date(), 14), 'yyyy-MM-dd'));
   const [participants, setParticipants] = useState<string[]>(meId ? [meId] : []);
   const [showParticipants, setShowParticipants] = useState(false);
-  const [checklistItems, setChecklistItems] = useState<DraftItem[]>(defaultChecklist('PA'));
-  const [outcomeItems, setOutcomeItems] = useState<DraftItem[]>(defaultOutcomes('PA'));
+  const [checklistItems, setChecklistItems] = useState<DraftItem[]>([]);
+  const [outcomeItems, setOutcomeItems] = useState<DraftItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!createPhaseOpen) return;
+    const firstCode = phaseDefs[0]?.code ?? '';
+    const firstDef = phaseDefs[0];
     setProjectId(createPhaseProjectId || (orgProjects[0]?.id ?? ''));
-    setPhaseType('PA');
+    setPhaseType(firstCode);
     setTitle('');
     setDescription('');
     setStartDate(createPhaseDates?.startDate ?? format(new Date(), 'yyyy-MM-dd'));
     setEndDate(createPhaseDates?.endDate ?? format(addDays(new Date(), 14), 'yyyy-MM-dd'));
     setParticipants(meId ? [meId] : []);
     setShowParticipants(false);
-    setChecklistItems(defaultChecklist('PA'));
-    setOutcomeItems(defaultOutcomes('PA'));
+    setChecklistItems(draftFromDef(firstDef, 'checklist'));
+    setOutcomeItems(draftFromDef(firstDef, 'outcomes'));
     setError(null);
-  }, [createPhaseOpen, createPhaseProjectId, createPhaseDates, meId]);
+  }, [createPhaseOpen, createPhaseProjectId, createPhaseDates, meId, phaseDefs]);
 
-  const changePhaseType = (phase: DevPhase) => {
-    setPhaseType(phase);
-    setChecklistItems(defaultChecklist(phase));
-    setOutcomeItems(defaultOutcomes(phase));
+  const changePhaseType = (code: string) => {
+    setPhaseType(code);
+    const def = phaseDefs.find(p => p.code === code);
+    setChecklistItems(draftFromDef(def, 'checklist'));
+    setOutcomeItems(draftFromDef(def, 'outcomes'));
   };
 
   const toggleParticipant = (uid: string) => {
@@ -172,8 +169,11 @@ export default function CreatePhaseModal() {
 
   const orgMembers = selectedOrg?.members || [];
   const lockedProject = createPhaseProjectId ? orgProjects.find(p => p.id === createPhaseProjectId) : null;
-  const checklistRoles = PHASE_ROLE_TASKS[phaseType].map(x => x.role);
-  const outcomeRoles = PHASE_ROLE_OUTCOMES[phaseType].map(x => x.role);
+  const currentDef = phaseDefs.find(p => p.code === phaseType);
+  const distinctRoles = (items: { role?: UserRole }[]): UserRole[] =>
+    [...new Set(items.map(i => i.role).filter((r): r is UserRole => !!r))];
+  const checklistRoles = distinctRoles(currentDef?.checklist ?? []);
+  const outcomeRoles = distinctRoles(currentDef?.outcomes ?? []);
 
   return (
     <AnimatePresence>
@@ -209,12 +209,15 @@ export default function CreatePhaseModal() {
 
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block">Loại Phase</label>
-              <Dropdown value={phaseType} onChange={v => changePhaseType(v as DevPhase)}
-                options={DEV_PHASES.map(phase => ({
-                  value: phase, label: PHASE_META[phase].fullLabel, hint: phase,
-                  dotClass: `${PHASE_META[phase].bg} border ${PHASE_META[phase].border}`,
-                  labelClass: `font-medium ${PHASE_META[phase].color}`,
-                }))} />
+              <Dropdown value={phaseType} onChange={v => changePhaseType(v)}
+                options={phaseDefs.map(def => {
+                  const meta = getPhaseMeta(def.code);
+                  return {
+                    value: def.code, label: meta.fullLabel, hint: def.code,
+                    dotClass: `${meta.bg} border ${meta.border}`,
+                    labelClass: `font-medium ${meta.color}`,
+                  };
+                })} />
             </div>
 
             <div>

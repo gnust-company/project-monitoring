@@ -2,7 +2,6 @@ import { useState, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { ROLE_LABELS } from '../../data/mockData';
-import { PHASE_META } from '../../types';
 import type { UserRole } from '../../types';
 import { isPhaseComplete } from '../../lib/projectStatus';
 import {
@@ -28,7 +27,7 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
   const {
     currentUser, currentUserEmail, updateCurrentUser, uploadAvatar,
     organizations, phaseBlocks, orgProjects,
-    changePassword, deleteAccount,
+    changePassword, deleteAccount, getPhaseMeta,
   } = useApp();
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -206,7 +205,7 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
         ) : (
           <div className="space-y-1.5">
             {assignedBlocks.map(pb => {
-              const meta = PHASE_META[pb.phaseType];
+              const meta = getPhaseMeta(pb.phaseType);
               const project = orgProjects.find(p => p.id === pb.projectId);
               const done = pb.checklist.filter(c => c.done).length;
               const pct = pb.checklist.length > 0 ? Math.round((done / pb.checklist.length) * 100) : 0;
@@ -218,7 +217,7 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border border-hairline bg-white text-left group
                     ${clickable ? 'hover:border-stone-300 hover:shadow-sm transition-all' : 'cursor-default'}`}>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${meta.bg} ${meta.color} flex-shrink-0`}>
-                    {pb.phaseType}
+                    {meta.label}
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-ink truncate">{pb.title}</div>

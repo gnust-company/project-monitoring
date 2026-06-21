@@ -6,6 +6,7 @@ import {
   Settings, Users, Trash2, Check, AlertTriangle, UserPlus, X, Mail,
 } from 'lucide-react';
 import Avatar from '../common/Avatar';
+import PhaseManager from './PhaseManager';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -22,6 +23,7 @@ export default function WorkspaceSettingsView() {
     goToWorkspaceSelector,
   } = useApp();
 
+  const [tab, setTab] = useState<'general' | 'phases'>('general');
   const [nameDraft, setNameDraft] = useState(selectedOrg?.name ?? '');
   const [descDraft, setDescDraft] = useState(selectedOrg?.description ?? '');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -82,6 +84,18 @@ export default function WorkspaceSettingsView() {
           </p>
         </motion.div>
 
+        {/* Tabs */}
+        <div className="flex items-center gap-1 mb-6 border-b border-hairline">
+          {([['general', 'Chung & Thành viên'], ['phases', 'Phase']] as const).map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors
+                ${tab === key ? 'border-ink text-ink' : 'border-transparent text-stone-400 hover:text-stone-600'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'general' && <>
         {/* General */}
         <motion.div custom={1} variants={fadeUp} initial="hidden" animate="visible"
           className="bg-surface-card rounded-2xl border border-hairline p-6 mb-6">
@@ -207,6 +221,15 @@ export default function WorkspaceSettingsView() {
               <button onClick={() => setConfirmDelete(false)}
                 className="ml-3 text-xs text-stone-500 hover:text-stone-700">Hủy</button>
             )}
+          </motion.div>
+        )}
+        </>}
+
+        {/* Phase management (#26 mảng A — phase động per-workspace) */}
+        {tab === 'phases' && (
+          <motion.div custom={1} variants={fadeUp} initial="hidden" animate="visible"
+            className="bg-surface-card rounded-2xl border border-hairline p-6">
+            <PhaseManager />
           </motion.div>
         )}
       </div>

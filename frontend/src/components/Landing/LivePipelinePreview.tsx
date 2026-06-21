@@ -218,7 +218,7 @@ export default function LivePipelinePreview() {
         rows.get(b.row)!.push(b);
       }
 
-      for (const [_, rowBlocks] of rows) {
+      for (const [, rowBlocks] of rows) {
         const resolved = resolveOverlaps(rowBlocks, dragPreview?.blockId);
         resolved.forEach((pos, id) => {
           const b = rowBlocks.find(x => x.id === id)!;

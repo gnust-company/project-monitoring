@@ -6,6 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.application.use_cases.change_requests import ListPendingChangeRequests
 from app.application.use_cases.phase_blocks import ListActivity
+from app.application.use_cases.phase_definitions import (
+    CreatePhaseDef,
+    DeletePhaseDef,
+    ListPhaseDefs,
+    PhaseDefInUseError,
+    PhaseDefNotFoundError,
+    ReorderPhaseDefs,
+    UpdatePhaseDef,
+)
 from app.application.use_cases.organizations import (
     AddMember,
     CreateOrganization,
@@ -24,13 +33,18 @@ from app.presentation.api.deps import (
     OrgRepoDep,
     add_member_uc,
     create_org_uc,
+    create_phase_def_uc,
     delete_org_uc,
+    delete_phase_def_uc,
     get_org_uc,
     list_activity_uc,
     list_orgs_uc,
     list_pending_crs_uc,
+    list_phase_defs_uc,
     remove_member_uc,
     rename_org_uc,
+    reorder_phase_defs_uc,
+    update_phase_def_uc,
 )
 from app.presentation.api.schemas import (
     ActivityOut,
@@ -39,6 +53,10 @@ from app.presentation.api.schemas import (
     OrganizationOut,
     OrgCreate,
     OrgRename,
+    PhaseDefCreate,
+    PhaseDefinitionOut,
+    PhaseDefUpdate,
+    PhaseReorderIn,
     UserOut,
 )
 
@@ -166,3 +184,70 @@ async def list_change_requests(
     uc: Annotated[ListPendingChangeRequests, Depends(list_pending_crs_uc)],
 ) -> list[ChangeRequestOut]:
     return [ChangeRequestOut.model_validate(cr) for cr in await uc.execute(org_id)]
+
+
+# ─── Phase definitions (#26 mảng A — phase động per-workspace) ────────
+@router.get("/{org_id}/phases", response_model=list[PhaseDefinitionOut])
+async def list_phases(
+    org_id: UUID,
+    access: AccessDep,
+    uc: Annotated[ListPhaseDefs, Depends(list_phase_defs_uc)],
+) -> list[PhaseDefinitionOut]:
+    """Mọi member đọc được (FE render timeline/dashboard theo phase của workspace)."""
+    return [PhaseDefinitionOut.from_entity(p) for p in await uc.execute(org_id)]
+
+
+@router.post("/{org_id}/phases", response_model=PhaseDefinitionOut, status_code=status.HTTP_201_CREATED)
+async def create_phase(
+    org_id: UUID,
+    body: PhaseDefCreate,
+    access: ManageDep,
+    uc: Annotated[CreatePhaseDef, Depends(create_phase_def_uc)],
+) -> PhaseDefinitionOut:
+    phase = await uc.execute(org_id, body.model_dump(mode="json"))
+    return PhaseDefinitionOut.from_entity(phase)
+
+
+@router.post("/{org_id}/phases/reorder", response_model=list[PhaseDefinitionOut])
+async def reorder_phases(
+    org_id: UUID,
+    body: PhaseReorderIn,
+    access: ManageDep,
+    uc: Annotated[ReorderPhaseDefs, Depends(reorder_phase_defs_uc)],
+) -> list[PhaseDefinitionOut]:
+    phases = await uc.execute(org_id, body.ordered_ids)
+    return [PhaseDefinitionOut.from_entity(p) for p in phases]
+
+
+@router.patch("/{org_id}/phases/{phase_id}", response_model=PhaseDefinitionOut)
+async def update_phase(
+    org_id: UUID,
+    phase_id: UUID,
+    body: PhaseDefUpdate,
+    access: ManageDep,
+    uc: Annotated[UpdatePhaseDef, Depends(update_phase_def_uc)],
+) -> PhaseDefinitionOut:
+    try:
+        phase = await uc.execute(org_id, phase_id, body.model_dump(mode="json", exclude_unset=True))
+    except PhaseDefNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase not found")
+    return PhaseDefinitionOut.from_entity(phase)
+
+
+@router.delete("/{org_id}/phases/{phase_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_phase(
+    org_id: UUID,
+    phase_id: UUID,
+    access: ManageDep,
+    uc: Annotated[DeletePhaseDef, Depends(delete_phase_def_uc)],
+    force: bool = False,
+) -> None:
+    try:
+        await uc.execute(org_id, phase_id, force=force)
+    except PhaseDefNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase not found")
+    except PhaseDefInUseError as e:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail={"message": f"{e.count} block đang dùng phase này", "count": e.count},
+        )

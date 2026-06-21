@@ -27,26 +27,14 @@ async def _make_block(client, token, project_id, **over):
     return resp.json()
 
 
-# ─── Templates (Slice 6) ─────────────────────────────────────────────
-async def test_templates_endpoint(client: AsyncClient, make_user):
-    token, *_ = await _setup(client, make_user)
-    resp = await client.get(f"{API}/templates/phase-tasks?phase=SD", headers=auth(token))
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["phase"] == "SD"
-    roles = {g["role"] for g in data["checklist"]}
-    assert "UI_Designer" in roles and "SW_Architect" in roles
-    assert any("SRS" in g["outcomes"] for g in data["outcomes"])
-
-
-# ─── Create / seed ───────────────────────────────────────────────────
-async def test_create_block_seeds_from_templates(client: AsyncClient, make_user):
+# ─── Create / seed (#26 mảng A: seed từ phase definition mặc định của workspace) ─
+async def test_create_block_seeds_from_phase_definition(client: AsyncClient, make_user):
     token, user, _, proj = await _setup(client, make_user)
     block = await _make_block(client, token, proj["id"])
     # assignee mặc định = người tạo
     assert block["assignee"] == user["id"]
     assert block["createdBy"] == user["id"]
-    # checklist + outcomes seed từ template SD
+    # checklist + outcomes seed từ phase definition SD (7 phase mặc định seed khi tạo org)
     checklist_texts = [c["text"] for c in block["checklist"]]
     assert "Design wireframes" in checklist_texts
     assert "Create HLD" in checklist_texts

@@ -13,8 +13,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.domain.phase_templates import iter_template_rows
-from app.infrastructure.db.models import Base, PhaseTaskTemplateModel
+from app.infrastructure.db.models import Base
 from app.infrastructure.db.session import get_session
 from app.main import app
 
@@ -28,17 +27,13 @@ TEST_DATABASE_URL = os.getenv(
 def _setup_schema():
     """Dựng lại schema 1 lần cho cả phiên test (loop độc lập với test loop).
 
-    Seed phase_task_templates (commit) để mọi test thấy — read thấy data committed,
-    rollback của từng test không đụng tới."""
+    #26 (mảng A): phase mặc định nay seed theo từng workspace khi tạo org (qua API),
+    không còn bảng global phase_task_templates để seed sẵn ở đây."""
     async def _rebuild():
         engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
-            await conn.execute(
-                PhaseTaskTemplateModel.__table__.insert(),
-                list(iter_template_rows()),
-            )
         await engine.dispose()
 
     asyncio.run(_rebuild())

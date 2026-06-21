@@ -17,7 +17,8 @@ users ──< organization_members >── organizations
                                                              ├──< attachments        (file | link)
                                                              └──< activity_log
 
-phase_task_templates   (nguồn sinh checklist/outcome mặc định theo phase × role)
+phase_definitions      (per-org: phase động, thêm/đổi/sắp xếp/xóa) ──< phase_definition_items
+                       (checklist/outcome mặc định theo phase × role)
 ```
 
 ## Enums
@@ -30,7 +31,8 @@ CREATE TYPE user_role AS ENUM (
 CREATE TYPE project_status AS ENUM ('On Track', 'At Risk', 'Delayed');
 
 -- 7 phase chuẩn của development pipeline
-CREATE TYPE dev_phase AS ENUM ('PA', 'SA', 'SD', 'SI', 'ST', 'DEP', 'OM');
+-- #26 (mảng A): enum dev_phase đã bị bỏ (migration 0008). Phase nay động per-workspace
+-- (bảng phase_definitions); phase_blocks.phase_type là VARCHAR lưu code của phase definition.
 
 CREATE TYPE phase_tag AS ENUM ('Backlog', 'Todo', 'Inprogress', 'Complete', 'Canceled');
 
@@ -122,7 +124,7 @@ CREATE INDEX idx_projects_org ON projects(org_id);
 CREATE TABLE phase_blocks (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id      UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  phase_type      dev_phase NOT NULL,
+  phase_type      VARCHAR(32) NOT NULL,  -- #26 (mảng A): code phase_definitions của org (trước đây enum dev_phase)
   tag             phase_tag NOT NULL DEFAULT 'Todo',
   title           VARCHAR(255) NOT NULL,
   description     TEXT NOT NULL DEFAULT '',
@@ -237,21 +239,35 @@ CREATE INDEX idx_activity_block   ON activity_log(phase_block_id, created_at DES
 CREATE INDEX idx_activity_org     ON activity_log(org_id, created_at DESC);
 ```
 
-### phase_task_templates
+### phase_definitions + phase_definition_items (#26 mảng A — phase động per-workspace)
 
-Nguồn sinh checklist/outcome mặc định theo `(phase_type, role)` — thay cho `PHASE_ROLE_TASKS` / `PHASE_ROLE_OUTCOMES` hard-code ở frontend. Khi tạo phase block, BE đọc bảng này để sinh `phase_items`.
+Thay cho enum cứng `dev_phase` và bảng global `phase_task_templates` (migration **0008_phase_definitions** xóa cả hai). Mỗi workspace tự định nghĩa danh sách phase (thêm/đổi tên/đổi màu/sắp xếp/xóa) + checklist/outcome mặc định riêng. `phase_blocks.phase_type` lưu `code` của một phase definition trong cùng org. Org mới được seed 7 phase mặc định (PA…OM) khi tạo.
 
 ```sql
-CREATE TABLE phase_task_templates (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  phase_type dev_phase NOT NULL,
-  role       user_role NOT NULL,
-  kind       phase_item_kind NOT NULL,
-  text       TEXT NOT NULL,
-  position   INTEGER NOT NULL DEFAULT 0
+CREATE TABLE phase_definitions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  code        VARCHAR(32) NOT NULL,           -- khóa ngắn duy nhất trong org (vd 'PA')
+  name        VARCHAR(255) NOT NULL,          -- nhãn ngắn (VN)
+  full_name   VARCHAR(255) NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  color       VARCHAR(32) NOT NULL DEFAULT 'gray',  -- khóa palette (FE map sang class Tailwind)
+  position    INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (org_id, code)
 );
+CREATE INDEX ix_phase_definitions_org_id ON phase_definitions(org_id);
 
-CREATE INDEX idx_templates_phase ON phase_task_templates(phase_type, kind);
+-- checklist/outcome mặc định của 1 phase (sinh phase_items khi tạo phase block)
+CREATE TABLE phase_definition_items (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  phase_def_id UUID NOT NULL REFERENCES phase_definitions(id) ON DELETE CASCADE,
+  kind         phase_item_kind NOT NULL,
+  role         user_role,                     -- NULL = mục "chung" (không theo role)
+  text         TEXT NOT NULL,
+  position     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX ix_phase_definition_items_phase_def_id ON phase_definition_items(phase_def_id);
 ```
 
 **Seed data**: chuyển nguyên nội dung `PHASE_ROLE_TASKS` và `PHASE_ROLE_OUTCOMES` từ `frontend/src/types.ts` vào bảng này (VD: `('PA', 'PM', 'checklist', 'Define goals and objectives', 0)` ...). Nguồn sự thật ở backend: `app/domain/phase_templates.py`; seed bằng migration `0002_seed_templates` (56 dòng).
@@ -317,7 +333,7 @@ CREATE INDEX idx_notif_user ON notifications(user_id, read, created_at DESC);
 | `Attachment` | `attachments` | `fileName` → `file_name` |
 | `Comment` | `comments` | |
 | `ActivityItem` | `activity_log` | nay có `project_id` → dùng cho cả changelog dự án |
-| `PHASE_ROLE_TASKS/OUTCOMES` | `phase_task_templates` | từ hằng số → data |
+| `PhaseDefinition` | `phase_definitions` + `phase_definition_items` | #26 mảng A: phase động per-org (thay enum `dev_phase` + `phase_task_templates`); FE `PHASE_META`/`PHASE_ROLE_*` chỉ còn cho landing/demo |
 | *(mới)* permission | `users.is_superuser` + `organization_members.role` | tách khỏi `UserRole` |
 | *(mới)* PIC dự án (#11) | `projects.pic_user_id` | mặc định `created_by`, đổi được; thay thế approval queue |
 | *(deprecated)* approval queue | `change_requests` | đã thay bằng PIC; bảng giữ lại, không dùng (#11) |

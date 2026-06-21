@@ -6,6 +6,7 @@ from app.application.ports import (
     ObjectStorage,
     OrganizationRepository,
     PhaseBlockRepository,
+    PhaseDefinitionRepository,
     UserRepository,
 )
 from app.application.use_cases.storage_cleanup import purge_object_urls
@@ -22,12 +23,15 @@ class UserNotFoundError(Exception):
 
 
 class CreateOrganization:
-    def __init__(self, orgs: OrganizationRepository) -> None:
+    def __init__(self, orgs: OrganizationRepository, phases: PhaseDefinitionRepository) -> None:
         self._orgs = orgs
+        self._phases = phases
 
     async def execute(self, name: str, creator_id: UUID, description: str = "") -> Organization:
         org = await self._orgs.create(Organization(id=uuid4(), name=name, description=description))
         await self._orgs.add_member(org.id, creator_id, WorkspaceRole.OWNER)
+        # #26 (mảng A): seed 7 phase mặc định cho workspace mới.
+        await self._phases.seed_defaults(org.id)
         org.member_ids = [creator_id]
         return org
 

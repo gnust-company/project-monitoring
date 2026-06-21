@@ -13,7 +13,6 @@ from app.domain.value_objects import (
     AttachmentKind,
     ChangeRequestAction,
     ChangeRequestStatus,
-    DevPhase,
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
@@ -119,11 +118,39 @@ class ActivityEntry:
 
 
 @dataclass(slots=True)
+class PhaseDefinitionItem:
+    """#26 (mảng A): 1 dòng checklist/outcome mặc định của 1 phase definition."""
+    id: UUID
+    kind: PhaseItemKind
+    text: str
+    role: UserRole | None = None
+    position: int = 0
+
+
+@dataclass(slots=True)
+class PhaseDefinition:
+    """#26 (mảng A): định nghĩa phase theo từng workspace (thay enum DevPhase cứng).
+
+    `code` là khóa ngắn duy nhất trong org (vd "PA"); phase_blocks.phase_type lưu code này.
+    """
+    id: UUID
+    org_id: UUID
+    code: str
+    name: str
+    full_name: str = ""
+    description: str = ""
+    color: str = "gray"  # khóa palette (FE map sang class Tailwind)
+    position: int = 0
+    items: list[PhaseDefinitionItem] = field(default_factory=list)
+    created_at: datetime | None = None
+
+
+@dataclass(slots=True)
 class PhaseBlock:
     """Aggregate root của một phase block trên timeline."""
     id: UUID
     project_id: UUID
-    phase_type: DevPhase
+    phase_type: str  # #26: code của phase definition (per-org), không còn enum cứng
     tag: PhaseTag
     title: str
     description: str
@@ -181,17 +208,3 @@ class Notification:
     change_request_id: UUID | None = None
     read: bool = False
     created_at: datetime | None = None
-
-
-@dataclass(slots=True)
-class PhaseTaskTemplate:
-    """Nguồn sinh checklist/outcome mặc định theo (phase, role).
-
-    Tương ứng PHASE_ROLE_TASKS / PHASE_ROLE_OUTCOMES ở frontend.
-    """
-    id: UUID
-    phase_type: DevPhase
-    role: UserRole
-    kind: PhaseItemKind
-    text: str
-    position: int = 0

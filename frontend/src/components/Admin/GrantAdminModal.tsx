@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldPlus, ShieldMinus, X, AlertTriangle } from 'lucide-react';
 import type { AdminUserInfo } from '../../types';
@@ -12,10 +12,10 @@ interface Props {
 }
 
 export default function GrantAdminModal({ user, onClose, onDone }: Props) {
+  // State reset tự nhiên nhờ remount theo key={user.id} ở nơi mount (AdminLayout) —
+  // không cần effect đồng bộ (tránh react-hooks/set-state-in-effect).
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => { if (user) { setError(null); setSubmitting(false); } }, [user]);
 
   const granting = user ? !user.isSuperuser : true; // true = cấp quyền, false = thu hồi
 

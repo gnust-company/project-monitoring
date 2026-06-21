@@ -1,6 +1,5 @@
 import { useRef, useMemo, useState, useCallback, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { useApp } from '../../context/AppContext';
-import { PHASE_META, DEV_PHASES } from '../../types';
 import type { PhaseBlock } from '../../types';
 import { getUserById } from '../../data/mockData';
 import { Search, X, MousePointer2, Hand, SquarePen, Eye, Save, RotateCcw } from 'lucide-react';
@@ -77,7 +76,7 @@ export default function PipelineTimeline() {
     orgProjects, phaseBlocks, searchQuery, zoomLevel, selectedOrgId,
     setSearchQuery, setZoomLevel,
     openPhaseDetail, openCreatePhase,
-    openProjectDetail, updatePhaseBlock,
+    openProjectDetail, updatePhaseBlock, phaseDefs, getPhaseMeta,
   } = useApp();
 
   const boardRef = useRef<HTMLDivElement>(null);
@@ -909,7 +908,7 @@ export default function PipelineTimeline() {
                   {pbs.map(pb => {
                     const pos = layoutMap.get(pb.id);
                     if (!pos || !isInView(pb)) return null;
-                    const meta = PHASE_META[pb.phaseType];
+                    const meta = getPhaseMeta(pb.phaseType);
                     const left = getDatePos(parseISO(pos.startDate));
                     const right = getDatePos(parseISO(pos.endDate));
                     const width = Math.max(24, right - left);
@@ -985,12 +984,12 @@ export default function PipelineTimeline() {
         {/* Legend — chú thích các phase */}
         <div className="absolute bottom-3 right-3 z-30 bg-white/95 backdrop-blur border border-hairline rounded-lg shadow-md px-3 py-2 pointer-events-none">
           <div className="flex items-center gap-3 flex-wrap">
-            {DEV_PHASES.map(phase => {
-              const meta = PHASE_META[phase];
+            {phaseDefs.map(def => {
+              const meta = getPhaseMeta(def.code);
               return (
-                <span key={phase} className="flex items-center gap-1.5 text-[9px] text-stone-500">
+                <span key={def.code} className="flex items-center gap-1.5 text-[9px] text-stone-500">
                   <span className={`w-2 h-2 rounded-sm ${meta.solid}`} />
-                  <span className="font-bold text-stone-600">{phase}</span>
+                  <span className="font-bold text-stone-600">{meta.label}</span>
                   <span className="font-light hidden xl:inline">{meta.fullLabel}</span>
                 </span>
               );
@@ -1028,7 +1027,7 @@ export default function PipelineTimeline() {
         const pb = phaseBlocks.find(b => b.id === hoverInfo.id);
         const pos = layoutMap.get(hoverInfo.id);
         if (!pb || !pos) return null;
-        const meta = PHASE_META[pb.phaseType];
+        const meta = getPhaseMeta(pb.phaseType);
         const pct = Math.round(phaseBlockProgress(pb) * 100); // #8: gộp checklist + outcomes
         const assignee = getUserById(pb.createdBy); // #13: PIC = người tạo
         const boardTop = boardRef.current?.getBoundingClientRect().top ?? 0;
