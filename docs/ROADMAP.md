@@ -19,12 +19,12 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | 2 | #5, #11, #13, #20 | ✅ Xong |
 | 3 | #10, #9, #8, #12, #17 | ✅ Xong |
 | 4 | #15, #25, #23, #14, #18 | ✅ Xong |
-| 5 | #21, #22, #24, #26 | ⬜ Chưa bắt đầu (issue mới từ user) |
+| 5 | #21, #22, #24, #26 | 🟡 Đang làm (#24 xong) |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
-> **Trạng thái GitHub**: #8, #9, #10, #12, #14, #15, #17, #18, #23, #25 đã đóng (2026-06-20).
-> Còn OPEN: Wave 5 (#21, #22, #24, #26).
+> **Trạng thái GitHub**: #8, #9, #10, #12, #14, #15, #17, #18, #23, #24, #25 đã đóng (#24 đóng 2026-06-21).
+> Còn OPEN: Wave 5 (#21, #22, #26).
 
 ---
 
@@ -87,8 +87,9 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
   - Xóa phase/dự án/workspace → xóa luôn object trên MinIO (tránh phình store). Rà cascade ở BE storage layer.
 - [ ] [#22 — Tăng cường upload file (progress + multi-file modal)](https://github.com/gnust-company/project-monitoring/issues/22)
   - Modal kéo-thả/chọn nhiều file, progress bar từng file, thêm/sửa/xóa trước khi confirm mới upload.
-- [ ] [#24 — Rà soát changelog (ẩn UUID, format dễ đọc)](https://github.com/gnust-company/project-monitoring/issues/24)
-  - Changelog phase đang show kèm raw ID (vd "added participant — 9c1008f1…"); cần map ID → tên người/đối tượng, format gọn.
+- [x] [#24 — Rà soát changelog (ẩn UUID, format dễ đọc)](https://github.com/gnust-company/project-monitoring/issues/24)
+  - Helper chung `lib/formatActivity.ts` biến `(action, target)` thô của BE → câu tiếng Việt: dịch hành động, UUID→tên người (`getUserById`), ISO date→dd/MM/yyyy, PhaseTag code→nhãn (`PHASE_TAG_META`); lớp phòng vệ quét & thay mọi UUID lẻ.
+  - Tên người gộp vào động từ ("đã thêm người tham gia Nguyễn A") để bỏ dấu "—" lửng. Áp dụng ở PhaseDetailModal, ProjectDetailModal, DashboardView (recent activity). FE-only, không đụng schema/BE.
 - [ ] [#26 — Mở rộng người dùng: phase tùy biến theo workspace](https://github.com/gnust-company/project-monitoring/issues/26) ⚠️ *lớn — đổi schema*
   - Phase (tên/màu/role/checklist/outcome) thành **default sửa được** theo workspace (không hard-code 7 phase). Tạo workspace 2 step (mời thành viên + tùy chỉnh phase); view Overview (description + changelog workspace-level); cảnh báo block khi xóa phase đang dùng.
 

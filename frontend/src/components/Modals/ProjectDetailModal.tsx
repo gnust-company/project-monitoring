@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { getUserById } from '../../data/mockData';
 import { ROLE_LABELS } from '../../data/mockData';
 import { projectsApi } from '../../api';
+import { formatActivity } from '../../lib/formatActivity';
 import { PHASE_META } from '../../types';
 import type { ProjectStatus, ActivityItem } from '../../types';
 import {
@@ -354,6 +355,7 @@ export default function ProjectDetailModal() {
                   {activity.map(a => {
                     const user = getUserById(a.userId);
                     const block = a.phaseBlockId ? phaseBlocks.find(b => b.id === a.phaseBlockId) : null;
+                    const { verb, detail } = formatActivity(a.action, a.target, getUserById);
                     // 'created/deleted/renamed phase' đã có tên ở target → không lặp lại
                     const isPhaseNameAction = /\bphase$/.test(a.action);
                     const phaseName = !isPhaseNameAction ? block?.title : null;
@@ -362,9 +364,9 @@ export default function ProjectDetailModal() {
                         <Avatar name={user?.name} src={user?.avatar} className="w-5 h-5 mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-stone-700">
-                            <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {a.action}
+                            <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {verb}
                             {phaseName && <span className="text-stone-700"> · phase “{phaseName}”</span>}
-                            {a.target && <span className="text-stone-500"> — {a.target}</span>}
+                            {detail && <span className="text-stone-500"> — {detail}</span>}
                           </p>
                           <p className="text-[10px] text-stone-400">{format(parseISO(a.timestamp), 'dd/MM/yyyy HH:mm')}</p>
                         </div>

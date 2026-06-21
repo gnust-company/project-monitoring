@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { useMemo, useState, useEffect } from 'react';
 import Avatar from '../common/Avatar';
 import { computeProjectStatus, projectPhaseProgress, daysToNearestDeadline, isPhaseComplete } from '../../lib/projectStatus';
+import { formatActivity } from '../../lib/formatActivity';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -70,7 +71,7 @@ function ProgressRing({ pct, size = 150, stroke = 11 }: { pct: number; size?: nu
 
 export default function DashboardView() {
   const {
-    selectedOrg, orgProjects, phaseBlocks,
+    selectedOrg, orgProjects, phaseBlocks, getUserById,
     setWorkspaceView, openProjectDetail, setStatusFilter,
   } = useApp();
 
@@ -412,7 +413,7 @@ export default function DashboardView() {
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-body leading-relaxed">
                           <span className="font-medium text-ink">{user?.name || act.userId}</span>
-                          {' '}{act.action}
+                          {' '}{formatActivity(act.action, act.target, getUserById).verb}
                           <span className="text-muted-soft"> — {act.phaseTitle}</span>
                         </p>
                         <p className="text-[10px] text-muted-soft mt-0.5">{timeAgo}</p>

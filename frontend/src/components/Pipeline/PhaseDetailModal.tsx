@@ -13,6 +13,7 @@ import { format, parseISO } from 'date-fns';
 import Avatar from '../common/Avatar';
 import Dropdown from '../common/Dropdown';
 import DeleteReasonDialog from '../ui/DeleteReasonDialog';
+import { formatActivity } from '../../lib/formatActivity';
 
 // Gom item theo role — luôn hiện đủ role chuẩn của phase (kèm ô thêm riêng),
 // thêm role lạ nếu có, cuối cùng là nhóm "Chung".
@@ -920,13 +921,14 @@ export default function PhaseDetailModal() {
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {selectedPhaseBlock.activityLog.map(a => {
                     const user = getUserById(a.userId);
+                    const { verb, detail } = formatActivity(a.action, a.target, getUserById);
                     return (
                       <div key={a.id} className="flex gap-2.5 items-start">
                         <Avatar name={user?.name} src={user?.avatar} className="w-6 h-6 shrink-0" />
                         <div className="min-w-0">
                           <p className="text-xs text-gray-700">
-                            <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {a.action}
-                            {a.target && <span className="text-gray-500"> — {a.target}</span>}
+                            <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {verb}
+                            {detail && <span className="text-gray-500"> — {detail}</span>}
                           </p>
                           <p className="text-[10px] text-gray-400">{format(parseISO(a.timestamp), 'dd/MM/yyyy HH:mm')}</p>
                         </div>
