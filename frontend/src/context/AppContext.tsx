@@ -110,7 +110,7 @@ interface AppContextType extends AppState {
   deletePhaseItem: (blockId: string, itemId: string) => Promise<void>;
   addPhaseComment: (blockId: string, content: string) => Promise<void>;
   addPhaseLink: (blockId: string, fileName: string, url: string, outcomeItemId?: string | null) => Promise<void>;
-  uploadPhaseFile: (blockId: string, file: File, outcomeItemId?: string | null) => Promise<void>;
+  uploadPhaseFile: (blockId: string, file: File, outcomeItemId?: string | null, onProgress?: (pct: number) => void) => Promise<void>;
   deletePhaseAttachment: (blockId: string, attachmentId: string) => Promise<void>;
 
   // Org actions
@@ -522,8 +522,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     patchBlock(blockId, pb => ({ ...pb, attachments: [...pb.attachments, att] }));
   }, [patchBlock]);
 
-  const uploadPhaseFile = useCallback(async (blockId: string, file: File, outcomeItemId?: string | null) => {
-    const att = await phaseBlocksApi.uploadFile(blockId, file, outcomeItemId);
+  const uploadPhaseFile = useCallback(async (blockId: string, file: File, outcomeItemId?: string | null, onProgress?: (pct: number) => void) => {
+    const att = await phaseBlocksApi.uploadFile(blockId, file, outcomeItemId, onProgress);
     patchBlock(blockId, pb => ({ ...pb, attachments: [...pb.attachments, att] }));
   }, [patchBlock]);
 

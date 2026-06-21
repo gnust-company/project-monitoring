@@ -96,6 +96,34 @@ export const api = {
     }));
   },
 
+  // #22: upload có theo dõi tiến độ — dùng XHR vì fetch không phát sự kiện upload progress.
+  uploadWithProgress<T>(path: string, file: File, onProgress?: (pct: number) => void): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${BASE}${path}`);
+      const token = getToken();
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        let data: unknown = null;
+        try { data = xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch { /* giữ null */ }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data as T);
+        } else {
+          const d = data as { detail?: string; message?: string } | null;
+          const detail = (d && (d.detail || d.message)) || xhr.statusText;
+          reject(new ApiError(xhr.status, typeof detail === 'string' ? detail : JSON.stringify(detail)));
+        }
+      };
+      xhr.onerror = () => reject(new ApiError(0, 'Lỗi mạng khi tải tệp'));
+      const form = new FormData();
+      form.append('file', file);
+      xhr.send(form);
+    });
+  },
+
   // POST nhưng cần biết status code (vd 200 áp dụng vs 202 chờ duyệt)
   async postWithStatus<T>(path: string, body?: unknown): Promise<{ status: number; data: T }> {
     const resp = await fetch(`${BASE}${path}`, {

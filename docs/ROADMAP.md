@@ -19,12 +19,12 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | 2 | #5, #11, #13, #20 | ✅ Xong |
 | 3 | #10, #9, #8, #12, #17 | ✅ Xong |
 | 4 | #15, #25, #23, #14, #18 | ✅ Xong |
-| 5 | #21, #22, #24, #26 | 🟡 Đang làm (#21, #24 xong) |
+| 5 | #21, #22, #24, #26 | 🟡 Đang làm (#21, #22, #24 xong) |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
-> **Trạng thái GitHub**: #8, #9, #10, #12, #14, #15, #17, #18, #21, #23, #24, #25 đã đóng (#21, #24 đóng 2026-06-21).
-> Còn OPEN: Wave 5 (#22, #26).
+> **Trạng thái GitHub**: #8, #9, #10, #12, #14, #15, #17, #18, #21, #22, #23, #24, #25 đã đóng (#21, #22, #24 đóng 2026-06-21).
+> Còn OPEN: Wave 5 (#26).
 
 ---
 
@@ -87,8 +87,9 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
   - Helper `use_cases/storage_cleanup.py` (`purge_object_urls`, best-effort): xóa phase/dự án/workspace → xóa object `attachments` (kind=file); xóa user → xóa avatar. Thu thập URL **trước** khi xóa hàng DB (FK CASCADE chỉ dọn row). Repo query `file_attachment_urls_by_project/_org`.
   - **Audit lỗ hổng "xóa cha → con kẹt/leak"**: phát hiện 3 cột FK người dùng `ON DELETE SET NULL` nhưng cột NOT NULL (`projects.created_by`, `phase_blocks.created_by`, `comments.author_id`) → xóa user từng tạo dự án/phase/comment bị `NotNullViolation` (không xóa được). Sửa nullable qua **migration 0006** + ORM models + domain entities + DTOs + FE mapper. Các quan hệ cha-con khác (org→project→phase→items/comments/attachments) đã CASCADE đầy đủ, không orphan row.
   - Test: `test_attachments.py` thêm 3 ca (xóa phase/dự án/account → object MinIO trả 404).
-- [ ] [#22 — Tăng cường upload file (progress + multi-file modal)](https://github.com/gnust-company/project-monitoring/issues/22)
-  - Modal kéo-thả/chọn nhiều file, progress bar từng file, thêm/sửa/xóa trước khi confirm mới upload.
+- [x] [#22 — Tăng cường upload file (progress + multi-file modal)](https://github.com/gnust-company/project-monitoring/issues/22)
+  - `uploadWithProgress` (XHR) thay `fetch` để báo % upload thật; `uploadFile`/`uploadPhaseFile` truyền `onProgress`.
+  - `FileUploadModal` mới: kéo-thả/chọn nhiều file, thêm/xóa hàng đợi trước khi confirm; progress bar + % từng file, ✓ xong / ⚠ lỗi (thử lại được); khóa thao tác khi đang tải. Nút "Upload tệp" ở Document mở modal này.
 - [x] [#24 — Rà soát changelog (ẩn UUID, format dễ đọc)](https://github.com/gnust-company/project-monitoring/issues/24)
   - Helper chung `lib/formatActivity.ts` biến `(action, target)` thô của BE → câu tiếng Việt: dịch hành động, UUID→tên người (`getUserById`), ISO date→dd/MM/yyyy, PhaseTag code→nhãn (`PHASE_TAG_META`); lớp phòng vệ quét & thay mọi UUID lẻ.
   - Tên người gộp vào động từ ("đã thêm người tham gia Nguyễn A") để bỏ dấu "—" lửng. Áp dụng ở PhaseDetailModal, ProjectDetailModal, DashboardView (recent activity). FE-only, không đụng schema/BE.

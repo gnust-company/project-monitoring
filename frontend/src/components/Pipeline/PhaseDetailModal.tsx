@@ -13,6 +13,7 @@ import { format, parseISO } from 'date-fns';
 import Avatar from '../common/Avatar';
 import Dropdown from '../common/Dropdown';
 import DeleteReasonDialog from '../ui/DeleteReasonDialog';
+import FileUploadModal from '../ui/FileUploadModal';
 import { formatActivity } from '../../lib/formatActivity';
 
 // Gom item theo role — luôn hiện đủ role chuẩn của phase (kèm ô thêm riêng),
@@ -33,7 +34,6 @@ export default function PhaseDetailModal() {
     addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,
     currentUser, selectedOrg,
   } = useApp();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [commentText, setCommentText] = useState('');
   const [checkDrafts, setCheckDrafts] = useState<Record<string, string>>({});
@@ -63,6 +63,8 @@ export default function PhaseDetailModal() {
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkName, setLinkName] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  // #22: modal tải nhiều tệp (kéo-thả + progress)
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   // Collapsible sections — mặc định thu gọn
   const [expandChecklist, setExpandChecklist] = useState(false);
@@ -250,13 +252,6 @@ export default function PhaseDetailModal() {
     if (!commentText.trim() || !selectedPhaseBlock) return;
     addPhaseComment(selectedPhaseBlock.id, commentText.trim());
     setCommentText('');
-  };
-
-  const handleAttachFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedPhaseBlock) return;
-    uploadPhaseFile(selectedPhaseBlock.id, file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleAttachLink = () => {
@@ -857,8 +852,7 @@ export default function PhaseDetailModal() {
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">
-                <input ref={fileInputRef} type="file" onChange={handleAttachFile} className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()}
+                <button onClick={() => setShowUploadModal(true)}
                   className="py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-500
                              hover:border-gray-300 transition-colors flex items-center justify-center gap-1.5">
                   <Paperclip className="w-3.5 h-3.5" /> Upload tệp
@@ -970,6 +964,14 @@ export default function PhaseDetailModal() {
             setConfirmDelete(false);
             closePhaseDetail();
           }}
+        />
+      )}
+
+      {/* #22: modal tải nhiều tệp + thanh tiến độ */}
+      {showUploadModal && (
+        <FileUploadModal
+          onClose={() => setShowUploadModal(false)}
+          uploadFn={(file, onProgress) => uploadPhaseFile(selectedPhaseBlock.id, file, null, onProgress)}
         />
       )}
     </AnimatePresence>

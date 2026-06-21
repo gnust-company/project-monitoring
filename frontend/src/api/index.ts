@@ -196,9 +196,9 @@ export const phaseBlocksApi = {
   async addLink(blockId: string, fileName: string, url: string, outcomeItemId?: string | null): Promise<Attachment> {
     return mapAttachment(await api.post<AttachmentDTO>(`/phase-blocks/${blockId}/attachments/link`, { fileName, url, outcomeItemId }));
   },
-  async uploadFile(blockId: string, file: File, outcomeItemId?: string | null): Promise<Attachment> {
+  async uploadFile(blockId: string, file: File, outcomeItemId?: string | null, onProgress?: (pct: number) => void): Promise<Attachment> {
     const qs = outcomeItemId ? `?outcome_item_id=${outcomeItemId}` : '';
-    return mapAttachment(await api.upload<AttachmentDTO>(`/phase-blocks/${blockId}/attachments/file${qs}`, file));
+    return mapAttachment(await api.uploadWithProgress<AttachmentDTO>(`/phase-blocks/${blockId}/attachments/file${qs}`, file, onProgress));
   },
   async deleteAttachment(blockId: string, attachmentId: string): Promise<void> {
     await api.del(`/phase-blocks/${blockId}/attachments/${attachmentId}`);
