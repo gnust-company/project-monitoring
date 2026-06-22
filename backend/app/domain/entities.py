@@ -223,3 +223,16 @@ class Notification:
     change_request_id: UUID | None = None
     read: bool = False
     created_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class Announcement:
+    """#27: thông báo broadcast từ admin, hiện modal trong khoảng [starts_at, ends_at]."""
+    id: UUID
+    title: str
+    body: str = ""
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    created_by: UUID | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

@@ -3,7 +3,7 @@
 Theo dõi tiến độ các issue đã verify + breakdown. Tick `[x]` khi hoàn thành.
 Repo: <https://github.com/gnust-company/project-monitoring>
 
-> Cập nhật lần cuối: 2026-06-20
+> Cập nhật lần cuối: 2026-06-22
 
 ## Quyết định nền tảng (đã chốt)
 - **Phân quyền PIC** ([#11](https://github.com/gnust-company/project-monitoring/issues/11)): bỏ hẳn cơ chế approve `change_requests`. PIC = người tạo (project đổi PIC được trong detail; phase PIC = creator). Chỉ PIC sửa/xóa **metadata** project/phase. Checklist & outcome thì người khác vẫn note được + hiện log.
@@ -19,12 +19,13 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | 2 | #5, #11, #13, #20 | ✅ Xong |
 | 3 | #10, #9, #8, #12, #17 | ✅ Xong |
 | 4 | #15, #25, #23, #14, #18 | ✅ Xong |
-| 5 | #21, #22, #24, #26 | 🟡 Đang làm (#21, #22, #24 xong) |
+| 5 | #21, #22, #24, #26 | ✅ Xong |
+| 6 | #27 | 🟡 Đang làm (C1–C5 xong, chờ verify cuối + đóng issue) |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
-> **Trạng thái GitHub**: #8, #9, #10, #12, #14, #15, #17, #18, #21, #22, #23, #24, #25 đã đóng (#21, #22, #24 đóng 2026-06-21).
-> Còn OPEN: Wave 5 (#26).
+> **Trạng thái GitHub**: #3, #8, #9, #10, #12, #14, #15, #17, #18, #21, #22, #23, #24, #25, #26 đã đóng (#26 đóng 2026-06-22).
+> Còn OPEN: #27 (Overall Notification), #28 (mời thành viên — tách từ #26), #29 (i18n — tách từ #3).
 
 ---
 
@@ -93,11 +94,23 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 - [x] [#24 — Rà soát changelog (ẩn UUID, format dễ đọc)](https://github.com/gnust-company/project-monitoring/issues/24)
   - Helper chung `lib/formatActivity.ts` biến `(action, target)` thô của BE → câu tiếng Việt: dịch hành động, UUID→tên người (`getUserById`), ISO date→dd/MM/yyyy, PhaseTag code→nhãn (`PHASE_TAG_META`); lớp phòng vệ quét & thay mọi UUID lẻ.
   - Tên người gộp vào động từ ("đã thêm người tham gia Nguyễn A") để bỏ dấu "—" lửng. Áp dụng ở PhaseDetailModal, ProjectDetailModal, DashboardView (recent activity). FE-only, không đụng schema/BE.
-- [ ] [#26 — Mở rộng người dùng](https://github.com/gnust-company/project-monitoring/issues/26) ⚠️ *lớn — chia 3 mảng C→A→B (mỗi mảng 1 commit)*
+- [x] [#26 — Mở rộng người dùng](https://github.com/gnust-company/project-monitoring/issues/26) ⚠️ *lớn — chia 3 mảng C→A→B (mỗi mảng 1 commit)* — **đóng 2026-06-22**
   - **Mảng C (xong một phần — changelog gộp Dashboard)**: thêm cột `organizations.description` (migration 0007, backend + sửa trong Settings; chưa hiển thị riêng — user tạm để kệ). Bỏ ý tưởng view Overview → **gộp toàn bộ changelog vào Dashboard "Hoạt động gần đây"** qua `GET /organizations/{id}/recent-activity` (union: sự kiện vận hành thuộc dự án của org + vòng đời dự án). Sửa bug feed Dashboard cũ chỉ đọc `activityLog` nạp lười (rỗng tới khi mở modal) → giờ fetch từ server. Bổ sung log **created/renamed/deleted project** ở cấp workspace.
   - **Mảng A (xong)**: phase động hoàn toàn theo workspace. Migration **0008** xóa enum `dev_phase` + bảng global `phase_task_templates`, thêm `phase_definitions` + `phase_definition_items` per-org (seed 7 phase mặc định khi tạo org; `phase_blocks.phase_type` → VARCHAR lưu `code`). API `GET/POST/PATCH/DELETE /organizations/{id}/phases` + `…/phases/reorder` (đọc: member; sửa: owner). FE: `PHASE_META` tĩnh chỉ còn cho landing/demo, view workspace dùng `getPhaseMeta(code)` từ registry `phaseDefs` trong AppContext + bảng màu cố định `PHASE_PALETTE`; UI quản lý phase trong Settings (`PhaseManager`: thêm/đổi tên/màu/sắp xếp + sửa checklist/outcome mặc định + xóa có cảnh báo 409 số block đang dùng).
   - **Mảng B — role per-workspace (xong)**: bỏ role công việc toàn cục trên `User`; vai trò nay theo workspace. Migration **0009** thêm `workspace_roles` + `organization_members.job_role`, đổi `phase_(definition_)items.role` enum→VARCHAR (code), drop `users.role`; seed 8 role mặc định khi tạo org + backfill org cũ. API `GET/POST/PATCH/DELETE /organizations/{id}/roles` + `…/roles/reorder` + `PATCH …/members/{userId}/role` (owner gán cho ai cũng được; user tự đổi của mình). Đăng ký bỏ chọn role. Xóa role **cascade** xóa checklist/outcome mặc định gắn role. FE: `RoleManager` (tái dùng), AppContext `orgRoles`/`getRoleName`/`assignMemberRole`, **wizard tạo workspace 3 bước** (Thông tin → Vai trò → Phase), Settings thêm tab Vai trò + dropdown gán role cho member, **tách hồ sơ**: ProfileModal (tài khoản toàn cục) ↔ ProfileView trong workspace (thống kê theo workspace + tự đổi vai trò). 1 role/người/workspace.
-  - **Mảng B — phần còn lại (chưa làm)**: mời thành viên cần accept/từ chối + revoke; rời workspace (owner rời phải chuyển quyền chủ, người mới nhận thông báo).
+  - **Mảng B — fix sau verify**: migration **0010** thêm `workspace_roles.color` (sửa màu role, view Nhóm tô theo màu thay vì xám mặc định); wizard không đóng khi click nền + X có modal xác nhận + rollback xóa workspace nếu hủy giữa chừng; role cho sửa **cả mã viết tắt lẫn tên đầy đủ** (đổi mã → cascade mọi tham chiếu, trùng mã → 409); phase bỏ "Tên ngắn" chỉ còn Mã + Tên đầy đủ (đổi mã → cascade, 409); **bỏ auto-gán PM** (người tạo + thành viên mới bắt đầu chưa có vai trò).
+  - **Phần còn lại (tách ra, KHÔNG làm ở phase này → [#28](https://github.com/gnust-company/project-monitoring/issues/28))**: mời thành viên cần accept/từ chối + revoke; rời workspace (owner rời phải chuyển quyền chủ, người mới nhận thông báo).
+
+## Wave 6 — Kênh thông báo Admin (#27)
+
+- [ ] [#27 — Overall Notification (thông báo từ Admin)](https://github.com/gnust-company/project-monitoring/issues/27) 🟡 *C1–C5 xong (migration 0011), chờ verify cuối + đóng issue*
+  - **Mô hình**: admin (superuser) tạo "announcement" có `title`, `body` (markdown), `time_range` (start/end), `created_by`. Trong khoảng time-range, người dùng đăng nhập sẽ thấy modal. Nhiều thông báo có thể active cùng lúc (mỗi cái 1 time-range riêng). Người dùng "đánh dấu không hiện lại hôm nay/tuần này".
+  - [x] **C1 — Backend nền tảng**: migration **0011** thêm `announcements` (title, body, starts_at, ends_at, created_by FK users SET NULL, created_at, updated_at). Entity `Announcement` + ORM + repo + use case CRUD (superuser) + `ListActive(now)` lọc time-range.
+  - [x] **C2 — Dismiss per-user**: bảng `announcement_dismissals` (PK announcement_id+user_id, scope `day|week`, `dismissed_until`). `ListActive` loại thông báo user đã ẩn còn hiệu lực. Hạn ẩn tính UTC (day → hết hôm nay; week → 00:00 thứ Hai kế).
+  - [x] **C3 — API**: `GET/POST/PATCH/DELETE /announcements` (superuser; validate time-range → 422); `GET /announcements/active` (mọi user, đã lọc); `POST /announcements/{id}/dismiss { scope }`. 8 test ở `test_announcements.py`.
+  - [x] **C4 — FE quản lý (Admin view)**: tab "Thông báo" (`AdminAnnouncements`) — list + badge trạng thái (đang hiện/sắp tới/hết hạn) + form tạo/sửa (markdown + xem trước, date-range) + xóa. Markdown render tự viết (`lib/markdown.tsx`, an toàn, không `dangerouslySetInnerHTML`) — không thêm dependency.
+  - [x] **C5 — FE modal hiển thị**: `AnnouncementModal` (mount ở `App`) 2 cột — trái list, phải chi tiết (markdown); footer "Không hiện lại hôm nay / tuần này". Tự bật khi user có thông báo active chưa ẩn.
+  - **Ghi chú**: chỉ admin tạo; có sửa/xóa. Cân nhắc dùng chung hạ tầng này cho thông báo lời mời/chuyển quyền chủ ở [#28](https://github.com/gnust-company/project-monitoring/issues/28).
 
 ---
 
@@ -111,5 +124,6 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 ## Liên kết
 - Epic: [#7 — Listing Issue, góp ý từ user (#8–#20)](https://github.com/gnust-company/project-monitoring/issues/7)
-- Tổng hợp: [#3 — Tổng hợp Issue](https://github.com/gnust-company/project-monitoring/issues/3)
+- Tổng hợp: [#3 — Tổng hợp Issue](https://github.com/gnust-company/project-monitoring/issues/3) *(đã đóng 2026-06-22; i18n tách sang [#29](https://github.com/gnust-company/project-monitoring/issues/29))*
 - Issue mới (Wave 5): [#21](https://github.com/gnust-company/project-monitoring/issues/21), [#22](https://github.com/gnust-company/project-monitoring/issues/22), [#24](https://github.com/gnust-company/project-monitoring/issues/24), [#26](https://github.com/gnust-company/project-monitoring/issues/26)
+- Tồn đọng (chưa làm): [#27](https://github.com/gnust-company/project-monitoring/issues/27) (kênh thông báo Admin), [#28](https://github.com/gnust-company/project-monitoring/issues/28) (mời thành viên — tách từ #26), [#29](https://github.com/gnust-company/project-monitoring/issues/29) (i18n — tách từ #3)

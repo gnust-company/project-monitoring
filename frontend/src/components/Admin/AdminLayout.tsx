@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, LayoutDashboard, Building2, Users, ArrowLeft, LogOut, AlertCircle, Trash2, X } from 'lucide-react';
+import { ShieldCheck, LayoutDashboard, Building2, Users, Megaphone, ArrowLeft, LogOut, AlertCircle, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { adminApi } from '../../api';
 import type { AdminStats, AdminUserInfo, AdminWorkspaceInfo } from '../../types';
@@ -10,13 +10,15 @@ import AdminUsers from './AdminUsers';
 import AdminWorkspaces from './AdminWorkspaces';
 import ResetPasswordModal from './ResetPasswordModal';
 import GrantAdminModal from './GrantAdminModal';
+import AdminAnnouncements from './AdminAnnouncements';
 
-type AdminTab = 'overview' | 'workspaces' | 'users';
+type AdminTab = 'overview' | 'workspaces' | 'users' | 'announcements';
 
 const TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
   { key: 'workspaces', label: 'Workspaces', icon: Building2 },
   { key: 'users', label: 'Người dùng', icon: Users },
+  { key: 'announcements', label: 'Thông báo', icon: Megaphone },
 ];
 
 const pageVariants = {
@@ -167,6 +169,7 @@ export default function AdminLayout() {
                   users={users} loading={loading} currentUserId={currentUser.id}
                   onReset={setResetTarget} onToggleAdmin={setAdminTarget} onDelete={setDeleteTarget} />
               )}
+              {tab === 'announcements' && <AdminAnnouncements />}
             </motion.div>
           </AnimatePresence>
         )}

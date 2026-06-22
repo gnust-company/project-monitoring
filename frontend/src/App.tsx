@@ -8,6 +8,7 @@ import WorkspaceSelector from './components/OrgSelector/WorkspaceSelector';
 import WorkspaceLayout from './components/Workspace/WorkspaceLayout';
 import AdminLayout from './components/Admin/AdminLayout';
 import ProfileModal from './components/Modals/ProfileModal';
+import AnnouncementModal from './components/Modals/AnnouncementModal';
 
 function AppContent() {
   const { currentView, authReady, needsSetup } = useApp();
@@ -40,6 +41,7 @@ function AppContent() {
       {currentView === 'workspace' && <WorkspaceLayout />}
       {currentView === 'admin' && <AdminLayout />}
       <ProfileModal />
+      <AnnouncementModal />
     </>
   );
 }

@@ -984,13 +984,14 @@ export default function PipelineTimeline() {
         {/* Legend — chú thích các phase */}
         <div className="absolute bottom-3 right-3 z-30 bg-white/95 backdrop-blur border border-hairline rounded-lg shadow-md px-3 py-2 pointer-events-none">
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Chuẩn legend: màu · mã viết tắt · tên đầy đủ */}
             {phaseDefs.map(def => {
               const meta = getPhaseMeta(def.code);
               return (
                 <span key={def.code} className="flex items-center gap-1.5 text-[9px] text-stone-500">
                   <span className={`w-2 h-2 rounded-sm ${meta.solid}`} />
-                  <span className="font-bold text-stone-600">{meta.label}</span>
-                  <span className="font-light hidden xl:inline">{meta.fullLabel}</span>
+                  <span className="font-bold text-stone-600">{def.code}</span>
+                  <span className="font-light">{meta.fullLabel}</span>
                 </span>
               );
             })}

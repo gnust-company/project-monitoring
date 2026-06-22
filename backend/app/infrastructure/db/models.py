@@ -306,6 +306,37 @@ class NotificationModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class AnnouncementModel(Base):
+    """#27: thông báo broadcast từ admin (markdown body + time-range hiển thị)."""
+    __tablename__ = "announcements"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    title: Mapped[str] = mapped_column(String(512))
+    body: Mapped[str] = mapped_column(Text, default="", server_default="")
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class AnnouncementDismissalModel(Base):
+    """#27: user ẩn 1 announcement tới `dismissed_until` (hôm nay / tuần này)."""
+    __tablename__ = "announcement_dismissals"
+
+    announcement_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("announcements.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    scope: Mapped[str] = mapped_column(String(8))  # 'day' | 'week'
+    dismissed_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PhaseDefinitionModel(Base):
     """#26 (mảng A): định nghĩa phase theo từng workspace (thay enum dev_phase cứng)."""
     __tablename__ = "phase_definitions"

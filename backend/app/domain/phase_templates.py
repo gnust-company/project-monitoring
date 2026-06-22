@@ -98,22 +98,23 @@ def iter_template_rows() -> Iterator[dict]:
 # ─── #26 (mảng A): 7 phase mặc định để seed cho MỖI workspace mới ──────
 # Phase nay là per-org (bảng phase_definitions), không còn enum cứng. Cấu trúc dưới
 # là nguồn seed mặc định, port từ PHASE_META (FE) + PHASE_ROLE_* ở trên.
-# (code, name VN ngắn, full_name, color palette key, description)
+# (code, name, full_name, color palette key, description) — toàn bộ tiếng Anh (default).
+# name = full_name (sau #26 phase chỉ còn Mã + Tên đầy đủ; giữ 2 cột cho back-compat).
 _DEFAULT_PHASE_META: list[tuple[str, str, str, str, str]] = [
-    ("PA", "Đánh giá Dự án", "Project Assessment", "gray",
-     "Xác định mục tiêu, đánh giá khả thi, thu thập yêu cầu → Báo cáo Khả thi & BRD"),
-    ("SA", "Phân tích Phần mềm", "Software Analysis", "cyan",
-     "Xác định phạm vi, tạo WBS, quản lý rủi ro → Hiến chương Dự án & Yêu cầu Người dùng"),
-    ("SD", "Thiết kế Phần mềm", "Software Design", "violet",
-     "Wireframe, GUI, HLD/DDD, SRS → Tài liệu Thiết kế"),
-    ("SI", "Phát triển Phần mềm", "Software Implementation", "blue",
-     "Phát triển mã nguồn, thiết lập hạ tầng, test case → Mã nguồn & Test Case"),
-    ("ST", "Kiểm thử Phần mềm", "Software Testing", "orange",
-     "Kiểm thử hệ thống, hiệu năng, bảo mật → Kế hoạch & Báo cáo Kiểm thử"),
-    ("DEP", "Triển khai Phần mềm", "Software Deployment", "emerald",
-     "Lịch trình triển khai, xác nhận Go-live → Lịch bàn giao & Hướng dẫn Sử dụng"),
-    ("OM", "Vận hành & Bảo trì", "Operation & Maintenance", "slate",
-     "Quản lý sự cố PRD, giám sát, vá bảo mật → Nhật ký Sự cố & Báo cáo RCA"),
+    ("PA", "Project Assessment", "Project Assessment", "gray",
+     "Define objectives, assess feasibility, gather requirements → Feasibility Report & BRD"),
+    ("SA", "Software Analysis", "Software Analysis", "cyan",
+     "Define scope, build WBS, manage risks → Project Charter & User Requirements"),
+    ("SD", "Software Design", "Software Design", "violet",
+     "Wireframe, GUI, HLD/DDD, SRS → Design Documents"),
+    ("SI", "Software Implementation", "Software Implementation", "blue",
+     "Develop source code, set up infrastructure, test cases → Source Code & Test Cases"),
+    ("ST", "Software Testing", "Software Testing", "orange",
+     "System, performance and security testing → Test Plan & Test Report"),
+    ("DEP", "Software Deployment", "Software Deployment", "emerald",
+     "Deployment schedule, Go-live confirmation → Handover Schedule & User Guide"),
+    ("OM", "Operation & Maintenance", "Operation & Maintenance", "slate",
+     "PRD incident management, monitoring, security patching → Incident Log & RCA Report"),
 ]
 
 

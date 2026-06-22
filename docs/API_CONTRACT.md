@@ -296,6 +296,27 @@ FE poll định kỳ + badge chưa đọc. BE tự sinh khi có sự kiện.
 
 `type` ∈ `member_added | member_removed | phase_assigned | phase_created | phase_updated | phase_deleted | comment_added | change_request_created | change_request_approved | change_request_rejected`
 
+### Announcements (#27 — kênh thông báo từ admin)
+
+Admin (superuser) broadcast thông báo (body markdown) hiển thị trong khoảng `[startsAt, endsAt]`. User thấy modal khi đăng nhập; có thể tự ẩn "hôm nay / tuần này".
+
+| Method | Path | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/announcements/active` | mọi user | Thông báo đang trong time-range **và** user chưa tự ẩn (mới nhất trước) |
+| POST | `/announcements/{id}/dismiss` | mọi user | Ẩn 1 thông báo: body `{ scope }` (`day` \| `week`) → 204. `scope` khác → 422 |
+| GET | `/announcements` | superuser | Toàn bộ thông báo (cả sắp tới / hết hạn) để quản lý |
+| POST | `/announcements` | superuser | Tạo → 201. `startsAt >= endsAt` → 422 |
+| PATCH | `/announcements/{id}` | superuser | Sửa (title/body/startsAt/endsAt) — 404 nếu không tồn tại, 422 nếu time-range sai |
+| DELETE | `/announcements/{id}` | superuser | Xóa → 204 |
+
+```json
+{ "id": "uuid", "title": "Bảo trì hệ thống", "body": "# Markdown...",
+  "startsAt": "2026-06-22T00:00:00Z", "endsAt": "2026-06-25T00:00:00Z",
+  "createdBy": "uuid", "createdAt": "...", "updatedAt": "..." }
+```
+
+> Hạn ẩn tính theo UTC: `day` → hết 00:00 ngày kế; `week` → hết 00:00 thứ Hai kế tiếp. Dismiss là **per-user** (`announcement_dismissals`), không ảnh hưởng user khác.
+
 ### Activity Log (changelog)
 
 | Method | Path | Mô tả |

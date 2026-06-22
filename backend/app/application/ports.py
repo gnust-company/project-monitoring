@@ -6,8 +6,11 @@ Use case chỉ phụ thuộc vào ports, không bao giờ import infrastructure.
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from datetime import datetime
+
 from app.domain.entities import (
     ActivityEntry,
+    Announcement,
     Attachment,
     ChangeRequest,
     Comment,
@@ -142,6 +145,31 @@ class NotificationRepository(ABC):
 
     @abstractmethod
     async def mark_all_read(self, user_id: UUID) -> int: ...
+
+
+class AnnouncementRepository(ABC):
+    @abstractmethod
+    async def create(self, announcement: Announcement) -> Announcement: ...
+
+    @abstractmethod
+    async def get(self, announcement_id: UUID) -> Announcement | None: ...
+
+    @abstractmethod
+    async def list_all(self) -> list[Announcement]: ...
+
+    @abstractmethod
+    async def list_active(self, user_id: UUID, now: datetime) -> list[Announcement]: ...
+
+    @abstractmethod
+    async def update(self, announcement: Announcement) -> Announcement: ...
+
+    @abstractmethod
+    async def delete(self, announcement_id: UUID) -> bool: ...
+
+    @abstractmethod
+    async def dismiss(
+        self, announcement_id: UUID, user_id: UUID, scope: str, dismissed_until: datetime
+    ) -> None: ...
 
 
 class ProjectRepository(ABC):

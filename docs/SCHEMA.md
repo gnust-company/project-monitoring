@@ -339,6 +339,35 @@ CREATE TABLE notifications (
 CREATE INDEX idx_notif_user ON notifications(user_id, read, created_at DESC);
 ```
 
+### announcements + announcement_dismissals (#27 — kênh thông báo từ admin)
+
+Admin (superuser) broadcast thông báo (body markdown) hiển thị trong khoảng `[starts_at, ends_at]`.
+User thấy modal khi đăng nhập; tự ẩn "hôm nay / tuần này" → ghi vào `announcement_dismissals`
+(per-user; `dismissed_until` còn hiệu lực thì lọc khỏi `/active`).
+
+```sql
+CREATE TABLE announcements (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title       VARCHAR(512) NOT NULL,
+  body        TEXT NOT NULL DEFAULT '',          -- markdown
+  starts_at   TIMESTAMPTZ NOT NULL,
+  ends_at     TIMESTAMPTZ NOT NULL,              -- starts_at < ends_at (validate ở use case)
+  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX ix_announcements_window ON announcements(starts_at, ends_at);
+
+CREATE TABLE announcement_dismissals (
+  announcement_id UUID NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  scope           VARCHAR(8) NOT NULL,           -- 'day' | 'week'
+  dismissed_until TIMESTAMPTZ NOT NULL,          -- hết hiệu lực ẩn (UTC)
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (announcement_id, user_id)         -- 1 dismiss/người/thông báo (upsert)
+);
+```
+
 ## Mapping với frontend types.ts
 
 | Frontend type | Bảng | Ghi chú |
@@ -357,6 +386,7 @@ CREATE INDEX idx_notif_user ON notifications(user_id, read, created_at DESC);
 | *(mới)* PIC dự án (#11) | `projects.pic_user_id` | mặc định `created_by`, đổi được; thay thế approval queue |
 | *(deprecated)* approval queue | `change_requests` | đã thay bằng PIC; bảng giữ lại, không dùng (#11) |
 | *(mới)* notifications | `notifications` | in-app, FE poll |
+| `Announcement` | `announcements` + `announcement_dismissals` | #27: broadcast từ admin (markdown + time-range); dismiss per-user hôm nay/tuần này |
 
 ## Ghi chú thiết kế
 

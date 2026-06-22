@@ -3,7 +3,7 @@ import { api, setToken, clearToken } from './client';
 import type {
   User, Organization, Project, PhaseBlock, ChecklistItem, Comment, Attachment,
   ActivityItem, Notification, PhaseTag, ProjectStatus, PhaseDefinition, WorkspaceRoleDef,
-  AdminStats, AdminUserInfo, AdminWorkspaceInfo,
+  AdminStats, AdminUserInfo, AdminWorkspaceInfo, Announcement, DismissScope,
 } from '../types';
 
 // ─── DTO shapes (chỉ field cần dùng) ─────────────────────────────────
@@ -331,5 +331,34 @@ export const rolesApi = {
   },
   async reorder(orgId: string, orderedIds: string[]): Promise<WorkspaceRoleDef[]> {
     return (await api.post<WorkspaceRoleDTO[]>(`/organizations/${orgId}/roles/reorder`, { orderedIds })).map(mapRole);
+  },
+};
+
+// ─── Announcements (#27 — kênh thông báo từ admin) ───────────────────
+// DTO camelCase khớp Announcement 1-1 → không cần mapper.
+export interface AnnouncementBody {
+  title: string; body: string; startsAt: string; endsAt: string;
+}
+
+export const announcementsApi = {
+  // Mọi user: thông báo đang hiệu lực + chưa tự ẩn.
+  async active(): Promise<Announcement[]> {
+    return await api.get<Announcement[]>('/announcements/active');
+  },
+  async dismiss(id: string, scope: DismissScope): Promise<void> {
+    await api.post(`/announcements/${id}/dismiss`, { scope });
+  },
+  // Admin (superuser): quản lý toàn bộ.
+  async listAll(): Promise<Announcement[]> {
+    return await api.get<Announcement[]>('/announcements');
+  },
+  async create(body: AnnouncementBody): Promise<Announcement> {
+    return await api.post<Announcement>('/announcements', body);
+  },
+  async update(id: string, body: Partial<AnnouncementBody>): Promise<Announcement> {
+    return await api.patch<Announcement>(`/announcements/${id}`, body);
+  },
+  async remove(id: string): Promise<void> {
+    await api.del(`/announcements/${id}`);
   },
 };

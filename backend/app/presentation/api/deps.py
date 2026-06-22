@@ -45,6 +45,14 @@ from app.application.use_cases.workspace_roles import (
     ReorderRoles,
     UpdateRole,
 )
+from app.application.use_cases.announcements import (
+    CreateAnnouncement,
+    DeleteAnnouncement,
+    DismissAnnouncement,
+    ListActiveAnnouncements,
+    ListAllAnnouncements,
+    UpdateAnnouncement,
+)
 from app.application.use_cases.phase_blocks import (
     AddComment,
     AddPhaseItem,
@@ -91,6 +99,7 @@ from app.core.security import decode_token, hash_password, verify_password
 from app.domain.entities import Membership, Project, User
 from app.infrastructure.db.session import get_session
 from app.infrastructure.repositories.activity_log import SqlAlchemyActivityLogRepository
+from app.infrastructure.repositories.announcements import SqlAlchemyAnnouncementRepository
 from app.infrastructure.repositories.change_requests import SqlAlchemyChangeRequestRepository
 from app.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository
 from app.infrastructure.repositories.organizations import SqlAlchemyOrganizationRepository
@@ -141,6 +150,10 @@ def get_role_repo(session: SessionDep) -> SqlAlchemyWorkspaceRoleRepository:
     return SqlAlchemyWorkspaceRoleRepository(session)
 
 
+def get_announcement_repo(session: SessionDep) -> SqlAlchemyAnnouncementRepository:
+    return SqlAlchemyAnnouncementRepository(session)
+
+
 UserRepoDep = Annotated[SqlAlchemyUserRepository, Depends(get_user_repo)]
 OrgRepoDep = Annotated[SqlAlchemyOrganizationRepository, Depends(get_org_repo)]
 ProjectRepoDep = Annotated[SqlAlchemyProjectRepository, Depends(get_project_repo)]
@@ -150,6 +163,7 @@ BlockRepoDep = Annotated[SqlAlchemyPhaseBlockRepository, Depends(get_block_repo)
 ActivityRepoDep = Annotated[SqlAlchemyActivityLogRepository, Depends(get_activity_repo)]
 PhaseDefRepoDep = Annotated[SqlAlchemyPhaseDefinitionRepository, Depends(get_phase_def_repo)]
 RoleRepoDep = Annotated[SqlAlchemyWorkspaceRoleRepository, Depends(get_role_repo)]
+AnnouncementRepoDep = Annotated[SqlAlchemyAnnouncementRepository, Depends(get_announcement_repo)]
 
 
 # ─── Object storage (MinIO) ──────────────────────────────────────────
@@ -456,6 +470,31 @@ def reorder_roles_uc(roles: RoleRepoDep) -> ReorderRoles:
 
 def assign_member_role_uc(repo: OrgRepoDep, roles: RoleRepoDep) -> AssignMemberRole:
     return AssignMemberRole(repo, roles)
+
+
+# ─── Announcement use cases (#27) ────────────────────────────────────
+def list_all_announcements_uc(repo: AnnouncementRepoDep) -> ListAllAnnouncements:
+    return ListAllAnnouncements(repo)
+
+
+def list_active_announcements_uc(repo: AnnouncementRepoDep) -> ListActiveAnnouncements:
+    return ListActiveAnnouncements(repo)
+
+
+def create_announcement_uc(repo: AnnouncementRepoDep) -> CreateAnnouncement:
+    return CreateAnnouncement(repo)
+
+
+def update_announcement_uc(repo: AnnouncementRepoDep) -> UpdateAnnouncement:
+    return UpdateAnnouncement(repo)
+
+
+def delete_announcement_uc(repo: AnnouncementRepoDep) -> DeleteAnnouncement:
+    return DeleteAnnouncement(repo)
+
+
+def dismiss_announcement_uc(repo: AnnouncementRepoDep) -> DismissAnnouncement:
+    return DismissAnnouncement(repo)
 
 
 # ─── Attachment use cases ────────────────────────────────────────────

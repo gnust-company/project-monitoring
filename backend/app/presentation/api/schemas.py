@@ -193,6 +193,36 @@ class UnreadCountOut(CamelModel):
     count: int
 
 
+# ─── Announcement (#27) ──────────────────────────────────────────────
+class AnnouncementOut(CamelModel):
+    id: UUID
+    title: str
+    body: str = ""
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    created_by: UUID | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class AnnouncementCreate(CamelModel):
+    title: str
+    body: str = ""
+    starts_at: datetime
+    ends_at: datetime
+
+
+class AnnouncementUpdate(CamelModel):
+    title: str | None = None
+    body: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+
+
+class AnnouncementDismissIn(CamelModel):
+    scope: str  # 'day' | 'week'
+
+
 # ─── Project ─────────────────────────────────────────────────────────
 class ProjectOut(CamelModel):
     id: UUID

@@ -75,6 +75,20 @@ export interface Notification {
   createdAt: string;
 }
 
+// #27: thông báo broadcast từ admin (markdown body + time-range hiển thị)
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdBy?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export type DismissScope = 'day' | 'week';
+
 export type ChangeRequestAction = 'update_project' | 'delete_project';
 export type ChangeRequestStatus = 'pending' | 'approved' | 'rejected';
 
@@ -105,67 +119,67 @@ export const DEV_PHASES: DevPhase[] = ['PA', 'SA', 'SD', 'SI', 'ST', 'DEP', 'OM'
 
 export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; color: string; bg: string; border: string; solid: string; desc: string }> = {
   PA: {
-    label: 'Đánh giá Dự án',
+    label: 'Project Assessment',
     fullLabel: 'Project Assessment',
     color: 'text-gray-600',
     bg: 'bg-gray-100',
     border: 'border-gray-200',
     solid: 'bg-gray-400',
-    desc: 'Xác định mục tiêu, đánh giá khả thi, thu thập yêu cầu → Báo cáo Khả thi & BRD',
+    desc: 'Define objectives, assess feasibility, gather requirements → Feasibility Report & BRD',
   },
   SA: {
-    label: 'Phân tích Phần mềm',
+    label: 'Software Analysis',
     fullLabel: 'Software Analysis',
     color: 'text-cyan-700',
     bg: 'bg-cyan-50',
     border: 'border-cyan-200',
     solid: 'bg-cyan-500',
-    desc: 'Xác định phạm vi, tạo WBS, quản lý rủi ro → Hiến chương Dự án & Yêu cầu Người dùng',
+    desc: 'Define scope, build WBS, manage risks → Project Charter & User Requirements',
   },
   SD: {
-    label: 'Thiết kế Phần mềm',
+    label: 'Software Design',
     fullLabel: 'Software Design',
     color: 'text-violet-600',
     bg: 'bg-violet-50',
     border: 'border-violet-200',
     solid: 'bg-violet-500',
-    desc: 'Wireframe, GUI, HLD/DDD, SRS → Tài liệu Thiết kế',
+    desc: 'Wireframe, GUI, HLD/DDD, SRS → Design Documents',
   },
   SI: {
-    label: 'Phát triển Phần mềm',
+    label: 'Software Implementation',
     fullLabel: 'Software Implementation',
     color: 'text-blue-600',
     bg: 'bg-blue-50',
     border: 'border-blue-200',
     solid: 'bg-blue-500',
-    desc: 'Phát triển mã nguồn, thiết lập hạ tầng, test case → Mã nguồn & Test Case',
+    desc: 'Develop source code, set up infrastructure, test cases → Source Code & Test Cases',
   },
   ST: {
-    label: 'Kiểm thử Phần mềm',
+    label: 'Software Testing',
     fullLabel: 'Software Testing',
     color: 'text-orange-600',
     bg: 'bg-orange-50',
     border: 'border-orange-200',
     solid: 'bg-orange-500',
-    desc: 'Kiểm thử hệ thống, hiệu năng, bảo mật → Kế hoạch & Báo cáo Kiểm thử',
+    desc: 'System, performance and security testing → Test Plan & Test Report',
   },
   DEP: {
-    label: 'Triển khai Phần mềm',
+    label: 'Software Deployment',
     fullLabel: 'Software Deployment',
     color: 'text-emerald-600',
     bg: 'bg-emerald-50',
     border: 'border-emerald-200',
     solid: 'bg-emerald-500',
-    desc: 'Lịch trình triển khai, xác nhận Go-live → Lịch bàn giao & Hướng dẫn Sử dụng',
+    desc: 'Deployment schedule, Go-live confirmation → Handover Schedule & User Guide',
   },
   OM: {
-    label: 'Vận hành & Bảo trì',
+    label: 'Operation & Maintenance',
     fullLabel: 'Operation & Maintenance',
     color: 'text-slate-600',
     bg: 'bg-slate-100',
     border: 'border-slate-300',
     solid: 'bg-slate-500',
-    desc: 'Quản lý sự cố PRD, giám sát, vá bảo mật → Nhật ký Sự cố & Báo cáo RCA',
+    desc: 'PRD incident management, monitoring, security patching → Incident Log & RCA Report',
   },
 };
 
