@@ -20,12 +20,12 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | 3 | #10, #9, #8, #12, #17 | ✅ Xong |
 | 4 | #15, #25, #23, #14, #18 | ✅ Xong |
 | 5 | #21, #22, #24, #26 | ✅ Xong |
-| 6 | #27 | 🟡 Đang làm (C1–C5 xong, chờ verify cuối + đóng issue) |
+| 6 | #27 | ✅ Xong |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
-> **Trạng thái GitHub**: #3, #8, #9, #10, #12, #14, #15, #17, #18, #21, #22, #23, #24, #25, #26 đã đóng (#26 đóng 2026-06-22).
-> Còn OPEN: #27 (Overall Notification), #28 (mời thành viên — tách từ #26), #29 (i18n — tách từ #3).
+> **Trạng thái GitHub**: #3, #8, #9, #10, #12, #14, #15, #17, #18, #21, #22, #23, #24, #25, #26, #27 đã đóng (#26 + #27 đóng 2026-06-22).
+> Còn OPEN: #28 (mời thành viên — tách từ #26), #29 (i18n — tách từ #3).
 
 ---
 
@@ -103,7 +103,7 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 ## Wave 6 — Kênh thông báo Admin (#27)
 
-- [ ] [#27 — Overall Notification (thông báo từ Admin)](https://github.com/gnust-company/project-monitoring/issues/27) 🟡 *C1–C5 xong (migration 0011), chờ verify cuối + đóng issue*
+- [x] [#27 — Overall Notification (thông báo từ Admin)](https://github.com/gnust-company/project-monitoring/issues/27) ✅ *đóng 2026-06-22 (migration 0011)*
   - **Mô hình**: admin (superuser) tạo "announcement" có `title`, `body` (markdown), `time_range` (start/end), `created_by`. Trong khoảng time-range, người dùng đăng nhập sẽ thấy modal. Nhiều thông báo có thể active cùng lúc (mỗi cái 1 time-range riêng). Người dùng "đánh dấu không hiện lại hôm nay/tuần này".
   - [x] **C1 — Backend nền tảng**: migration **0011** thêm `announcements` (title, body, starts_at, ends_at, created_by FK users SET NULL, created_at, updated_at). Entity `Announcement` + ORM + repo + use case CRUD (superuser) + `ListActive(now)` lọc time-range.
   - [x] **C2 — Dismiss per-user**: bảng `announcement_dismissals` (PK announcement_id+user_id, scope `day|week`, `dismissed_until`). `ListActive` loại thông báo user đã ẩn còn hiệu lực. Hạn ẩn tính UTC (day → hết hôm nay; week → 00:00 thứ Hai kế).
