@@ -2,15 +2,15 @@
 import { api, setToken, clearToken } from './client';
 import type {
   User, Organization, Project, PhaseBlock, ChecklistItem, Comment, Attachment,
-  ActivityItem, Notification, UserRole, PhaseTag, ProjectStatus, PhaseDefinition,
+  ActivityItem, Notification, PhaseTag, ProjectStatus, PhaseDefinition, WorkspaceRoleDef,
   AdminStats, AdminUserInfo, AdminWorkspaceInfo,
 } from '../types';
 
 // ─── DTO shapes (chỉ field cần dùng) ─────────────────────────────────
-interface UserDTO { id: string; email: string; name: string; role: UserRole; avatar: string | null; isSuperuser: boolean; }
+interface UserDTO { id: string; email: string; name: string; avatar: string | null; isSuperuser: boolean; jobRole?: string | null; }
 interface OrgDTO { id: string; name: string; description: string; members: UserDTO[]; myRole: 'owner' | 'member' | null; }
-interface PhaseItemDTO { id: string; text: string; done: boolean; role: UserRole | null; }
-interface PhaseDefItemDTO { id: string; kind: 'checklist' | 'outcome'; text: string; role: UserRole | null; position: number; }
+interface PhaseItemDTO { id: string; text: string; done: boolean; role: string | null; }
+interface PhaseDefItemDTO { id: string; kind: 'checklist' | 'outcome'; text: string; role: string | null; position: number; }
 interface PhaseDefDTO {
   id: string; orgId: string; code: string; name: string; fullName: string; description: string;
   color: string; position: number; checklist: PhaseDefItemDTO[]; outcomes: PhaseDefItemDTO[];
@@ -28,7 +28,7 @@ interface ActivityDTO { id: string; projectId: string | null; phaseBlockId: stri
 
 // ─── Mappers ─────────────────────────────────────────────────────────
 export function mapUser(d: UserDTO): User {
-  return { id: d.id, name: d.name, avatar: d.avatar || '', role: d.role, email: d.email, isSuperuser: d.isSuperuser };
+  return { id: d.id, name: d.name, avatar: d.avatar || '', email: d.email, isSuperuser: d.isSuperuser, jobRole: d.jobRole ?? undefined };
 }
 function mapOrg(d: OrgDTO): Organization {
   return { id: d.id, name: d.name, description: d.description ?? '', members: (d.members ?? []).map(mapUser), myRole: d.myRole ?? undefined };
@@ -45,6 +45,10 @@ function mapAttachment(d: AttachmentDTO): Attachment {
 }
 export function mapActivity(d: ActivityDTO): ActivityItem {
   return { id: d.id, userId: d.userId ?? '', action: d.action, target: d.target, timestamp: d.createdAt, phaseBlockId: d.phaseBlockId };
+}
+interface WorkspaceRoleDTO { id: string; orgId: string; code: string; name: string; position: number; }
+export function mapRole(d: WorkspaceRoleDTO): WorkspaceRoleDef {
+  return { id: d.id, orgId: d.orgId, code: d.code, name: d.name, position: d.position };
 }
 export function mapPhaseDef(d: PhaseDefDTO): PhaseDefinition {
   const mi = (i: PhaseDefItemDTO) => ({ role: i.role ?? undefined, text: i.text });
@@ -73,13 +77,13 @@ export const auth = {
   async setupStatus(): Promise<boolean> {
     return (await api.get<{ needsSetup: boolean }>('/auth/setup-status')).needsSetup;
   },
-  async setup(email: string, password: string, name: string, role: UserRole): Promise<User> {
-    const t = await api.post<TokenDTO>('/auth/setup', { email, password, name, role });
+  async setup(email: string, password: string, name: string): Promise<User> {
+    const t = await api.post<TokenDTO>('/auth/setup', { email, password, name });
     setToken(t.accessToken);
     return mapUser(t.user);
   },
-  async register(email: string, password: string, name: string, role: UserRole): Promise<User> {
-    const t = await api.post<TokenDTO>('/auth/register', { email, password, name, role });
+  async register(email: string, password: string, name: string): Promise<User> {
+    const t = await api.post<TokenDTO>('/auth/register', { email, password, name });
     setToken(t.accessToken);
     return mapUser(t.user);
   },
@@ -98,7 +102,7 @@ export const auth = {
 
 // ─── Users / profile ─────────────────────────────────────────────────
 export const usersApi = {
-  async updateProfile(updates: { name?: string; role?: UserRole }): Promise<User> {
+  async updateProfile(updates: { name?: string }): Promise<User> {
     return mapUser(await api.patch<UserDTO>('/users/me', updates));
   },
   async uploadAvatar(file: File): Promise<User> {
@@ -137,6 +141,10 @@ export const orgsApi = {
   async removeMember(id: string, userId: string): Promise<void> {
     await api.del(`/organizations/${id}/members/${userId}`);
   },
+  // #26 mảng B: gán job role cho member (owner gán cho ai cũng được; user tự đổi của mình)
+  async setMemberRole(orgId: string, userId: string, role: string | null): Promise<void> {
+    await api.patch<void>(`/organizations/${orgId}/members/${userId}/role`, { role });
+  },
 };
 
 // ─── Projects ────────────────────────────────────────────────────────
@@ -168,8 +176,8 @@ export const projectsApi = {
 export interface CreatePhaseBody {
   phaseType: string; title: string; startDate: string; endDate: string;
   tag?: PhaseTag; description?: string; assignee?: string | null; participantIds?: string[];
-  checklist?: { text: string; role?: UserRole; done?: boolean }[] | null;
-  outcomes?: { text: string; role?: UserRole; done?: boolean }[] | null;
+  checklist?: { text: string; role?: string; done?: boolean }[] | null;
+  outcomes?: { text: string; role?: string; done?: boolean }[] | null;
 }
 
 export const phaseBlocksApi = {
@@ -191,10 +199,10 @@ export const phaseBlocksApi = {
     await api.del(`/phase-blocks/${id}${q}`);
   },
   // items
-  async addItem(blockId: string, kind: 'checklist' | 'outcome', text: string, role?: UserRole): Promise<ChecklistItem> {
+  async addItem(blockId: string, kind: 'checklist' | 'outcome', text: string, role?: string): Promise<ChecklistItem> {
     return mapItem(await api.post<PhaseItemDTO>(`/phase-blocks/${blockId}/items`, { kind, text, role }));
   },
-  async updateItem(blockId: string, itemId: string, updates: { text?: string; done?: boolean; role?: UserRole }): Promise<ChecklistItem> {
+  async updateItem(blockId: string, itemId: string, updates: { text?: string; done?: boolean; role?: string }): Promise<ChecklistItem> {
     return mapItem(await api.patch<PhaseItemDTO>(`/phase-blocks/${blockId}/items/${itemId}`, updates));
   },
   async deleteItem(blockId: string, itemId: string): Promise<void> {
@@ -282,8 +290,8 @@ export interface PhaseDefBody {
   fullName?: string;
   description?: string;
   color?: string;
-  checklist?: { role?: UserRole; text: string }[];
-  outcomes?: { role?: UserRole; text: string }[];
+  checklist?: { role?: string; text: string }[];
+  outcomes?: { role?: string; text: string }[];
 }
 
 export const phaseDefsApi = {
@@ -302,5 +310,26 @@ export const phaseDefsApi = {
   },
   async reorder(orgId: string, orderedIds: string[]): Promise<PhaseDefinition[]> {
     return (await api.post<PhaseDefDTO[]>(`/organizations/${orgId}/phases/reorder`, { orderedIds })).map(mapPhaseDef);
+  },
+};
+
+// ─── Workspace roles (#26 mảng B — role công việc per-workspace) ──────
+export interface RoleBody { code?: string; name: string }
+
+export const rolesApi = {
+  async list(orgId: string): Promise<WorkspaceRoleDef[]> {
+    return (await api.get<WorkspaceRoleDTO[]>(`/organizations/${orgId}/roles`)).map(mapRole);
+  },
+  async create(orgId: string, body: RoleBody): Promise<WorkspaceRoleDef> {
+    return mapRole(await api.post<WorkspaceRoleDTO>(`/organizations/${orgId}/roles`, body));
+  },
+  async update(orgId: string, id: string, body: Partial<RoleBody>): Promise<WorkspaceRoleDef> {
+    return mapRole(await api.patch<WorkspaceRoleDTO>(`/organizations/${orgId}/roles/${id}`, body));
+  },
+  async remove(orgId: string, id: string): Promise<void> {
+    await api.del(`/organizations/${orgId}/roles/${id}`);
+  },
+  async reorder(orgId: string, orderedIds: string[]): Promise<WorkspaceRoleDef[]> {
+    return (await api.post<WorkspaceRoleDTO[]>(`/organizations/${orgId}/roles/reorder`, { orderedIds })).map(mapRole);
   },
 };

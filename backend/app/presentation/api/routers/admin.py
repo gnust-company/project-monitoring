@@ -60,7 +60,7 @@ async def list_users(
     infos = await uc.execute()
     return [
         AdminUserOut(
-            id=i.user.id, email=i.user.email, name=i.user.name, role=i.user.role,
+            id=i.user.id, email=i.user.email, name=i.user.name,
             avatar=i.user.avatar_url, is_superuser=i.user.is_superuser,
             created_at=i.user.created_at, workspace_count=i.workspace_count,
         )

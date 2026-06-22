@@ -115,7 +115,7 @@ export default function AdminDashboard({ stats, users, workspaces, onSeeUsers, o
                     <p className="text-[11px] text-muted-soft truncate">{u.email}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-medium text-muted px-2 py-0.5 rounded-md bg-surface-soft flex-shrink-0">{u.role}</span>
+                <span className="text-[10px] font-medium text-muted px-2 py-0.5 rounded-md bg-surface-soft flex-shrink-0">{u.workspaceCount} ws</span>
               </div>
             ))}
           </div>

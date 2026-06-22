@@ -1,16 +1,27 @@
 // ─── User Roles ────────────────────────────────────────────────────
+// #26 mảng B: role công việc nay theo workspace (workspace_roles). UserRole chỉ còn
+// dùng cho landing/demo + bộ 8 mặc định; code role thực tế là string tùy biến.
 export type UserRole = 'PM' | 'BA' | 'SW_Architect' | 'SysOps' | 'UI_Designer' | 'GUI' | 'SW_Developer' | 'SW_Tester';
 
 export interface User {
   id: string;
   name: string;
   avatar: string;
-  role: UserRole;
   email?: string;        // có khi đăng nhập thật
   isSuperuser?: boolean; // admin toàn cục (first-run setup)
+  jobRole?: string;      // #26 mảng B: code role công việc trong workspace (khi list theo org)
 }
 
-// Cấp quyền trong workspace — độc lập với UserRole (vai trò công việc)
+// #26 mảng B: định nghĩa role công việc theo workspace
+export interface WorkspaceRoleDef {
+  id: string;
+  orgId: string;
+  code: string;
+  name: string;
+  position: number;
+}
+
+// Cấp quyền trong workspace — độc lập với role công việc
 export type WorkspaceRole = 'owner' | 'member';
 
 export interface Organization {
@@ -34,7 +45,6 @@ export interface AdminUserInfo {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
   avatar: string | null;
   isSuperuser: boolean;
   createdAt: string | null;
@@ -184,8 +194,8 @@ export interface PhaseDefinition {
   description: string;
   color: string;       // khóa palette
   position: number;
-  checklist: { role?: UserRole; text: string }[];  // checklist mặc định
-  outcomes: { role?: UserRole; text: string }[];    // outcome mặc định
+  checklist: { role?: string; text: string }[];  // checklist mặc định (role = code workspace role)
+  outcomes: { role?: string; text: string }[];    // outcome mặc định
 }
 
 // Style + nhãn của 1 phase code, resolve từ danh sách phase definition của workspace.
@@ -319,7 +329,13 @@ export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
-  role?: UserRole; // đầu việc thuộc role nào trong phase
+  role?: string; // #26 mảng B: code workspace role (đầu việc thuộc role nào trong phase)
+}
+
+// Tên hiển thị của 1 role code, resolve từ danh sách role của workspace (fallback code).
+export function resolveRoleName(roles: WorkspaceRoleDef[], code: string | undefined): string {
+  if (!code) return 'Chung';
+  return roles.find(r => r.code === code)?.name ?? code;
 }
 
 export interface PhaseBlock {

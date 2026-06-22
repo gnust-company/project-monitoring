@@ -43,7 +43,7 @@ async def setup(
     uc: Annotated[SetupSuperuser, Depends(setup_superuser_uc)],
 ) -> TokenOut:
     try:
-        user = await uc.execute(body.email, body.password, body.name, body.role)
+        user = await uc.execute(body.email, body.password, body.name)
     except SetupAlreadyDoneError:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Setup already completed")
     return TokenOut(access_token=create_access_token(str(user.id)), user=UserOut.from_entity(user))
@@ -55,7 +55,7 @@ async def register(
     uc: Annotated[RegisterUser, Depends(register_user_uc)],
 ) -> TokenOut:
     try:
-        user = await uc.execute(body.email, body.password, body.name, body.role)
+        user = await uc.execute(body.email, body.password, body.name)
     except EmailTakenError:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Email already registered")
     except EmailDomainNotAllowedError as e:

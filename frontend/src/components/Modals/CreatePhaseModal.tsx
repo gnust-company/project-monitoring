@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import type { PhaseBlock, UserRole, PhaseDefinition } from '../../types';
-import { ROLE_LABELS } from '../../data/mockData';
+import type { PhaseBlock, PhaseDefinition } from '../../types';
 import { X, Plus, Calendar, Users, Trash2, Target, CheckSquare } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import Dropdown from '../common/Dropdown';
 
-type DraftItem = { text: string; done: boolean; role?: UserRole };
+type DraftItem = { text: string; done: boolean; role?: string };
 
 // #26: checklist/outcome mặc định lấy từ phase definition của workspace.
 function draftFromDef(def: PhaseDefinition | undefined, kind: 'checklist' | 'outcomes'): DraftItem[] {
@@ -18,19 +17,20 @@ function draftFromDef(def: PhaseDefinition | undefined, kind: 'checklist' | 'out
 function DraftSection({ items, setItems, roles, icon, label }: {
   items: DraftItem[];
   setItems: React.Dispatch<React.SetStateAction<DraftItem[]>>;
-  roles: UserRole[];
+  roles: string[];
   icon: React.ReactNode;
   label: string;
 }) {
+  const { getRoleName } = useApp();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const keyOf = (r: UserRole | undefined) => r ?? '__general__';
+  const keyOf = (r: string | undefined) => r ?? '__general__';
 
   // thứ tự: role của template trước, role lạ trong items sau, cuối cùng là "Chung"
-  const ordered: (UserRole | undefined)[] = [...roles];
+  const ordered: (string | undefined)[] = [...roles];
   for (const it of items) if (it.role && !ordered.includes(it.role)) ordered.push(it.role);
   ordered.push(undefined);
 
-  const addItem = (role: UserRole | undefined) => {
+  const addItem = (role: string | undefined) => {
     const k = keyOf(role);
     const text = (drafts[k] ?? '').trim();
     if (!text) return;
@@ -51,7 +51,7 @@ function DraftSection({ items, setItems, roles, icon, label }: {
             <div key={k}>
               <div className="flex items-center gap-2 px-0.5 mb-1">
                 <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wide">
-                  {role ? (ROLE_LABELS[role] ?? role) : 'Chung'}
+                  {getRoleName(role)}
                 </span>
                 <div className="flex-1 h-px bg-stone-100" />
               </div>
@@ -73,7 +73,7 @@ function DraftSection({ items, setItems, roles, icon, label }: {
                   <input type="text" value={drafts[k] ?? ''}
                     onChange={e => setDrafts(d => ({ ...d, [k]: e.target.value }))}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(role); } }}
-                    placeholder={role ? `Thêm mục cho ${ROLE_LABELS[role] ?? role}...` : 'Thêm mục chung...'}
+                    placeholder={role ? `Thêm mục cho ${getRoleName(role)}...` : 'Thêm mục chung...'}
                     className="flex-1 px-2.5 py-1 bg-stone-50/60 border border-dashed border-stone-200 rounded-md text-xs
                                focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink focus:bg-white" />
                   <button type="button" onClick={() => addItem(role)}
@@ -93,7 +93,7 @@ function DraftSection({ items, setItems, roles, icon, label }: {
 export default function CreatePhaseModal() {
   const {
     createPhaseOpen, closeCreatePhase, createPhaseProjectId, createPhaseDates,
-    orgProjects, addPhaseBlock, selectedOrg, currentUser, phaseDefs, getPhaseMeta,
+    orgProjects, addPhaseBlock, selectedOrg, currentUser, phaseDefs, getPhaseMeta, getRoleName,
   } = useApp();
 
   const meId = currentUser?.id ?? '';
@@ -170,8 +170,8 @@ export default function CreatePhaseModal() {
   const orgMembers = selectedOrg?.members || [];
   const lockedProject = createPhaseProjectId ? orgProjects.find(p => p.id === createPhaseProjectId) : null;
   const currentDef = phaseDefs.find(p => p.code === phaseType);
-  const distinctRoles = (items: { role?: UserRole }[]): UserRole[] =>
-    [...new Set(items.map(i => i.role).filter((r): r is UserRole => !!r))];
+  const distinctRoles = (items: { role?: string }[]): string[] =>
+    [...new Set(items.map(i => i.role).filter((r): r is string => !!r))];
   const checklistRoles = distinctRoles(currentDef?.checklist ?? []);
   const outcomeRoles = distinctRoles(currentDef?.outcomes ?? []);
 
@@ -276,7 +276,7 @@ export default function CreatePhaseModal() {
                           {isSelected && <span className="text-white text-[10px]">✓</span>}
                         </div>
                         <span className="text-xs font-medium">{member.name}</span>
-                        <span className="text-[10px] text-stone-400 ml-auto">{member.role}</span>
+                        <span className="text-[10px] text-stone-400 ml-auto">{getRoleName(member.jobRole)}</span>
                       </button>
                     );
                   })}

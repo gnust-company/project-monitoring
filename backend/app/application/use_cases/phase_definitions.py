@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 from app.application.ports import PhaseDefinitionRepository
 from app.domain.entities import PhaseDefinition, PhaseDefinitionItem
-from app.domain.value_objects import PhaseItemKind, UserRole
+from app.domain.value_objects import PhaseItemKind
 
 
 class PhaseDefNotFoundError(Exception):
@@ -27,8 +27,9 @@ class PhaseCodeConflictError(Exception):
     """Code phase bị trùng trong workspace."""
 
 
-def _role(value: Any) -> UserRole | None:
-    return UserRole(value) if value else None
+def _role(value: Any) -> str | None:
+    # #26 mảng B: role là code workspace role (string), không ép enum nữa.
+    return str(value) if value else None
 
 
 def _slugify(name: str) -> str:
@@ -111,10 +112,10 @@ class UpdatePhaseDef:
             checklist = payload.get("checklist")
             outcomes = payload.get("outcomes")
             if checklist is None:
-                checklist = [{"text": i.text, "role": i.role.value if i.role else None}
+                checklist = [{"text": i.text, "role": i.role}
                              for i in phase.items if i.kind == PhaseItemKind.CHECKLIST]
             if outcomes is None:
-                outcomes = [{"text": i.text, "role": i.role.value if i.role else None}
+                outcomes = [{"text": i.text, "role": i.role}
                             for i in phase.items if i.kind == PhaseItemKind.OUTCOME]
             phase.items = _build_items(checklist, outcomes)
         return await self._phases.update(phase, replace_items=replace)

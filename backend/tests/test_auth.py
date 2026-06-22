@@ -39,7 +39,7 @@ async def test_setup_creates_superuser_then_locks(client: AsyncClient):
     assert data["accessToken"]
     assert data["user"]["email"] == "admin@hub.io"
     assert data["user"]["isSuperuser"] is True
-    assert data["user"]["role"] == "PM"
+    # #26 mảng B: user không còn role toàn cục
 
     # Sau khi đã có user, setup-status phải False và setup phải bị khóa
     status_resp = await client.get(f"{API}/auth/setup-status")
@@ -65,7 +65,6 @@ async def test_register_login_me_flow(client: AsyncClient):
     me = await client.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200
     assert me.json()["email"] == "sara@hub.io"
-    assert me.json()["role"] == "BA"
 
 
 async def test_login_wrong_password_401(client: AsyncClient):

@@ -1,17 +1,13 @@
 import { useState, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { ROLE_LABELS } from '../../data/mockData';
-import type { UserRole } from '../../types';
 import { isPhaseComplete } from '../../lib/projectStatus';
 import {
-  Mail, Shield, FolderKanban, GitBranch, CheckSquare, Layers,
+  Mail, FolderKanban, GitBranch, CheckSquare, Layers,
   Pencil, Check, ChevronRight, Camera, Lock, Trash2, AlertTriangle,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import Dropdown from '../common/Dropdown';
 
-const ROLE_OPTIONS: UserRole[] = ['PM', 'BA', 'SW_Architect', 'SysOps', 'UI_Designer', 'GUI', 'SW_Developer', 'SW_Tester'];
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -163,17 +159,8 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
                 <Pencil className="w-3.5 h-3.5 text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             )}
-            <div className="flex items-center gap-2 text-xs text-stone-500 mb-3">
+            <div className="flex items-center gap-2 text-xs text-stone-500">
               <Mail className="w-3 h-3" /> {currentUserEmail}
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
-              <Dropdown
-                className="w-52"
-                value={currentUser.role}
-                onChange={v => updateCurrentUser({ role: v as UserRole })}
-                options={ROLE_OPTIONS.map(r => ({ value: r, label: ROLE_LABELS[r] ?? r }))}
-              />
             </div>
           </div>
         </div>

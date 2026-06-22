@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type {
   Organization, Project, PhaseBlock, WorkspaceView, ProjectStatus, ZoomLevel,
-  User, UserRole, Notification, ChecklistItem, PhaseDefinition, PhaseMeta,
+  User, Notification, ChecklistItem, PhaseDefinition, PhaseMeta, WorkspaceRoleDef,
 } from '../types';
-import { resolvePhaseMeta } from '../types';
+import { resolvePhaseMeta, resolveRoleName } from '../types';
 import {
-  auth, usersApi, orgsApi, projectsApi, phaseBlocksApi, notificationsApi, phaseDefsApi,
-  type CreatePhaseBody, type PhaseDefBody,
+  auth, usersApi, orgsApi, projectsApi, phaseBlocksApi, notificationsApi, phaseDefsApi, rolesApi,
+  type CreatePhaseBody, type PhaseDefBody, type RoleBody,
 } from '../api';
 import { getToken } from '../api/client';
 import { registerUsers } from '../data/mockData';
@@ -58,8 +58,8 @@ interface AppContextType extends AppState {
   needsSetup: boolean;
   authError: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
-  setupSuperuser: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<void>;
+  setupSuperuser: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   currentUser: User | null;
   updateCurrentUser: (updates: Partial<User>) => Promise<void>;
@@ -106,7 +106,7 @@ interface AppContextType extends AppState {
   updatePhaseBlock: (id: string, updates: Partial<PhaseBlockUI>) => Promise<void>;
   deletePhaseBlock: (id: string, reason?: string) => Promise<void>;
   // granular phase sub-resources
-  addPhaseItem: (blockId: string, kind: 'checklist' | 'outcome', text: string, role?: UserRole) => Promise<void>;
+  addPhaseItem: (blockId: string, kind: 'checklist' | 'outcome', text: string, role?: string) => Promise<void>;
   updatePhaseItem: (blockId: string, itemId: string, updates: { text?: string; done?: boolean }) => Promise<void>;
   deletePhaseItem: (blockId: string, itemId: string) => Promise<void>;
   addPhaseComment: (blockId: string, content: string) => Promise<void>;
@@ -121,6 +121,15 @@ interface AppContextType extends AppState {
   updatePhaseDef: (id: string, body: Partial<PhaseDefBody>) => Promise<void>;
   deletePhaseDef: (id: string, force?: boolean) => Promise<void>;
   reorderPhaseDefs: (orderedIds: string[]) => Promise<void>;
+
+  // Workspace roles (#26 mảng B — role công việc per-workspace)
+  orgRoles: WorkspaceRoleDef[];
+  getRoleName: (code: string | undefined) => string;
+  addRole: (body: RoleBody) => Promise<WorkspaceRoleDef>;
+  updateRole: (id: string, body: Partial<RoleBody>) => Promise<void>;
+  deleteRole: (id: string) => Promise<void>;
+  reorderRoles: (orderedIds: string[]) => Promise<void>;
+  assignMemberRole: (userId: string, code: string | null) => Promise<void>;
 
   // Org actions
   addOrganization: (name: string, description?: string) => Promise<Organization>;
@@ -180,6 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [projectsState, setProjectsState] = useState<Project[]>([]);
   const [orgsState, setOrgsState] = useState<Organization[]>([]);
   const [phaseDefs, setPhaseDefs] = useState<PhaseDefinition[]>([]);
+  const [orgRoles, setOrgRoles] = useState<WorkspaceRoleDef[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -249,14 +259,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       onlyMine: false, rangeStart: null, rangeEnd: null,
     }));
     try {
-      const [projects, blocks, defs] = await Promise.all([
+      const [projects, blocks, defs, roles] = await Promise.all([
         projectsApi.listByOrg(orgId),
         phaseBlocksApi.listByOrg(orgId),
         phaseDefsApi.list(orgId),
+        rolesApi.list(orgId),
       ]);
       setProjectsState(projects);
       setPbState(blocks);
       setPhaseDefs(defs);
+      setOrgRoles(roles);
     } catch { /* ignore */ }
   }, []);
 
@@ -269,15 +281,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await afterAuth(me);
   }, [afterAuth]);
 
-  const register = useCallback(async (email: string, password: string, name: string, role: UserRole) => {
+  const register = useCallback(async (email: string, password: string, name: string) => {
     setAuthError(null);
-    const me = await auth.register(email, password, name, role);
+    const me = await auth.register(email, password, name);
     await afterAuth(me);
   }, [afterAuth]);
 
-  const setupSuperuser = useCallback(async (email: string, password: string, name: string, role: UserRole) => {
+  const setupSuperuser = useCallback(async (email: string, password: string, name: string) => {
     setAuthError(null);
-    const me = await auth.setup(email, password, name, role);
+    const me = await auth.setup(email, password, name);
     setNeedsSetup(false);
     await afterAuth(me);
   }, [afterAuth]);
@@ -289,6 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjectsState([]);
     setPbState([]);
     setPhaseDefs([]);
+    setOrgRoles([]);
     setNotifications([]);
     setUnreadCount(0);
     setState({ ...INITIAL_STATE, currentView: 'login' });
@@ -296,7 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateCurrentUser = useCallback(async (updates: Partial<User>) => {
     if (!currentUser) return;
-    const updated = await usersApi.updateProfile({ name: updates.name, role: updates.role });
+    const updated = await usersApi.updateProfile({ name: updates.name });
     setCurrentUser(updated);
     setOrgsState(prev => {
       const next = prev.map(org => ({ ...org, members: org.members.map(m => m.id === updated.id ? updated : m) }));
@@ -323,6 +336,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjectsState([]);
     setPbState([]);
     setPhaseDefs([]);
+    setOrgRoles([]);
     setNotifications([]);
     setUnreadCount(0);
     setState({ ...INITIAL_STATE, currentView: 'landing' });
@@ -514,7 +528,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await phaseBlocksApi.deleteItem(blockId, itemId);
   }, [patchBlock]);
 
-  const addPhaseItem = useCallback(async (blockId: string, kind: 'checklist' | 'outcome', text: string, role?: UserRole) => {
+  const addPhaseItem = useCallback(async (blockId: string, kind: 'checklist' | 'outcome', text: string, role?: string) => {
     // Dùng item trả về trực tiếp (tránh race với commit-after-response của BE)
     const item = await phaseBlocksApi.addItem(blockId, kind, text, role);
     patchBlock(blockId, pb => kind === 'checklist'
@@ -576,6 +590,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!state.selectedOrgId) return;
     const fresh = await phaseDefsApi.reorder(state.selectedOrgId, orderedIds);
     setPhaseDefs(fresh);
+  }, [state.selectedOrgId]);
+
+  // ─── Workspace roles (#26 mảng B) ─────────────────────────────────
+  const getRoleName = useCallback(
+    (code: string | undefined): string => resolveRoleName(orgRoles, code),
+    [orgRoles],
+  );
+
+  const addRole = useCallback(async (body: RoleBody): Promise<WorkspaceRoleDef> => {
+    if (!state.selectedOrgId) throw new Error('Chưa chọn workspace');
+    const created = await rolesApi.create(state.selectedOrgId, body);
+    setOrgRoles(prev => [...prev, created].sort((a, b) => a.position - b.position));
+    return created;
+  }, [state.selectedOrgId]);
+
+  const updateRole = useCallback(async (id: string, body: Partial<RoleBody>) => {
+    if (!state.selectedOrgId) return;
+    const updated = await rolesApi.update(state.selectedOrgId, id, body);
+    setOrgRoles(prev => prev.map(r => r.id === id ? updated : r).sort((a, b) => a.position - b.position));
+  }, [state.selectedOrgId]);
+
+  // Xóa role → BE cascade xóa checklist/outcome mặc định gắn role + gỡ khỏi member.
+  // Refetch phase defs để phản ánh cascade (link Role↔Phase).
+  const deleteRole = useCallback(async (id: string) => {
+    if (!state.selectedOrgId) return;
+    await rolesApi.remove(state.selectedOrgId, id);
+    setOrgRoles(prev => prev.filter(r => r.id !== id));
+    try { setPhaseDefs(await phaseDefsApi.list(state.selectedOrgId)); } catch { /* ignore */ }
+  }, [state.selectedOrgId]);
+
+  const reorderRoles = useCallback(async (orderedIds: string[]) => {
+    if (!state.selectedOrgId) return;
+    setOrgRoles(await rolesApi.reorder(state.selectedOrgId, orderedIds));
+  }, [state.selectedOrgId]);
+
+  const assignMemberRole = useCallback(async (userId: string, code: string | null) => {
+    if (!state.selectedOrgId) return;
+    const orgId = state.selectedOrgId;
+    await orgsApi.setMemberRole(orgId, userId, code);
+    setOrgsState(prev => prev.map(o => o.id === orgId
+      ? { ...o, members: o.members.map(m => m.id === userId ? { ...m, jobRole: code ?? undefined } : m) }
+      : o));
   }, [state.selectedOrgId]);
 
   // ─── Organizations ────────────────────────────────────────────────
@@ -693,6 +749,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addPhaseItem, updatePhaseItem, deletePhaseItem,
       addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,
       phaseDefs, getPhaseMeta, addPhaseDef, updatePhaseDef, deletePhaseDef, reorderPhaseDefs,
+      orgRoles, getRoleName, addRole, updateRole, deleteRole, reorderRoles, assignMemberRole,
       addOrganization, updateOrganization, deleteOrganization, addOrgMember, removeOrgMember,
       notifications, unreadCount, loadNotifications, markNotificationRead, markAllNotificationsRead,
       selectedOrg, organizations: orgsState, orgProjects, orgPhaseBlocks,

@@ -16,7 +16,7 @@ from app.infrastructure.db.models import (
 
 def _user_to_entity(m: UserModel) -> User:
     return User(
-        id=m.id, email=m.email, name=m.name, role=m.role,
+        id=m.id, email=m.email, name=m.name,
         avatar_url=m.avatar_url, is_superuser=m.is_superuser, created_at=m.created_at,
     )
 
@@ -55,7 +55,8 @@ class SqlAlchemyOrganizationRepository(OrganizationRepository):
     async def list_all_memberships(self) -> list[Membership]:
         rows = await self._session.scalars(select(OrganizationMemberModel))
         return [
-            Membership(user_id=m.user_id, org_id=m.org_id, role=m.role, joined_at=m.joined_at)
+            Membership(user_id=m.user_id, org_id=m.org_id, role=m.role,
+                       job_role=m.job_role, joined_at=m.joined_at)
             for m in rows
         ]
 
@@ -99,14 +100,25 @@ class SqlAlchemyOrganizationRepository(OrganizationRepository):
         await self._session.execute(delete(OrganizationModel).where(OrganizationModel.id == org_id))
 
     async def add_member(
-        self, org_id: UUID, user_id: UUID, role: WorkspaceRole = WorkspaceRole.MEMBER
+        self, org_id: UUID, user_id: UUID, role: WorkspaceRole = WorkspaceRole.MEMBER,
+        job_role: str | None = None,
     ) -> None:
         existing = await self._session.get(OrganizationMemberModel, (org_id, user_id))
         if existing:
             existing.role = role
+            if job_role is not None:
+                existing.job_role = job_role
         else:
-            self._session.add(OrganizationMemberModel(org_id=org_id, user_id=user_id, role=role))
+            self._session.add(OrganizationMemberModel(
+                org_id=org_id, user_id=user_id, role=role, job_role=job_role,
+            ))
         await self._session.flush()
+
+    async def set_member_job_role(self, org_id: UUID, user_id: UUID, job_role: str | None) -> None:
+        m = await self._session.get(OrganizationMemberModel, (org_id, user_id))
+        if m is not None:
+            m.job_role = job_role
+            await self._session.flush()
 
     async def remove_member(self, org_id: UUID, user_id: UUID) -> None:
         await self._session.execute(
@@ -120,16 +132,18 @@ class SqlAlchemyOrganizationRepository(OrganizationRepository):
         m = await self._session.get(OrganizationMemberModel, (org_id, user_id))
         if m is None:
             return None
-        return Membership(user_id=m.user_id, org_id=m.org_id, role=m.role, joined_at=m.joined_at)
+        return Membership(user_id=m.user_id, org_id=m.org_id, role=m.role,
+                          job_role=m.job_role, joined_at=m.joined_at)
 
-    async def list_members(self, org_id: UUID) -> list[User]:
-        rows = await self._session.scalars(
-            select(UserModel)
+    async def list_members(self, org_id: UUID) -> list[tuple[User, str | None]]:
+        """#26 mảng B: trả (User, job_role code) — role công việc trong workspace này."""
+        rows = await self._session.execute(
+            select(UserModel, OrganizationMemberModel.job_role)
             .join(OrganizationMemberModel, OrganizationMemberModel.user_id == UserModel.id)
             .where(OrganizationMemberModel.org_id == org_id)
             .order_by(OrganizationMemberModel.joined_at)
         )
-        return [_user_to_entity(u) for u in rows]
+        return [(_user_to_entity(u), job_role) for u, job_role in rows]
 
     async def list_owner_ids(self, org_id: UUID) -> list[UUID]:
         rows = await self._session.scalars(

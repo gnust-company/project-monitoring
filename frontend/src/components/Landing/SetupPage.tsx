@@ -1,19 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { ROLE_LABELS } from '../../data/mockData';
-import type { UserRole } from '../../types';
-import { Layers, Mail, Lock, User, Shield, ArrowRight, ShieldCheck } from 'lucide-react';
-import Dropdown from '../common/Dropdown';
-
-const ROLE_OPTIONS: UserRole[] = ['PM', 'BA', 'SW_Architect', 'SysOps', 'UI_Designer', 'GUI', 'SW_Developer', 'SW_Tester'];
+import { Layers, Mail, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function SetupPage() {
   const { setupSuperuser } = useApp();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('PM');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +19,7 @@ export default function SetupPage() {
     setLoading(true);
     setError(null);
     try {
-      await setupSuperuser(email, password, name, role);
+      await setupSuperuser(email, password, name);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
       setLoading(false);
@@ -65,19 +59,6 @@ export default function SetupPage() {
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="you@company.com" required className={inputClass} />
-          </div>
-          <div>
-            <Dropdown
-              value={role}
-              onChange={v => setRole(v as UserRole)}
-              options={ROLE_OPTIONS.map(r => ({ value: r, label: ROLE_LABELS[r] ?? r }))}
-              renderTrigger={sel => (
-                <>
-                  <Shield className="w-4 h-4 text-muted flex-shrink-0" />
-                  <span className="flex-1 text-left text-ink">{sel?.label}</span>
-                </>
-              )}
-            />
           </div>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />

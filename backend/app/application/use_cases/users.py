@@ -1,4 +1,4 @@
-"""Use cases cho hồ sơ user — cập nhật tên/role, avatar (MinIO),
+"""Use cases cho hồ sơ user — cập nhật tên, avatar (MinIO),
 đổi mật khẩu, xóa tài khoản, và quản trị người dùng (superuser)."""
 from collections.abc import Callable
 from uuid import uuid4
@@ -6,7 +6,6 @@ from uuid import uuid4
 from app.application.ports import ObjectStorage, UserRepository
 from app.application.use_cases.storage_cleanup import purge_object_urls
 from app.domain.entities import User
-from app.domain.value_objects import UserRole
 
 
 class InvalidPasswordError(Exception):
@@ -17,11 +16,10 @@ class UpdateProfile:
     def __init__(self, users: UserRepository) -> None:
         self._users = users
 
-    async def execute(self, user: User, name: str | None = None, role: UserRole | None = None) -> User:
+    async def execute(self, user: User, name: str | None = None) -> User:
+        # #26 mảng B: bỏ role toàn cục — chỉ còn đổi tên ở hồ sơ tài khoản.
         if name is not None:
             user.name = name
-        if role is not None:
-            user.role = role
         return await self._users.update(user)
 
 

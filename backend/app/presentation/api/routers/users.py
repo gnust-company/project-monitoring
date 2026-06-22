@@ -34,7 +34,7 @@ async def update_me(
     current: CurrentUser,
     uc: Annotated[UpdateProfile, Depends(update_profile_uc)],
 ) -> UserOut:
-    user = await uc.execute(current, name=body.name, role=body.role)
+    user = await uc.execute(current, name=body.name)
     return UserOut.from_entity(user)
 
 

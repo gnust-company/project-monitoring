@@ -1,21 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PHASE_PALETTE, PHASE_COLOR_KEYS, resolvePhaseMeta } from '../../types';
-import type { UserRole, PhaseDefinition } from '../../types';
-import { ROLE_LABELS } from '../../data/mockData';
-import { phaseDefsApi, type PhaseDefBody } from '../../api';
+import type { PhaseDefinition, WorkspaceRoleDef } from '../../types';
+import { phaseDefsApi, rolesApi, type PhaseDefBody } from '../../api';
 import { ApiError } from '../../api/client';
 import {
   Layers, Plus, Trash2, Check, ChevronUp, ChevronDown, CheckSquare, Target, AlertTriangle,
 } from 'lucide-react';
 
-type DraftItem = { role?: UserRole; text: string };
+type DraftItem = { role?: string; text: string };
 type Draft = {
   name: string; fullName: string; description: string; color: string;
   checklist: DraftItem[]; outcomes: DraftItem[];
 };
-
-const ROLE_KEYS = Object.keys(ROLE_LABELS) as UserRole[];
 
 function toDraft(def: PhaseDefinition): Draft {
   return {
@@ -26,11 +23,12 @@ function toDraft(def: PhaseDefinition): Draft {
 }
 
 // Editor cho 1 nhóm item (checklist hoặc outcome) — role select + text + xóa, kèm nút thêm.
-function ItemEditor({ items, setItems, icon, label }: {
+function ItemEditor({ items, setItems, icon, label, roleOptions }: {
   items: DraftItem[];
   setItems: (next: DraftItem[]) => void;
   icon: React.ReactNode;
   label: string;
+  roleOptions: WorkspaceRoleDef[];
 }) {
   return (
     <div>
@@ -41,11 +39,12 @@ function ItemEditor({ items, setItems, icon, label }: {
         {items.map((it, idx) => (
           <div key={idx} className="flex items-center gap-1.5 group">
             <select value={it.role ?? ''}
-              onChange={e => { const v = e.target.value; const next = [...items]; next[idx] = { ...next[idx], role: v ? (v as UserRole) : undefined }; setItems(next); }}
+              onChange={e => { const v = e.target.value; const next = [...items]; next[idx] = { ...next[idx], role: v || undefined }; setItems(next); }}
               className="px-1.5 py-1 bg-white border border-stone-200 rounded-md text-[11px] text-stone-600 w-28 flex-shrink-0
                          focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink">
               <option value="">Chung</option>
-              {ROLE_KEYS.map(r => <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>)}
+              {roleOptions.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
+              {it.role && !roleOptions.some(r => r.code === it.role) && <option value={it.role}>{it.role}</option>}
             </select>
             <input type="text" value={it.text}
               onChange={e => { const next = [...items]; next[idx] = { ...next[idx], text: e.target.value }; setItems(next); }}
@@ -72,16 +71,19 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
   const ctx = useApp();
   const standalone = !!orgId;
   const [localDefs, setLocalDefs] = useState<PhaseDefinition[]>([]);
+  const [localRoles, setLocalRoles] = useState<WorkspaceRoleDef[]>([]);
 
   useEffect(() => {
     if (!standalone || !orgId) return;
     let alive = true;
     phaseDefsApi.list(orgId).then(d => { if (alive) setLocalDefs(d); }).catch(() => { /* ignore */ });
+    rolesApi.list(orgId).then(r => { if (alive) setLocalRoles(r); }).catch(() => { /* ignore */ });
     return () => { alive = false; };
   }, [standalone, orgId]);
 
   const byPos = (a: PhaseDefinition, b: PhaseDefinition) => a.position - b.position;
   const phaseDefs = standalone ? localDefs : ctx.phaseDefs;
+  const roleOptions = standalone ? localRoles : ctx.orgRoles;
   const getPhaseMeta = (code: string) => resolvePhaseMeta(phaseDefs, code);
   const addPhaseDef = standalone
     ? async (b: PhaseDefBody) => { const c = await phaseDefsApi.create(orgId!, b); setLocalDefs(p => [...p, c].sort(byPos)); return c; }
@@ -244,9 +246,9 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
             </div>
 
             <ItemEditor items={draft.checklist} setItems={next => setDraft({ ...draft, checklist: next })}
-              icon={<CheckSquare className="w-3.5 h-3.5" />} label="Checklist mặc định" />
+              icon={<CheckSquare className="w-3.5 h-3.5" />} label="Checklist mặc định" roleOptions={roleOptions} />
             <ItemEditor items={draft.outcomes} setItems={next => setDraft({ ...draft, outcomes: next })}
-              icon={<Target className="w-3.5 h-3.5" />} label="Outcome mặc định" />
+              icon={<Target className="w-3.5 h-3.5" />} label="Outcome mặc định" roleOptions={roleOptions} />
 
             {error && <p className="text-[11px] text-error">{error}</p>}
 

@@ -15,18 +15,18 @@ function formatDate(date: Date): string {
 
 // ─── Users ─────────────────────────────────────────────────────────
 export const users: User[] = [
-  { id: 'u1', name: 'Sarah Chen', avatar: 'https://i.pravatar.cc/150?u=u1', role: 'PM' },
-  { id: 'u2', name: 'Mike Ross', avatar: 'https://i.pravatar.cc/150?u=u2', role: 'PM' },
-  { id: 'u3', name: 'Alex Kim', avatar: 'https://i.pravatar.cc/150?u=u3', role: 'SW_Developer' },
-  { id: 'u4', name: 'Jordan Lee', avatar: 'https://i.pravatar.cc/150?u=u4', role: 'BA' },
-  { id: 'u5', name: 'Taylor Swift', avatar: 'https://i.pravatar.cc/150?u=u5', role: 'UI_Designer' },
-  { id: 'u6', name: 'Casey Park', avatar: 'https://i.pravatar.cc/150?u=u6', role: 'SW_Tester' },
-  { id: 'u7', name: 'Riley Johnson', avatar: 'https://i.pravatar.cc/150?u=u7', role: 'SW_Architect' },
-  { id: 'u8', name: 'Morgan Blake', avatar: 'https://i.pravatar.cc/150?u=u8', role: 'GUI' },
-  { id: 'u9', name: 'Drew Patel', avatar: 'https://i.pravatar.cc/150?u=u9', role: 'SysOps' },
-  { id: 'u10', name: 'Sam Wilson', avatar: 'https://i.pravatar.cc/150?u=u10', role: 'PM' },
-  { id: 'u11', name: 'Jamie Torres', avatar: 'https://i.pravatar.cc/150?u=u11', role: 'SW_Developer' },
-  { id: 'u12', name: 'Avery Brooks', avatar: 'https://i.pravatar.cc/150?u=u12', role: 'SW_Tester' },
+  { id: 'u1', name: 'Sarah Chen', avatar: 'https://i.pravatar.cc/150?u=u1', jobRole: 'PM' },
+  { id: 'u2', name: 'Mike Ross', avatar: 'https://i.pravatar.cc/150?u=u2', jobRole: 'PM' },
+  { id: 'u3', name: 'Alex Kim', avatar: 'https://i.pravatar.cc/150?u=u3', jobRole: 'SW_Developer' },
+  { id: 'u4', name: 'Jordan Lee', avatar: 'https://i.pravatar.cc/150?u=u4', jobRole: 'BA' },
+  { id: 'u5', name: 'Taylor Swift', avatar: 'https://i.pravatar.cc/150?u=u5', jobRole: 'UI_Designer' },
+  { id: 'u6', name: 'Casey Park', avatar: 'https://i.pravatar.cc/150?u=u6', jobRole: 'SW_Tester' },
+  { id: 'u7', name: 'Riley Johnson', avatar: 'https://i.pravatar.cc/150?u=u7', jobRole: 'SW_Architect' },
+  { id: 'u8', name: 'Morgan Blake', avatar: 'https://i.pravatar.cc/150?u=u8', jobRole: 'GUI' },
+  { id: 'u9', name: 'Drew Patel', avatar: 'https://i.pravatar.cc/150?u=u9', jobRole: 'SysOps' },
+  { id: 'u10', name: 'Sam Wilson', avatar: 'https://i.pravatar.cc/150?u=u10', jobRole: 'PM' },
+  { id: 'u11', name: 'Jamie Torres', avatar: 'https://i.pravatar.cc/150?u=u11', jobRole: 'SW_Developer' },
+  { id: 'u12', name: 'Avery Brooks', avatar: 'https://i.pravatar.cc/150?u=u12', jobRole: 'SW_Tester' },
 ];
 
 // ─── Organizations ─────────────────────────────────────────────────

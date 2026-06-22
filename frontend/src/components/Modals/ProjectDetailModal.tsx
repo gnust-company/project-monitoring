@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById } from '../../data/mockData';
-import { ROLE_LABELS } from '../../data/mockData';
 import { projectsApi } from '../../api';
 import { formatActivity } from '../../lib/formatActivity';
 import type { ProjectStatus, ActivityItem } from '../../types';
@@ -26,7 +25,7 @@ export default function ProjectDetailModal() {
   const {
     selectedProjectDetail, projectDetailOpen, closeProjectDetail,
     updateProject, deleteProject, changeProjectPic, phaseBlocks,
-    currentUser, selectedOrg, isOwner, getPhaseMeta,
+    currentUser, selectedOrg, isOwner, getPhaseMeta, getRoleName,
   } = useApp();
 
   // Inline editing
@@ -235,7 +234,7 @@ export default function ProjectDetailModal() {
                 <Dropdown className="w-60" value={meta.picUserId} onChange={uid => setMeta(m => ({ ...m, picUserId: uid }))}
                   options={orgMembers.map(m => ({
                     value: m.id, label: m.name,
-                    hint: ROLE_LABELS[m.role] ?? m.role, avatar: m.avatar,
+                    hint: getRoleName(m.jobRole), avatar: m.avatar,
                   }))} />
               ) : picUser ? (
                 <div className="flex items-center gap-1.5">

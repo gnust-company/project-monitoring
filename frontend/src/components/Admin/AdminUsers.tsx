@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Crown, KeyRound, Mail, Briefcase, Building2, Calendar, ShieldPlus, ShieldMinus, Trash2 } from 'lucide-react';
+import { Search, Crown, KeyRound, Mail, Building2, Calendar, ShieldPlus, ShieldMinus, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { AdminUserInfo } from '../../types';
 import Avatar from '../common/Avatar';
@@ -28,8 +28,7 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
     if (!q) return users;
     return users.filter(u =>
       u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q));
+      u.email.toLowerCase().includes(q));
   }, [users, query]);
 
   return (
@@ -52,9 +51,8 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
 
       <div className="bg-white rounded-2xl border border-hairline overflow-hidden">
         {/* Header row */}
-        <div className="hidden md:grid grid-cols-[1fr_140px_120px_110px_180px] gap-3 px-5 py-3 border-b border-hairline-soft bg-surface-soft/50 text-[11px] font-semibold text-muted uppercase tracking-wide">
+        <div className="hidden md:grid grid-cols-[1fr_120px_110px_180px] gap-3 px-5 py-3 border-b border-hairline-soft bg-surface-soft/50 text-[11px] font-semibold text-muted uppercase tracking-wide">
           <span>Người dùng</span>
-          <span>Vai trò</span>
           <span>Workspace</span>
           <span>Ngày tạo</span>
           <span className="text-right">Hành động</span>
@@ -75,7 +73,7 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
             <motion.div key={u.id}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(idx * 0.02, 0.3) }}>
               <div
-                className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_140px_120px_110px_180px] gap-3 px-5 py-3 items-center hover:bg-surface-soft/40 transition-colors cursor-pointer"
+                className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_120px_110px_180px] gap-3 px-5 py-3 items-center hover:bg-surface-soft/40 transition-colors cursor-pointer"
                 onClick={() => setExpanded(expanded === u.id ? null : u.id)}>
                 {/* User */}
                 <div className="flex items-center gap-3 min-w-0">
@@ -92,8 +90,6 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
                     <p className="text-[11px] text-muted-soft truncate">{u.email}</p>
                   </div>
                 </div>
-                {/* Role */}
-                <span className="hidden md:inline-flex text-[11px] font-medium text-body px-2 py-1 rounded-md bg-surface-soft w-fit">{u.role}</span>
                 {/* Workspace count */}
                 <span className="hidden md:block text-sm text-body tabular-nums">{u.workspaceCount}</span>
                 {/* Created */}
@@ -145,7 +141,6 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
                   className="overflow-hidden bg-surface-soft/40 border-t border-hairline-soft">
                   <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <Detail icon={Mail} label="Email" value={u.email} />
-                    <Detail icon={Briefcase} label="Vai trò" value={u.role} />
                     <Detail icon={Building2} label="Workspace" value={String(u.workspaceCount)} />
                     <Detail icon={Calendar} label="Tham gia" value={fmtDate(u.createdAt)} />
                   </div>

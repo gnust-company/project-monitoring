@@ -19,6 +19,7 @@ from app.domain.entities import (
     PhaseItem,
     Project,
     User,
+    WorkspaceRoleDef,
 )
 from app.domain.value_objects import WorkspaceRole
 
@@ -90,8 +91,12 @@ class OrganizationRepository(ABC):
 
     @abstractmethod
     async def add_member(
-        self, org_id: UUID, user_id: UUID, role: WorkspaceRole = WorkspaceRole.MEMBER
+        self, org_id: UUID, user_id: UUID, role: WorkspaceRole = WorkspaceRole.MEMBER,
+        job_role: str | None = None,
     ) -> None: ...
+
+    @abstractmethod
+    async def set_member_job_role(self, org_id: UUID, user_id: UUID, job_role: str | None) -> None: ...
 
     @abstractmethod
     async def remove_member(self, org_id: UUID, user_id: UUID) -> None: ...
@@ -100,7 +105,9 @@ class OrganizationRepository(ABC):
     async def get_membership(self, org_id: UUID, user_id: UUID) -> Membership | None: ...
 
     @abstractmethod
-    async def list_members(self, org_id: UUID) -> list[User]: ...
+    async def list_members(self, org_id: UUID) -> list[tuple[User, str | None]]:
+        """#26 mảng B: (User, job_role code) trong workspace này."""
+        ...
 
     @abstractmethod
     async def list_owner_ids(self, org_id: UUID) -> list[UUID]: ...
@@ -276,6 +283,38 @@ class PhaseDefinitionRepository(ABC):
     @abstractmethod
     async def seed_defaults(self, org_id: UUID) -> None:
         """Seed 7 phase mặc định cho 1 workspace mới."""
+        ...
+
+
+class WorkspaceRoleRepository(ABC):
+    """#26 (mảng B): role công việc theo workspace (thay enum UserRole toàn cục)."""
+
+    @abstractmethod
+    async def list_by_org(self, org_id: UUID) -> list[WorkspaceRoleDef]: ...
+
+    @abstractmethod
+    async def get(self, role_id: UUID) -> WorkspaceRoleDef | None: ...
+
+    @abstractmethod
+    async def create(self, role: WorkspaceRoleDef) -> WorkspaceRoleDef: ...
+
+    @abstractmethod
+    async def update(self, role: WorkspaceRoleDef) -> WorkspaceRoleDef: ...
+
+    @abstractmethod
+    async def delete(self, role_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def cascade_remove_role(self, org_id: UUID, code: str) -> None:
+        """Xóa role kéo theo checklist/outcome mặc định + gỡ khỏi item/membership."""
+        ...
+
+    @abstractmethod
+    async def count_members_using(self, org_id: UUID, code: str) -> int: ...
+
+    @abstractmethod
+    async def seed_defaults(self, org_id: UUID) -> None:
+        """Seed 8 role mặc định cho 1 workspace mới."""
         ...
 
 

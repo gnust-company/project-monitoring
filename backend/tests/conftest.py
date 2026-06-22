@@ -78,8 +78,10 @@ def auth(token: str) -> dict[str, str]:
 def make_user(client: AsyncClient):
     """Factory: đăng ký 1 user → trả (token, user_dict)."""
     async def _make(email: str, role: str = "PM", password: str = "pw123456", name: str | None = None):
+        # #26 mảng B: đăng ký KHÔNG còn role toàn cục. Tham số `role` giữ lại cho tương
+        # thích chữ ký test cũ nhưng bị bỏ qua (role nay theo workspace).
         resp = await client.post("/api/v1/auth/register", json={
-            "email": email, "password": password, "name": name or email.split("@")[0], "role": role,
+            "email": email, "password": password, "name": name or email.split("@")[0],
         })
         assert resp.status_code == 201, resp.text
         data = resp.json()

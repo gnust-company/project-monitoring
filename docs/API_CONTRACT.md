@@ -34,17 +34,17 @@ Schema database tương ứng: [SCHEMA.md](./SCHEMA.md).
 |---|---|---|
 | GET | `/auth/setup-status` | `{ needsSetup: bool }` — `true` khi DB chưa có user nào (FE hiện view tạo super-user) |
 | POST | `/auth/setup` | Tạo tài khoản đầu tiên (`isSuperuser=true`). Body như `register`. **Khóa** sau khi đã có user (409). → `{ accessToken, user }` |
-| POST | `/auth/register` | Đăng ký. Body: `{ email, password, name, role }` — `role` **bắt buộc**. → `{ accessToken, user }` |
+| POST | `/auth/register` | Đăng ký. Body: `{ email, password, name }` — #26 mảng B: **không còn `role`** (vai trò gán theo workspace khi vào). → `{ accessToken, user }` |
 | POST | `/auth/login` | Body: `{ email, password }` → `{ accessToken, user }` |
 | GET | `/auth/me` | User hiện tại từ token |
 
 **User shape** (mọi nơi trả user đều dùng shape này):
 
 ```json
-{ "id": "uuid", "email": "a@b.c", "name": "Sarah Chen", "avatar": "https://...", "role": "PM", "isSuperuser": false }
+{ "id": "uuid", "email": "a@b.c", "name": "Sarah Chen", "avatar": "https://...", "isSuperuser": false }
 ```
 
-`role` ∈ `PM | BA | SW_Architect | SysOps | UI_Designer | GUI | SW_Developer | SW_Tester` (vai trò công việc).
+> #26 mảng B: `User` **không còn `role` toàn cục**. Vai trò công việc theo workspace — khi list theo org, mỗi member kèm `jobRole` (code workspace role); xem `GET /organizations/{orgId}/roles`.
 
 ### Phân quyền (permission)
 
@@ -71,7 +71,7 @@ Nguồn cho **Profile view** (FE: trang Hồ sơ mở từ avatar/sidebar).
 | Method | Path | Mô tả |
 |---|---|---|
 | GET | `/users/me` | = `/auth/me` |
-| PATCH | `/users/me` | Cập nhật hồ sơ. Body (partial): `{ name?, role? }` |
+| PATCH | `/users/me` | Cập nhật hồ sơ tài khoản. Body (partial): `{ name? }` (#26 mảng B: bỏ `role`) |
 | POST | `/users/me/avatar` | `multipart/form-data` field `file` → upload MinIO (bucket `avatars`), set `avatar` → trả User |
 
 **Profile stats** — FE có thể tự tổng hợp từ `/organizations` + `/organizations/{orgId}/phase-blocks`, hoặc BE cấp endpoint gộp:
@@ -110,6 +110,19 @@ Mọi member **đọc** được (FE render timeline/dashboard theo phase của 
 | DELETE | `/organizations/{orgId}/phases/{phaseId}?force=false` | Xóa phase. Nếu đang được block dùng và `force=false` → **409** `{ detail: { message, count } }`; `?force=true` để xóa (block giữ nguyên, hiển thị màu trung tính) → 204 |
 | POST | `/organizations/{orgId}/phases/reorder` | Sắp xếp lại. Body: `{ orderedIds: [phaseId…] }` → trả danh sách mới |
 
+#### Workspace roles (#26 mảng B — vai trò công việc per-workspace)
+
+Mọi member **đọc** được; thêm/sửa/xóa/sắp xếp là **owner-only**. Seed 8 role mặc định khi tạo org. Đăng ký KHÔNG còn hỏi role; member mới được gán role mặc định, owner/chính chủ đổi sau.
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/organizations/{orgId}/roles` | Danh sách role công việc, sắp theo `position` → `[{ id, orgId, code, name, position }]` |
+| POST | `/organizations/{orgId}/roles` | Tạo role. Body: `{ name, code? }` (`code` tự sinh slug nếu thiếu) → 201 |
+| PATCH | `/organizations/{orgId}/roles/{roleId}` | Cập nhật `{ name?, position? }` (đổi tên → checklist/outcome hiển thị tên mới vì tham chiếu `code`) |
+| DELETE | `/organizations/{orgId}/roles/{roleId}` | Xóa role → **cascade**: xóa checklist/outcome mặc định gắn role + đặt `phase_items.role`/`members.job_role` về NULL → 204 |
+| POST | `/organizations/{orgId}/roles/reorder` | Sắp xếp. Body: `{ orderedIds: [roleId…] }` |
+| PATCH | `/organizations/{orgId}/members/{userId}/role` | Gán vai trò cho member. Body: `{ role: code \| null }`. **Owner** đổi cho bất kỳ ai; **user thường** chỉ đổi role của chính mình (khác → 403); code không tồn tại → 404 → 204 |
+
 ```json
 {
   "id": "uuid", "orgId": "uuid", "code": "SD", "name": "Thiết kế Phần mềm",
@@ -125,7 +138,7 @@ Mọi member **đọc** được (FE render timeline/dashboard theo phase của 
 {
   "id": "uuid",
   "name": "TechNova Solutions",
-  "members": [ { "id": "...", "name": "...", "avatar": "...", "role": "PM" } ]
+  "members": [ { "id": "...", "name": "...", "avatar": "...", "jobRole": "PM" } ]
 }
 ```
 
@@ -305,7 +318,8 @@ Lộ trình thay mock data trong `frontend/src/context/AppContext.tsx`:
 
 | FE hiện tại | Thay bằng |
 |---|---|
-| `login(email, { name, role })` | `POST /auth/login` (login) / `POST /auth/register` (đăng ký có role) |
+| `login(email, password)` | `POST /auth/login` (login) / `POST /auth/register` (đăng ký, KHÔNG role — #26 mảng B) |
+| Vai trò công việc per-workspace | `GET/POST/PATCH/DELETE /organizations/{id}/roles` + `PATCH /organizations/{id}/members/{userId}/role` |
 | `currentUser` | `GET /auth/me` |
 | `updateCurrentUser(updates)` (Profile view) | `PATCH /users/me` |
 | `organizations` (seed) | `GET /organizations` |

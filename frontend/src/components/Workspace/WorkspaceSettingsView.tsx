@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { ROLE_LABELS } from '../../data/mockData';
 import {
   Settings, Users, Trash2, Check, AlertTriangle, UserPlus, X, Mail,
 } from 'lucide-react';
 import Avatar from '../common/Avatar';
 import PhaseManager from './PhaseManager';
+import RoleManager from './RoleManager';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -20,10 +20,10 @@ export default function WorkspaceSettingsView() {
   const {
     selectedOrg, currentUser, orgProjects, phaseBlocks, isOwner,
     updateOrganization, deleteOrganization, addOrgMember, removeOrgMember,
-    goToWorkspaceSelector,
+    goToWorkspaceSelector, orgRoles, assignMemberRole,
   } = useApp();
 
-  const [tab, setTab] = useState<'general' | 'phases'>('general');
+  const [tab, setTab] = useState<'general' | 'roles' | 'phases'>('general');
   const [nameDraft, setNameDraft] = useState(selectedOrg?.name ?? '');
   const [descDraft, setDescDraft] = useState(selectedOrg?.description ?? '');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -86,7 +86,7 @@ export default function WorkspaceSettingsView() {
 
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-6 border-b border-hairline">
-          {([['general', 'Chung & Thành viên'], ['phases', 'Phase']] as const).map(([key, label]) => (
+          {([['general', 'Chung & Thành viên'], ['roles', 'Vai trò'], ['phases', 'Phase']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors
                 ${tab === key ? 'border-ink text-ink' : 'border-transparent text-stone-400 hover:text-stone-600'}`}>
@@ -184,9 +184,14 @@ export default function WorkspaceSettingsView() {
                       {m.name} {isSelf && <span className="text-[10px] text-stone-400 font-normal">(bạn)</span>}
                     </div>
                   </div>
-                  <span className="text-[10px] font-semibold text-stone-500 px-2 py-0.5 bg-stone-100 rounded-md">
-                    {ROLE_LABELS[m.role] ?? m.role}
-                  </span>
+                  {/* #26 mảng B: gán vai trò công việc trong workspace (owner đổi của ai cũng được) */}
+                  <select value={m.jobRole ?? ''}
+                    onChange={e => assignMemberRole(m.id, e.target.value || null)}
+                    className="text-[11px] text-stone-600 bg-stone-50 border border-stone-200 rounded-md px-1.5 py-1
+                               focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink">
+                    <option value="">— chưa có vai trò —</option>
+                    {orgRoles.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
+                  </select>
                   {!isSelf && isOwner && (
                     <button onClick={() => removeOrgMember(selectedOrg.id, m.id)}
                       title="Xóa khỏi workspace"
@@ -224,6 +229,14 @@ export default function WorkspaceSettingsView() {
           </motion.div>
         )}
         </>}
+
+        {/* Role management (#26 mảng B — role công việc per-workspace) */}
+        {tab === 'roles' && (
+          <motion.div custom={1} variants={fadeUp} initial="hidden" animate="visible"
+            className="bg-surface-card rounded-2xl border border-hairline p-6">
+            <RoleManager />
+          </motion.div>
+        )}
 
         {/* Phase management (#26 mảng A — phase động per-workspace) */}
         {tab === 'phases' && (

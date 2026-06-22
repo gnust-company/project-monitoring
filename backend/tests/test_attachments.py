@@ -127,11 +127,10 @@ async def test_delete_account_purges_avatar(client: AsyncClient, make_user):
 async def test_update_profile_and_avatar(client: AsyncClient, make_user):
     token, user, _ = await _block(client, make_user)
 
-    patched = await client.patch(f"{API}/users/me", json={"name": "New Name", "role": "SW_Architect"},
+    patched = await client.patch(f"{API}/users/me", json={"name": "New Name"},
                                  headers=auth(token))
     assert patched.status_code == 200
     assert patched.json()["name"] == "New Name"
-    assert patched.json()["role"] == "SW_Architect"
 
     avatar = await client.post(
         f"{API}/users/me/avatar",

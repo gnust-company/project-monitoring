@@ -8,7 +8,6 @@ from uuid import uuid4
 
 from app.application.ports import UserRepository
 from app.domain.entities import User
-from app.domain.value_objects import UserRole
 
 
 class EmailTakenError(Exception):
@@ -48,7 +47,7 @@ class RegisterUser:
         self._allowed = tuple(d.strip().lower().lstrip("@") for d in allowed_email_domains if d.strip())
 
     async def execute(
-        self, email: str, password: str, name: str, role: UserRole, *,
+        self, email: str, password: str, name: str, *,
         is_superuser: bool = False, enforce_email_domain: bool = True,
     ) -> User:
         # #5: chặn domain ngoài allowlist (trừ /auth/setup vì enforce_email_domain=False).
@@ -59,11 +58,11 @@ class RegisterUser:
 
         if await self._users.get_by_email(email):
             raise EmailTakenError(email)
+        # #26 mảng B: không còn role toàn cục — role gắn theo workspace khi vào.
         user = User(
             id=uuid4(),
             email=email,
             name=name,
-            role=role,
             avatar_url=None,
             is_superuser=is_superuser,
         )
@@ -101,10 +100,10 @@ class SetupSuperuser:
         self._users = users
         self._register = register
 
-    async def execute(self, email: str, password: str, name: str, role: UserRole) -> User:
+    async def execute(self, email: str, password: str, name: str) -> User:
         if (await self._users.count()) > 0:
             raise SetupAlreadyDoneError()
         # #5: setup (admin đầu tiên) KHÔNG bị giới hạn domain.
         return await self._register.execute(
-            email, password, name, role, is_superuser=True, enforce_email_domain=False
+            email, password, name, is_superuser=True, enforce_email_domain=False
         )

@@ -46,8 +46,8 @@ export default function WorkspaceSelector() {
         <div className="space-y-4">
           {organizations.map((org, i) => {
             const memberCount = org.members.length;
-            const pmCount = org.members.filter(m => m.role === 'PM').length;
-            const devCount = org.members.filter(m => m.role === 'SW_Developer').length;
+            const pmCount = org.members.filter(m => m.jobRole === 'PM').length;
+            const devCount = org.members.filter(m => m.jobRole === 'SW_Developer').length;
 
             return (
               <motion.button key={org.id} custom={i + 1} variants={fadeUp} initial="hidden" animate="visible"

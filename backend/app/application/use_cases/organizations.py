@@ -8,9 +8,11 @@ from app.application.ports import (
     PhaseBlockRepository,
     PhaseDefinitionRepository,
     UserRepository,
+    WorkspaceRoleRepository,
 )
 from app.application.use_cases.storage_cleanup import purge_object_urls
 from app.domain.entities import Organization, User
+from app.domain.roles import DEFAULT_MEMBER_ROLE_CODE
 from app.domain.value_objects import WorkspaceRole
 
 
@@ -23,13 +25,21 @@ class UserNotFoundError(Exception):
 
 
 class CreateOrganization:
-    def __init__(self, orgs: OrganizationRepository, phases: PhaseDefinitionRepository) -> None:
+    def __init__(
+        self, orgs: OrganizationRepository, phases: PhaseDefinitionRepository,
+        roles: WorkspaceRoleRepository,
+    ) -> None:
         self._orgs = orgs
         self._phases = phases
+        self._roles = roles
 
     async def execute(self, name: str, creator_id: UUID, description: str = "") -> Organization:
         org = await self._orgs.create(Organization(id=uuid4(), name=name, description=description))
-        await self._orgs.add_member(org.id, creator_id, WorkspaceRole.OWNER)
+        # #26 (mảng B): seed 8 role mặc định TRƯỚC khi gán role cho người tạo.
+        await self._roles.seed_defaults(org.id)
+        await self._orgs.add_member(
+            org.id, creator_id, WorkspaceRole.OWNER, job_role=DEFAULT_MEMBER_ROLE_CODE,
+        )
         # #26 (mảng A): seed 7 phase mặc định cho workspace mới.
         await self._phases.seed_defaults(org.id)
         org.member_ids = [creator_id]
@@ -54,7 +64,7 @@ class GetOrganization:
             raise OrgNotFoundError(str(org_id))
         return org
 
-    async def members(self, org_id: UUID) -> list[User]:
+    async def members(self, org_id: UUID) -> list[tuple[User, str | None]]:
         return await self._orgs.list_members(org_id)
 
 
@@ -102,7 +112,9 @@ class AddMember:
         if user is None:
             raise UserNotFoundError(email)
         org = await self._orgs.get(org_id)
-        await self._orgs.add_member(org_id, user.id, WorkspaceRole.MEMBER)
+        await self._orgs.add_member(
+            org_id, user.id, WorkspaceRole.MEMBER, job_role=DEFAULT_MEMBER_ROLE_CODE,
+        )
         await self._notifier.notify(
             user.id, "member_added",
             f"Bạn được thêm vào workspace {org.name if org else ''}".strip(),

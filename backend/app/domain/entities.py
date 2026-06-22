@@ -16,7 +16,6 @@ from app.domain.value_objects import (
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
-    UserRole,
     WorkspaceRole,
 )
 
@@ -26,7 +25,6 @@ class User:
     id: UUID
     email: str
     name: str
-    role: UserRole
     avatar_url: str | None = None
     is_superuser: bool = False
     created_at: datetime | None = None
@@ -34,11 +32,27 @@ class User:
 
 @dataclass(slots=True)
 class Membership:
-    """Quan hệ user ↔ workspace, kèm cấp quyền (owner/member)."""
+    """Quan hệ user ↔ workspace. `role` = cấp quyền (owner/member);
+    `job_role` (#26 mảng B) = code role công việc trong workspace (per-org, tùy biến)."""
     user_id: UUID
     org_id: UUID
     role: WorkspaceRole = WorkspaceRole.MEMBER
+    job_role: str | None = None
     joined_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class WorkspaceRoleDef:
+    """#26 (mảng B): định nghĩa role công việc theo workspace (thay enum UserRole toàn cục).
+
+    `code` duy nhất trong org; membership.job_role + phase item.role tham chiếu code này.
+    """
+    id: UUID
+    org_id: UUID
+    code: str
+    name: str
+    position: int = 0
+    created_at: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -74,12 +88,12 @@ class Project:
 
 @dataclass(slots=True)
 class PhaseItem:
-    """Một dòng checklist hoặc outcome trong phase, gắn với role (tùy chọn)."""
+    """Một dòng checklist hoặc outcome trong phase, gắn với role (code workspace role, tùy chọn)."""
     id: UUID
     kind: PhaseItemKind
     text: str
     done: bool = False
-    role: UserRole | None = None
+    role: str | None = None  # #26 mảng B: code workspace role (trước đây UserRole enum)
     position: int = 0
 
 
@@ -123,7 +137,7 @@ class PhaseDefinitionItem:
     id: UUID
     kind: PhaseItemKind
     text: str
-    role: UserRole | None = None
+    role: str | None = None  # #26 mảng B: code workspace role
     position: int = 0
 
 

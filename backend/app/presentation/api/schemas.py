@@ -16,7 +16,6 @@ from app.domain.value_objects import (
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
-    UserRole,
 )
 
 
@@ -29,15 +28,15 @@ class UserOut(CamelModel):
     id: UUID
     email: str
     name: str
-    role: UserRole
     avatar: str | None = None      # map từ domain.avatar_url
     is_superuser: bool = False
+    job_role: str | None = None    # #26 mảng B: code role công việc trong workspace (khi list theo org)
 
     @classmethod
-    def from_entity(cls, u: User) -> "UserOut":
+    def from_entity(cls, u: User, job_role: str | None = None) -> "UserOut":
         return cls(
-            id=u.id, email=u.email, name=u.name, role=u.role,
-            avatar=u.avatar_url, is_superuser=u.is_superuser,
+            id=u.id, email=u.email, name=u.name,
+            avatar=u.avatar_url, is_superuser=u.is_superuser, job_role=job_role,
         )
 
 
@@ -45,7 +44,6 @@ class RegisterIn(CamelModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
     name: str = Field(min_length=1, max_length=255)
-    role: UserRole
 
 
 class LoginIn(CamelModel):
@@ -64,7 +62,6 @@ class SetupStatusOut(CamelModel):
 
 class ProfileUpdate(CamelModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
-    role: UserRole | None = None
 
 
 # ─── Admin (superuser-only) ──────────────────────────────────────────
@@ -80,7 +77,6 @@ class AdminUserOut(CamelModel):
     id: UUID
     email: str
     name: str
-    role: UserRole
     avatar: str | None = None
     is_superuser: bool = False
     created_at: datetime | None = None
@@ -132,6 +128,33 @@ class OrgRename(CamelModel):
 
 class MemberAdd(CamelModel):
     email: EmailStr
+
+
+# ─── Workspace roles (#26 mảng B — role công việc per-workspace) ──────
+class WorkspaceRoleOut(CamelModel):
+    id: UUID
+    org_id: UUID
+    code: str
+    name: str
+    position: int = 0
+
+
+class RoleCreate(CamelModel):
+    code: str | None = Field(default=None, max_length=32)
+    name: str = Field(min_length=1, max_length=255)
+
+
+class RoleUpdate(CamelModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    position: int | None = None
+
+
+class RoleReorderIn(CamelModel):
+    ordered_ids: list[UUID]
+
+
+class MemberRoleUpdate(CamelModel):
+    role: str | None = None  # code workspace role (None = bỏ role)
 
 
 # ─── Change requests (approval queue) ────────────────────────────────
@@ -208,26 +231,26 @@ class PhaseItemOut(CamelModel):
     id: UUID
     text: str
     done: bool
-    role: UserRole | None = None
+    role: str | None = None  # #26 mảng B: code workspace role
 
 
 class PhaseItemCreate(CamelModel):
     kind: PhaseItemKind
     text: str = Field(min_length=1)
-    role: UserRole | None = None
+    role: str | None = None  # #26 mảng B: code workspace role
 
 
 class PhaseItemUpdate(CamelModel):
     text: str | None = None
     done: bool | None = None
-    role: UserRole | None = None
+    role: str | None = None  # #26 mảng B: code workspace role
     position: int | None = None
 
 
 class PhaseItemSeed(CamelModel):
     """Item gửi kèm khi tạo phase (FE chủ động thay vì để BE seed từ template)."""
     text: str
-    role: UserRole | None = None
+    role: str | None = None  # #26 mảng B: code workspace role
     done: bool = False
 
 
@@ -277,7 +300,7 @@ class PhaseDefItemOut(CamelModel):
     id: UUID
     kind: PhaseItemKind
     text: str
-    role: UserRole | None = None
+    role: str | None = None  # #26 mảng B: code workspace role
     position: int = 0
 
 
@@ -306,7 +329,7 @@ class PhaseDefinitionOut(CamelModel):
 
 class PhaseDefItemIn(CamelModel):
     text: str = Field(min_length=1)
-    role: UserRole | None = None
+    role: str | None = None  # #26 mảng B: code workspace role
 
 
 class PhaseDefCreate(CamelModel):

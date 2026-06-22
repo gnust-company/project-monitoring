@@ -14,7 +14,6 @@ def _to_entity(m: UserModel) -> User:
         id=m.id,
         email=m.email,
         name=m.name,
-        role=m.role,
         avatar_url=m.avatar_url,
         is_superuser=m.is_superuser,
         created_at=m.created_at,
@@ -43,7 +42,6 @@ class SqlAlchemyUserRepository(UserRepository):
             id=user.id,
             email=user.email,
             name=user.name,
-            role=user.role,
             avatar_url=user.avatar_url,
             is_superuser=user.is_superuser,
             password_hash=password_hash,
@@ -57,7 +55,6 @@ class SqlAlchemyUserRepository(UserRepository):
         if m is None:
             raise LookupError(f"User {user.id} not found")
         m.name = user.name
-        m.role = user.role
         m.avatar_url = user.avatar_url
         await self._session.flush()
         return _to_entity(m)

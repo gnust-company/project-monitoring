@@ -6,7 +6,7 @@ Mỗi bảng ánh xạ từ các type trong `frontend/src/types.ts`. ORM tương
 ## Sơ đồ quan hệ
 
 ```
-users ──< organization_members >── organizations
+users ──< organization_members >── organizations ──< workspace_roles  (role công việc per-org)
   │                                     │
   │                                     └──< projects ──< phase_blocks
   │                                                          │
@@ -24,6 +24,8 @@ phase_definitions      (per-org: phase động, thêm/đổi/sắp xếp/xóa) �
 ## Enums
 
 ```sql
+-- #26 mảng B: enum user_role giữ DORMANT (không cột nào dùng nữa) — chỉ là bộ 8 code
+-- mặc định seed vào workspace_roles. Vai trò công việc nay theo workspace (bảng workspace_roles).
 CREATE TYPE user_role AS ENUM (
   'PM', 'BA', 'SW_Architect', 'SysOps', 'UI_Designer', 'GUI', 'SW_Developer', 'SW_Tester'
 );
@@ -60,7 +62,8 @@ CREATE TABLE users (
   email         VARCHAR(255) NOT NULL UNIQUE,
   name          VARCHAR(255) NOT NULL,
   avatar_url    VARCHAR(1024),                    -- public URL trên MinIO (bucket avatars)
-  role          user_role NOT NULL,               -- vai trò công việc (sinh checklist)
+  -- #26 mảng B (migration 0009): bỏ cột role toàn cục — vai trò công việc nay theo
+  -- workspace (organization_members.job_role → workspace_roles.code).
   password_hash VARCHAR(255) NOT NULL,
   is_superuser  BOOLEAN NOT NULL DEFAULT false,   -- admin toàn cục, tạo ở first-run setup
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -83,9 +86,23 @@ CREATE TABLE organizations (
 CREATE TABLE organization_members (
   org_id    UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role      workspace_role NOT NULL DEFAULT 'member',  -- người tạo workspace = 'owner'
+  role      workspace_role NOT NULL DEFAULT 'member',  -- cấp quyền: người tạo workspace = 'owner'
+  job_role  VARCHAR(32),                               -- #26 mảng B: code role công việc (workspace_roles.code) — 1 role/người/workspace
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, user_id)
+);
+
+-- #26 mảng B: role công việc theo workspace (thay enum user_role toàn cục). Seed 8 mặc
+-- định khi tạo org; tùy biến (thêm/đổi tên/xóa). Xóa role → app cascade gỡ checklist/outcome
+-- mặc định gắn role + đặt phase_items.role/organization_members.job_role về NULL.
+CREATE TABLE workspace_roles (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  code       VARCHAR(32) NOT NULL,    -- khóa duy nhất trong org (membership/item.role tham chiếu)
+  name       VARCHAR(255) NOT NULL,
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (org_id, code)
 );
 ```
 
@@ -164,7 +181,7 @@ CREATE TABLE phase_items (
   kind           phase_item_kind NOT NULL,
   text           TEXT NOT NULL,
   done           BOOLEAN NOT NULL DEFAULT false,
-  role           user_role,
+  role           VARCHAR(32),                     -- #26 mảng B: code workspace role (trước đây enum user_role)
   position       INTEGER NOT NULL DEFAULT 0
 );
 
@@ -263,7 +280,7 @@ CREATE TABLE phase_definition_items (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phase_def_id UUID NOT NULL REFERENCES phase_definitions(id) ON DELETE CASCADE,
   kind         phase_item_kind NOT NULL,
-  role         user_role,                     -- NULL = mục "chung" (không theo role)
+  role         VARCHAR(32),                   -- #26 mảng B: code workspace role (NULL = "chung")
   text         TEXT NOT NULL,
   position     INTEGER NOT NULL DEFAULT 0
 );
@@ -334,6 +351,7 @@ CREATE INDEX idx_notif_user ON notifications(user_id, read, created_at DESC);
 | `Comment` | `comments` | |
 | `ActivityItem` | `activity_log` | nay có `project_id` → dùng cho cả changelog dự án |
 | `PhaseDefinition` | `phase_definitions` + `phase_definition_items` | #26 mảng A: phase động per-org (thay enum `dev_phase` + `phase_task_templates`); FE `PHASE_META`/`PHASE_ROLE_*` chỉ còn cho landing/demo |
+| `WorkspaceRoleDef` | `workspace_roles` + `organization_members.job_role` | #26 mảng B: vai trò công việc động per-org (thay enum `user_role` toàn cục trên `users`); item.role lưu code; FE `getRoleName(code)` |
 | *(mới)* permission | `users.is_superuser` + `organization_members.role` | tách khỏi `UserRole` |
 | *(mới)* PIC dự án (#11) | `projects.pic_user_id` | mặc định `created_by`, đổi được; thay thế approval queue |
 | *(deprecated)* approval queue | `change_requests` | đã thay bằng PIC; bảng giữ lại, không dùng (#11) |

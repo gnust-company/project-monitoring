@@ -1,5 +1,4 @@
 import { useApp } from '../../context/AppContext';
-import { ROLE_LABELS } from '../../data/mockData';
 import { Mail, Shield, FolderKanban, Crown, ListTodo } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
@@ -35,7 +34,7 @@ const statusStyle: Record<ProjectStatus, { text: string; bar: string }> = {
 interface PicProject { id: string; name: string; status: ProjectStatus; progress: number; }
 
 export default function TeamView() {
-  const { selectedOrg, phaseBlocks, orgProjects } = useApp();
+  const { selectedOrg, phaseBlocks, orgProjects, getRoleName } = useApp();
 
   // #10: dự án member làm PIC chính (Project.picUserId ?? createdBy).
   const picProjectsByMember = useMemo(() => {
@@ -81,8 +80,9 @@ export default function TeamView() {
 
   const members = selectedOrg.members;
   const roleGroups = members.reduce<Record<string, typeof members>>((acc, m) => {
-    if (!acc[m.role]) acc[m.role] = [];
-    acc[m.role].push(m);
+    const rk = m.jobRole ?? '';
+    if (!acc[rk]) acc[rk] = [];
+    acc[rk].push(m);
     return acc;
   }, {});
 
@@ -122,7 +122,7 @@ export default function TeamView() {
                 className={`${colors.bg} border border-stone-200/40 rounded-2xl p-4`}>
                 <div className="flex items-center gap-2 mb-2">
                   <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                  <span className={`text-xs font-bold ${colors.text}`}>{ROLE_LABELS[role] || role}</span>
+                  <span className={`text-xs font-bold ${colors.text}`}>{getRoleName(role || undefined)}</span>
                 </div>
                 <div className="text-3xl font-semibold text-ink tracking-tight">{group.length}</div>
                 <div className="text-[10px] text-stone-500 font-light">thành viên</div>
@@ -140,7 +140,7 @@ export default function TeamView() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {members.map((member, i) => {
-            const colors = roleColors[member.role] || { bg: 'bg-stone-50', text: 'text-stone-700', dot: 'bg-stone-400' };
+            const colors = roleColors[member.jobRole ?? ''] || { bg: 'bg-stone-50', text: 'text-stone-700', dot: 'bg-stone-400' };
             const picProjects = picProjectsByMember.get(member.id) || [];
             const involvement = involvementByMember.get(member.id) || { items: [], openTasks: 0, assignedTasks: 0 };
 
@@ -154,7 +154,7 @@ export default function TeamView() {
                     <div className="text-sm font-semibold text-ink truncate">{member.name}</div>
                     <div className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-lg text-[10px] font-bold ${colors.bg} ${colors.text}`}>
                       <Shield className="w-2.5 h-2.5" />
-                      {ROLE_LABELS[member.role] || member.role}
+                      {getRoleName(member.jobRole)}
                     </div>
                   </div>
                 </div>

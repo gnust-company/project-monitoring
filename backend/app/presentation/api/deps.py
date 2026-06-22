@@ -37,6 +37,14 @@ from app.application.use_cases.phase_definitions import (
     ReorderPhaseDefs,
     UpdatePhaseDef,
 )
+from app.application.use_cases.workspace_roles import (
+    AssignMemberRole,
+    CreateRole,
+    DeleteRole,
+    ListRoles,
+    ReorderRoles,
+    UpdateRole,
+)
 from app.application.use_cases.phase_blocks import (
     AddComment,
     AddPhaseItem,
@@ -88,6 +96,7 @@ from app.infrastructure.repositories.notifications import SqlAlchemyNotification
 from app.infrastructure.repositories.organizations import SqlAlchemyOrganizationRepository
 from app.infrastructure.repositories.phase_blocks import SqlAlchemyPhaseBlockRepository
 from app.infrastructure.repositories.phase_definitions import SqlAlchemyPhaseDefinitionRepository
+from app.infrastructure.repositories.workspace_roles import SqlAlchemyWorkspaceRoleRepository
 from app.infrastructure.repositories.projects import SqlAlchemyProjectRepository
 from app.infrastructure.repositories.users import SqlAlchemyUserRepository
 from app.infrastructure.storage.minio_storage import MinioStorage
@@ -128,6 +137,10 @@ def get_phase_def_repo(session: SessionDep) -> SqlAlchemyPhaseDefinitionReposito
     return SqlAlchemyPhaseDefinitionRepository(session)
 
 
+def get_role_repo(session: SessionDep) -> SqlAlchemyWorkspaceRoleRepository:
+    return SqlAlchemyWorkspaceRoleRepository(session)
+
+
 UserRepoDep = Annotated[SqlAlchemyUserRepository, Depends(get_user_repo)]
 OrgRepoDep = Annotated[SqlAlchemyOrganizationRepository, Depends(get_org_repo)]
 ProjectRepoDep = Annotated[SqlAlchemyProjectRepository, Depends(get_project_repo)]
@@ -136,6 +149,7 @@ NotificationRepoDep = Annotated[SqlAlchemyNotificationRepository, Depends(get_no
 BlockRepoDep = Annotated[SqlAlchemyPhaseBlockRepository, Depends(get_block_repo)]
 ActivityRepoDep = Annotated[SqlAlchemyActivityLogRepository, Depends(get_activity_repo)]
 PhaseDefRepoDep = Annotated[SqlAlchemyPhaseDefinitionRepository, Depends(get_phase_def_repo)]
+RoleRepoDep = Annotated[SqlAlchemyWorkspaceRoleRepository, Depends(get_role_repo)]
 
 
 # ─── Object storage (MinIO) ──────────────────────────────────────────
@@ -245,8 +259,8 @@ ManageDep = Annotated[Access, Depends(workspace_manage)]
 
 
 # ─── Organization use cases ──────────────────────────────────────────
-def create_org_uc(repo: OrgRepoDep, phases: PhaseDefRepoDep) -> CreateOrganization:
-    return CreateOrganization(repo, phases)
+def create_org_uc(repo: OrgRepoDep, phases: PhaseDefRepoDep, roles: RoleRepoDep) -> CreateOrganization:
+    return CreateOrganization(repo, phases, roles)
 
 
 def list_orgs_uc(repo: OrgRepoDep) -> ListOrganizations:
@@ -417,6 +431,31 @@ def delete_phase_def_uc(phases: PhaseDefRepoDep) -> DeletePhaseDef:
 
 def reorder_phase_defs_uc(phases: PhaseDefRepoDep) -> ReorderPhaseDefs:
     return ReorderPhaseDefs(phases)
+
+
+# ─── Workspace role use cases (#26 mảng B) ───────────────────────────
+def list_roles_uc(roles: RoleRepoDep) -> ListRoles:
+    return ListRoles(roles)
+
+
+def create_role_uc(roles: RoleRepoDep) -> CreateRole:
+    return CreateRole(roles)
+
+
+def update_role_uc(roles: RoleRepoDep) -> UpdateRole:
+    return UpdateRole(roles)
+
+
+def delete_role_uc(roles: RoleRepoDep) -> DeleteRole:
+    return DeleteRole(roles)
+
+
+def reorder_roles_uc(roles: RoleRepoDep) -> ReorderRoles:
+    return ReorderRoles(roles)
+
+
+def assign_member_role_uc(repo: OrgRepoDep, roles: RoleRepoDep) -> AssignMemberRole:
+    return AssignMemberRole(repo, roles)
 
 
 # ─── Attachment use cases ────────────────────────────────────────────

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { getUserById, ROLE_LABELS } from '../../data/mockData';
-import type { ChecklistItem, UserRole } from '../../types';
+import { getUserById } from '../../data/mockData';
+import type { ChecklistItem } from '../../types';
 import {
   X, CheckSquare, Square, MessageSquare, Paperclip, Clock,
   Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check,
@@ -17,10 +17,10 @@ import { formatActivity } from '../../lib/formatActivity';
 
 // Gom item theo role — luôn hiện đủ role chuẩn của phase (kèm ô thêm riêng),
 // thêm role lạ nếu có, cuối cùng là nhóm "Chung".
-function buildGroups(items: ChecklistItem[], roles: UserRole[]): Array<{ role: UserRole | null; items: ChecklistItem[] }> {
-  const ordered: UserRole[] = [...roles];
+function buildGroups(items: ChecklistItem[], roles: string[]): Array<{ role: string | null; items: ChecklistItem[] }> {
+  const ordered: string[] = [...roles];
   for (const it of items) if (it.role && !ordered.includes(it.role)) ordered.push(it.role);
-  const groups = ordered.map(role => ({ role: role as UserRole | null, items: items.filter(i => i.role === role) }));
+  const groups = ordered.map(role => ({ role: role as string | null, items: items.filter(i => i.role === role) }));
   groups.push({ role: null, items: items.filter(i => !i.role) });
   return groups;
 }
@@ -31,7 +31,7 @@ export default function PhaseDetailModal() {
     updatePhaseBlock, deletePhaseBlock, orgProjects,
     addPhaseItem, updatePhaseItem, deletePhaseItem,
     addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,
-    currentUser, selectedOrg, phaseDefs, getPhaseMeta,
+    currentUser, selectedOrg, phaseDefs, getPhaseMeta, getRoleName,
   } = useApp();
 
   const [commentText, setCommentText] = useState('');
@@ -153,23 +153,23 @@ export default function PhaseDetailModal() {
   }, [phaseDetailOpen, closePhaseDetail, hasDraft]);
 
 
-  const _distinctRoles = (items: { role?: UserRole }[]): UserRole[] =>
-    [...new Set(items.map(i => i.role).filter((r): r is UserRole => !!r))];
+  const _distinctRoles = (items: { role?: string }[]): string[] =>
+    [...new Set(items.map(i => i.role).filter((r): r is string => !!r))];
   const _curDef = selectedPhaseBlock ? phaseDefs.find(p => p.code === selectedPhaseBlock.phaseType) : undefined;
   const checklistRoles = _distinctRoles(_curDef?.checklist ?? []);
   const outcomeRoles = _distinctRoles(_curDef?.outcomes ?? []);
   const checklistGroups = useMemo(() => buildGroups(checklist, checklistRoles), [checklist, checklistRoles]);
   const outcomeGroups = useMemo(() => buildGroups(outcomes, outcomeRoles), [outcomes, outcomeRoles]);
 
-  const groupKey = (role: UserRole | null) => role ?? '__general__';
-  const addCheckItem = (role: UserRole | null) => {
+  const groupKey = (role: string | null) => role ?? '__general__';
+  const addCheckItem = (role: string | null) => {
     const key = groupKey(role);
     const text = (checkDrafts[key] ?? '').trim();
     if (!text || !selectedPhaseBlock) return;
     addPhaseItem(selectedPhaseBlock.id, 'checklist', text, role ?? undefined);
     setCheckDrafts(d => ({ ...d, [key]: '' }));
   };
-  const addOutcomeItemFor = (role: UserRole | null) => {
+  const addOutcomeItemFor = (role: string | null) => {
     const key = groupKey(role);
     const text = (outcomeDrafts[key] ?? '').trim();
     if (!text || !selectedPhaseBlock) return;
@@ -471,7 +471,7 @@ export default function PhaseDetailModal() {
                     <Dropdown className="w-52" value={phasePicId} onChange={changePic}
                       options={orgMembers.map(m => ({
                         value: m.id, label: m.name,
-                        hint: ROLE_LABELS[m.role] ?? m.role, avatar: m.avatar,
+                        hint: getRoleName(m.jobRole), avatar: m.avatar,
                       }))} />
                   ) : picUser ? (
                     <div className="flex items-center gap-1.5">
@@ -575,7 +575,7 @@ export default function PhaseDetailModal() {
                     <div key={key}>
                       <div className="flex items-center gap-2 px-1 mb-0.5">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                          {group.role ? (ROLE_LABELS[group.role] ?? group.role) : 'Chung'}
+                          {group.role ? (getRoleName(group.role)) : 'Chung'}
                         </span>
                         <span className="text-[10px] text-gray-400">{groupDone}/{group.items.length}</span>
                         <div className="flex-1 h-px bg-gray-100" />
@@ -632,7 +632,7 @@ export default function PhaseDetailModal() {
                           <input type="text" value={checkDrafts[key] ?? ''}
                             onChange={e => setCheckDrafts(d => ({ ...d, [key]: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') addCheckItem(group.role); }}
-                            placeholder={group.role ? `Thêm cho ${ROLE_LABELS[group.role] ?? group.role}…` : 'Thêm mục chung…'}
+                            placeholder={group.role ? `Thêm cho ${getRoleName(group.role)}…` : 'Thêm mục chung…'}
                             className="flex-1 px-2.5 py-1 bg-gray-50/70 border border-dashed border-gray-200 rounded-md text-xs
                                        text-gray-700 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:bg-white" />
                           <button onClick={() => addCheckItem(group.role)} className="p-1 hover:bg-gray-100 rounded shrink-0">
@@ -666,7 +666,7 @@ export default function PhaseDetailModal() {
                   <div key={key}>
                     <div className="flex items-center gap-2 px-1 mb-0.5">
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                        {group.role ? (ROLE_LABELS[group.role] ?? group.role) : 'Chung'}
+                        {group.role ? (getRoleName(group.role)) : 'Chung'}
                       </span>
                       <div className="flex-1 h-px bg-gray-100" />
                     </div>
@@ -768,7 +768,7 @@ export default function PhaseDetailModal() {
                         <input type="text" value={outcomeDrafts[key] ?? ''}
                           onChange={e => setOutcomeDrafts(d => ({ ...d, [key]: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') addOutcomeItemFor(group.role); }}
-                          placeholder={group.role ? `Thêm cho ${ROLE_LABELS[group.role] ?? group.role}…` : 'Thêm outcome chung…'}
+                          placeholder={group.role ? `Thêm cho ${getRoleName(group.role)}…` : 'Thêm outcome chung…'}
                           className="flex-1 px-2.5 py-1 bg-gray-50/70 border border-dashed border-gray-200 rounded-md text-xs
                                      text-gray-700 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:bg-white" />
                         <button onClick={() => addOutcomeItemFor(group.role)} className="p-1 hover:bg-gray-100 rounded shrink-0">

@@ -21,7 +21,7 @@ from app.domain.entities import (
     PhaseItem,
     User,
 )
-from app.domain.value_objects import AttachmentKind, PhaseItemKind, PhaseTag, UserRole
+from app.domain.value_objects import AttachmentKind, PhaseItemKind, PhaseTag
 
 
 class PhaseBlockNotFoundError(Exception):
@@ -60,8 +60,9 @@ class CreatePhaseBlockInput:
     outcomes: list[dict[str, Any]] | None = None
 
 
-def _role(value: Any) -> UserRole | None:
-    return UserRole(value) if value else None
+def _role(value: Any) -> str | None:
+    # #26 mảng B: role là code workspace role (string), không ép enum nữa.
+    return str(value) if value else None
 
 
 def _items_from(
@@ -275,7 +276,7 @@ class AddPhaseItem:
         self._activity = activity
 
     async def execute(self, block_id: UUID, kind: PhaseItemKind, text: str,
-                      role: UserRole | None, actor_id: UUID) -> PhaseItem:
+                      role: str | None, actor_id: UUID) -> PhaseItem:
         existing = await self._blocks.get(block_id)
         if existing is None:
             raise PhaseBlockNotFoundError(str(block_id))
