@@ -99,6 +99,7 @@ class WorkspaceRoleModel(Base):
     )
     code: Mapped[str] = mapped_column(String(32))
     name: Mapped[str] = mapped_column(String(255))
+    color: Mapped[str] = mapped_column(String(32), default="gray", server_default="gray")
     position: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

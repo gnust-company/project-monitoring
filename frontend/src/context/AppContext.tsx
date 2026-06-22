@@ -258,18 +258,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       searchQuery: '', phaseFilter: 'All', statusFilter: 'All', selectedProjectIds: null,
       onlyMine: false, rangeStart: null, rangeEnd: null,
     }));
-    try {
-      const [projects, blocks, defs, roles] = await Promise.all([
-        projectsApi.listByOrg(orgId),
-        phaseBlocksApi.listByOrg(orgId),
-        phaseDefsApi.list(orgId),
-        rolesApi.list(orgId),
-      ]);
-      setProjectsState(projects);
-      setPbState(blocks);
-      setPhaseDefs(defs);
-      setOrgRoles(roles);
-    } catch { /* ignore */ }
+    // Tải độc lập: 1 endpoint lỗi KHÔNG được làm rỗng các phần còn lại. Trước đây dùng
+    // Promise.all chung 1 try/catch → 1 call hỏng là orgRoles/phaseDefs không set, khiến
+    // role hiển thị sai (Nhóm hiện mã code, Hồ sơ hiện "chưa có vai trò"). (#26 fix)
+    const [projects, blocks, defs, roles] = await Promise.allSettled([
+      projectsApi.listByOrg(orgId),
+      phaseBlocksApi.listByOrg(orgId),
+      phaseDefsApi.list(orgId),
+      rolesApi.list(orgId),
+    ]);
+    if (projects.status === 'fulfilled') setProjectsState(projects.value);
+    if (blocks.status === 'fulfilled') setPbState(blocks.value);
+    if (defs.status === 'fulfilled') setPhaseDefs(defs.value);
+    if (roles.status === 'fulfilled') setOrgRoles(roles.value);
   }, []);
 
   const setWorkspaceView = useCallback((view: WorkspaceView) => setState(prev => ({ ...prev, workspaceView: view })), []);
@@ -311,8 +312,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!currentUser) return;
     const updated = await usersApi.updateProfile({ name: updates.name });
     setCurrentUser(updated);
+    // /users/me là tài khoản toàn cục → KHÔNG có jobRole; giữ jobRole per-org của member
+    // hiện có để tránh xóa nhầm vai trò trong workspace (#26 fix).
     setOrgsState(prev => {
-      const next = prev.map(org => ({ ...org, members: org.members.map(m => m.id === updated.id ? updated : m) }));
+      const next = prev.map(org => ({ ...org, members: org.members.map(m => m.id === updated.id ? { ...updated, jobRole: m.jobRole } : m) }));
       syncRegistry(next, updated);
       return next;
     });
@@ -321,7 +324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const uploadAvatar = useCallback(async (file: File) => {
     const updated = await usersApi.uploadAvatar(file);
     setCurrentUser(updated);
-    setOrgsState(prev => prev.map(org => ({ ...org, members: org.members.map(m => m.id === updated.id ? updated : m) })));
+    setOrgsState(prev => prev.map(org => ({ ...org, members: org.members.map(m => m.id === updated.id ? { ...updated, jobRole: m.jobRole } : m) })));
   }, []);
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {

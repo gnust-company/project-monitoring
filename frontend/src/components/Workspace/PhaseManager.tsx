@@ -10,13 +10,13 @@ import {
 
 type DraftItem = { role?: string; text: string };
 type Draft = {
-  name: string; fullName: string; description: string; color: string;
+  code: string; name: string; description: string; color: string;
   checklist: DraftItem[]; outcomes: DraftItem[];
 };
 
 function toDraft(def: PhaseDefinition): Draft {
   return {
-    name: def.name, fullName: def.fullName, description: def.description, color: def.color,
+    code: def.code, name: def.name, description: def.description, color: def.color,
     checklist: def.checklist.map(i => ({ role: i.role, text: i.text })),
     outcomes: def.outcomes.map(i => ({ role: i.role, text: i.text })),
   };
@@ -133,8 +133,9 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
     setBusy(true); setError(null);
     try {
       await updatePhaseDef(selected.id, {
+        code: draft.code.trim() || selected.code,
         name: draft.name.trim() || selected.name,
-        fullName: draft.fullName,
+        fullName: draft.name.trim() || selected.name,  // full_name mirror tên (đã bỏ ô "Tên ngắn")
         description: draft.description,
         color: draft.color,
         checklist: draft.checklist.filter(i => i.text.trim()),
@@ -213,19 +214,20 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
         {/* Editor */}
         {selected && draft ? (
           <div className="bg-white border border-hairline rounded-xl p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[110px_1fr] gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-stone-700 mb-1 block">Tên ngắn</label>
-                <input type="text" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })}
-                  className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
+                <label className="text-[11px] font-semibold text-stone-700 mb-1 block">Mã viết tắt</label>
+                <input type="text" value={draft.code} onChange={e => setDraft({ ...draft, code: e.target.value })}
+                  title="Mã phase (vd PA). Đổi mã sẽ cập nhật mọi block đang dùng."
+                  className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
               </div>
               <div>
                 <label className="text-[11px] font-semibold text-stone-700 mb-1 block">Tên đầy đủ</label>
-                <input type="text" value={draft.fullName} onChange={e => setDraft({ ...draft, fullName: e.target.value })}
+                <input type="text" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })}
+                  placeholder="VD: Project Assessment"
                   className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
               </div>
             </div>
-            <div className="text-[10px] text-stone-400">Mã phase: <span className="font-mono font-semibold">{selected.code}</span> (cố định)</div>
 
             <div>
               <label className="text-[11px] font-semibold text-stone-700 mb-1 block">Màu</label>

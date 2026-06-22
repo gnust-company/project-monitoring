@@ -93,6 +93,41 @@ async def test_edit_default_checklist_reflected_in_new_block(client: AsyncClient
     assert [o["text"] for o in block["outcomes"]] == ["Sản phẩm tùy biến"]
 
 
+async def test_rename_phase_code_cascades_to_blocks(client: AsyncClient, make_user):
+    token, _ = await make_user("pd-code@hub.io")
+    org = await _make_org(client, token)
+    proj = (await client.post(f"{API}/organizations/{org['id']}/projects", json={
+        "name": "App", "description": "", "startDate": "2026-04-01",
+    }, headers=auth(token))).json()
+    phases = (await client.get(f"{API}/organizations/{org['id']}/phases", headers=auth(token))).json()
+    sd = next(p for p in phases if p["code"] == "SD")
+
+    block = (await client.post(f"{API}/projects/{proj['id']}/phase-blocks", json={
+        "phaseType": "SD", "tag": "Todo", "title": "B", "checklist": [], "outcomes": [],
+        "startDate": "2026-06-10", "endDate": "2026-06-24",
+    }, headers=auth(token))).json()
+
+    # đổi MÃ phase SD → DESIGN
+    renamed = await client.patch(f"{API}/organizations/{org['id']}/phases/{sd['id']}",
+                                 json={"code": "DESIGN", "name": "Thiết kế"}, headers=auth(token))
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["code"] == "DESIGN"
+
+    # block đang dùng SD được cascade sang DESIGN
+    refetched = (await client.get(f"{API}/phase-blocks/{block['id']}", headers=auth(token))).json()
+    assert refetched["phaseType"] == "DESIGN"
+
+
+async def test_rename_phase_code_conflict_returns_409(client: AsyncClient, make_user):
+    token, _ = await make_user("pd-conf@hub.io")
+    org = await _make_org(client, token)
+    phases = (await client.get(f"{API}/organizations/{org['id']}/phases", headers=auth(token))).json()
+    sd = next(p for p in phases if p["code"] == "SD")
+    resp = await client.patch(f"{API}/organizations/{org['id']}/phases/{sd['id']}",
+                              json={"code": "PA"}, headers=auth(token))
+    assert resp.status_code == 409, resp.text
+
+
 async def test_delete_phase_in_use_requires_force(client: AsyncClient, make_user):
     token, _ = await make_user("pd-del@hub.io")
     org = await _make_org(client, token)

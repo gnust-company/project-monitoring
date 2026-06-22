@@ -136,16 +136,20 @@ class WorkspaceRoleOut(CamelModel):
     org_id: UUID
     code: str
     name: str
+    color: str = "gray"
     position: int = 0
 
 
 class RoleCreate(CamelModel):
     code: str | None = Field(default=None, max_length=32)
     name: str = Field(min_length=1, max_length=255)
+    color: str | None = Field(default=None, max_length=32)
 
 
 class RoleUpdate(CamelModel):
+    code: str | None = Field(default=None, max_length=32)
     name: str | None = Field(default=None, min_length=1, max_length=255)
+    color: str | None = Field(default=None, max_length=32)
     position: int | None = None
 
 
@@ -343,6 +347,7 @@ class PhaseDefCreate(CamelModel):
 
 
 class PhaseDefUpdate(CamelModel):
+    code: str | None = Field(default=None, max_length=32)
     name: str | None = Field(default=None, min_length=1, max_length=255)
     full_name: str | None = None
     description: str | None = None

@@ -46,9 +46,9 @@ function mapAttachment(d: AttachmentDTO): Attachment {
 export function mapActivity(d: ActivityDTO): ActivityItem {
   return { id: d.id, userId: d.userId ?? '', action: d.action, target: d.target, timestamp: d.createdAt, phaseBlockId: d.phaseBlockId };
 }
-interface WorkspaceRoleDTO { id: string; orgId: string; code: string; name: string; position: number; }
+interface WorkspaceRoleDTO { id: string; orgId: string; code: string; name: string; color: string; position: number; }
 export function mapRole(d: WorkspaceRoleDTO): WorkspaceRoleDef {
-  return { id: d.id, orgId: d.orgId, code: d.code, name: d.name, position: d.position };
+  return { id: d.id, orgId: d.orgId, code: d.code, name: d.name, color: d.color ?? 'gray', position: d.position };
 }
 export function mapPhaseDef(d: PhaseDefDTO): PhaseDefinition {
   const mi = (i: PhaseDefItemDTO) => ({ role: i.role ?? undefined, text: i.text });
@@ -314,7 +314,7 @@ export const phaseDefsApi = {
 };
 
 // ─── Workspace roles (#26 mảng B — role công việc per-workspace) ──────
-export interface RoleBody { code?: string; name: string }
+export interface RoleBody { code?: string; name: string; color?: string }
 
 export const rolesApi = {
   async list(orgId: string): Promise<WorkspaceRoleDef[]> {

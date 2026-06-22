@@ -20,9 +20,18 @@ class RoleForbiddenError(Exception):
     """Không phải owner và không phải chính mình → không được gán role."""
 
 
+class RoleCodeConflictError(Exception):
+    """Mã role (viết tắt) bị trùng trong workspace."""
+
+
 def _slugify(name: str) -> str:
     base = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_").upper()[:32]
     return base or "ROLE"
+
+
+def _normalize_code(raw: str) -> str:
+    """Chuẩn hóa mã do user nhập: gộp ký tự không hợp lệ thành '_', bỏ '_' thừa, cắt 32."""
+    return re.sub(r"[^A-Za-z0-9]+", "_", raw).strip("_")[:32]
 
 
 def _unique_code(existing: set[str], desired: str | None, name: str) -> str:
@@ -54,7 +63,8 @@ class CreateRole:
         if position is None:
             position = max((r.position for r in existing), default=-1) + 1
         return await self._roles.create(WorkspaceRoleDef(
-            id=uuid4(), org_id=org_id, code=code, name=payload["name"], position=position,
+            id=uuid4(), org_id=org_id, code=code, name=payload["name"],
+            color=payload.get("color") or "gray", position=position,
         ))
 
 
@@ -63,14 +73,29 @@ class UpdateRole:
         self._roles = roles
 
     async def execute(self, org_id: UUID, role_id: UUID, payload: dict[str, Any]) -> WorkspaceRoleDef:
-        role = await self._roles.get(role_id)
-        if role is None or role.org_id != org_id:
+        existing = await self._roles.list_by_org(org_id)
+        role = next((r for r in existing if r.id == role_id), None)
+        if role is None:
             raise RoleNotFoundError(str(role_id))
+        old_code = role.code
+        # Đổi MÃ role (viết tắt): chuẩn hóa, đảm bảo không trùng mã khác, rồi cascade
+        # cập nhật mọi tham chiếu (#26: cho phép sửa cả tên viết tắt lẫn tên đầy đủ).
+        if "code" in payload and payload["code"] is not None:
+            new_code = _normalize_code(payload["code"])
+            if new_code and new_code != old_code:
+                if any(r.code == new_code for r in existing if r.id != role_id):
+                    raise RoleCodeConflictError(new_code)
+                role.code = new_code
         if "name" in payload:
             role.name = payload["name"]
+        if "color" in payload and payload["color"]:
+            role.color = payload["color"]
         if "position" in payload and payload["position"] is not None:
             role.position = payload["position"]
-        return await self._roles.update(role)
+        updated = await self._roles.update(role)
+        if updated.code != old_code:
+            await self._roles.cascade_rename_role(org_id, old_code, updated.code)
+        return updated
 
 
 class DeleteRole:

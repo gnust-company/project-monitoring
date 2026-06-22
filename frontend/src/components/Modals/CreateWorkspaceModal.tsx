@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import { X, Building2, ArrowRight, Check, Layers, Users } from 'lucide-react';
+import { X, Building2, ArrowRight, Check, Layers, Users, AlertTriangle } from 'lucide-react';
 import PhaseManager from '../Workspace/PhaseManager';
 import RoleManager from '../Workspace/RoleManager';
 
 // Wizard 3 bước (#26): B1 = tên + mô tả → tạo workspace (seed 8 role + 7 phase mặc định);
 // B2 = tùy chỉnh role; B3 = tùy chỉnh phase. Đổi/xóa role ở B2 phản ánh sang checklist B3.
+// Workspace chỉ "thật sự" có sau khi bấm Hoàn tất; click nền KHÔNG đóng; bấm X phải
+// xác nhận (tránh ấn nhầm), hủy thì xóa lại workspace đang dựng dở.
 export default function CreateWorkspaceModal() {
-  const { createWorkspaceOpen, closeCreateWorkspace, addOrganization } = useApp();
+  const { createWorkspaceOpen, closeCreateWorkspace, addOrganization, deleteOrganization } = useApp();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState('');
@@ -16,11 +18,24 @@ export default function CreateWorkspaceModal() {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const reset = () => {
-    setStep(1); setName(''); setDescription(''); setCreatedId(null); setError(null); setBusy(false);
+    setStep(1); setName(''); setDescription(''); setCreatedId(null);
+    setError(null); setBusy(false); setConfirmCancel(false);
   };
-  const close = () => { reset(); closeCreateWorkspace(); };
+
+  // Hủy hẳn: xóa workspace đang dựng dở (đã tạo ở B1) rồi đóng.
+  const close = () => {
+    if (createdId) void deleteOrganization(createdId).catch(() => { /* ignore */ });
+    reset();
+    closeCreateWorkspace();
+  };
+  const finish = () => { reset(); closeCreateWorkspace(); };
+
+  // Bấm X: nếu chưa tạo gì (đang B1, chưa có workspace) thì đóng luôn; nếu đã dựng dở
+  // thì hỏi xác nhận để tránh ấn nhầm mất cấu hình.
+  const requestClose = () => { if (createdId) setConfirmCancel(true); else close(); };
 
   const handleNext = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,21 +70,45 @@ export default function CreateWorkspaceModal() {
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center"
-        onClick={close}
       >
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className={`bg-white rounded-xl shadow-2xl w-full mx-4 overflow-hidden max-h-[90vh] flex flex-col
+          className={`relative bg-white rounded-xl shadow-2xl w-full mx-4 overflow-hidden max-h-[90vh] flex flex-col
             ${step === 3 ? 'max-w-3xl' : step === 2 ? 'max-w-xl' : 'max-w-md'}`}
           onClick={e => e.stopPropagation()}
         >
+          {/* Xác nhận hủy (tránh ấn nhầm X) */}
+          {confirmCancel && (
+            <div className="absolute inset-0 z-10 bg-white/95 backdrop-blur-sm flex items-center justify-center p-6">
+              <div className="max-w-xs text-center">
+                <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                </div>
+                <h3 className="text-sm font-bold text-ink mb-1">Hủy tạo workspace?</h3>
+                <p className="text-xs text-stone-500 mb-4">
+                  Workspace <strong className="text-stone-700">{name}</strong> và mọi cấu hình vai trò/phase
+                  vừa thiết lập sẽ bị xóa.
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <button onClick={() => setConfirmCancel(false)}
+                    className="px-3.5 py-2 text-xs font-semibold text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-50">
+                    Tiếp tục cấu hình
+                  </button>
+                  <button onClick={close}
+                    className="px-3.5 py-2 text-xs font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600">
+                    Hủy, xóa workspace
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between px-5 py-4 border-b border-hairline flex-shrink-0">
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-stone-500" />
               <h2 className="text-base font-bold text-ink">Tạo Workspace</h2>
             </div>
-            <button onClick={close} className="p-1 hover:bg-stone-100 rounded-lg">
+            <button onClick={requestClose} className="p-1 hover:bg-stone-100 rounded-lg">
               <X className="w-4 h-4 text-stone-500" />
             </button>
           </div>
@@ -145,7 +184,7 @@ export default function CreateWorkspaceModal() {
                   className="px-4 py-2 text-stone-500 text-sm font-medium rounded-lg hover:bg-stone-100">
                   Quay lại
                 </button>
-                <button onClick={close}
+                <button onClick={finish}
                   className="px-4 py-2 bg-ink text-white text-sm font-semibold rounded-lg hover:bg-[#242424] transition-colors flex items-center gap-1.5">
                   <Check className="w-4 h-4" /> Hoàn tất
                 </button>

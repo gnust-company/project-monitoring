@@ -106,7 +106,7 @@ Mọi member **đọc** được (FE render timeline/dashboard theo phase của 
 |---|---|---|
 | GET | `/organizations/{orgId}/phases` | Danh sách phase definition (kèm `checklist`/`outcomes` mặc định), sắp theo `position` |
 | POST | `/organizations/{orgId}/phases` | Tạo phase. Body: `{ name, code?, fullName?, description?, color?, checklist?, outcomes? }`. `code` tự sinh (slug) nếu thiếu, duy nhất trong org → 201 |
-| PATCH | `/organizations/{orgId}/phases/{phaseId}` | Cập nhật `{ name?, fullName?, description?, color?, position?, checklist?, outcomes? }`. Gửi `checklist`/`outcomes` = thay-toàn-bộ items |
+| PATCH | `/organizations/{orgId}/phases/{phaseId}` | Cập nhật `{ code?, name?, fullName?, description?, color?, position?, checklist?, outcomes? }`. Gửi `checklist`/`outcomes` = thay-toàn-bộ items. Đổi `code` → **cascade** cập nhật `phase_blocks.phase_type` của mọi block đang dùng; trùng mã trong org → **409** |
 | DELETE | `/organizations/{orgId}/phases/{phaseId}?force=false` | Xóa phase. Nếu đang được block dùng và `force=false` → **409** `{ detail: { message, count } }`; `?force=true` để xóa (block giữ nguyên, hiển thị màu trung tính) → 204 |
 | POST | `/organizations/{orgId}/phases/reorder` | Sắp xếp lại. Body: `{ orderedIds: [phaseId…] }` → trả danh sách mới |
 
@@ -118,7 +118,7 @@ Mọi member **đọc** được; thêm/sửa/xóa/sắp xếp là **owner-only*
 |---|---|---|
 | GET | `/organizations/{orgId}/roles` | Danh sách role công việc, sắp theo `position` → `[{ id, orgId, code, name, position }]` |
 | POST | `/organizations/{orgId}/roles` | Tạo role. Body: `{ name, code? }` (`code` tự sinh slug nếu thiếu) → 201 |
-| PATCH | `/organizations/{orgId}/roles/{roleId}` | Cập nhật `{ name?, position? }` (đổi tên → checklist/outcome hiển thị tên mới vì tham chiếu `code`) |
+| PATCH | `/organizations/{orgId}/roles/{roleId}` | Cập nhật `{ code?, name?, position? }`. Đổi `name` → checklist/outcome hiển thị tên mới (tham chiếu `code`). Đổi `code` → **cascade** cập nhật `phase_(definition_)items.role` + `members.job_role`; trùng mã trong org → **409** |
 | DELETE | `/organizations/{orgId}/roles/{roleId}` | Xóa role → **cascade**: xóa checklist/outcome mặc định gắn role + đặt `phase_items.role`/`members.job_role` về NULL → 204 |
 | POST | `/organizations/{orgId}/roles/reorder` | Sắp xếp. Body: `{ orderedIds: [roleId…] }` |
 | PATCH | `/organizations/{orgId}/members/{userId}/role` | Gán vai trò cho member. Body: `{ role: code \| null }`. **Owner** đổi cho bất kỳ ai; **user thường** chỉ đổi role của chính mình (khác → 403); code không tồn tại → 404 → 204 |

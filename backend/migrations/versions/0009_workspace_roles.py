@@ -46,7 +46,7 @@ def upgrade() -> None:
     rows = [
         {"id": uuid.uuid4(), "org_id": org_id, "code": code, "name": name, "position": pos}
         for org_id in org_ids
-        for pos, (code, name) in enumerate(DEFAULT_ROLES)
+        for pos, (code, name, _color) in enumerate(DEFAULT_ROLES)
     ]
     if rows:
         op.bulk_insert(

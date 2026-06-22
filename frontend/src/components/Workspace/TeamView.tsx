@@ -3,6 +3,7 @@ import { Mail, Shield, FolderKanban, Crown, ListTodo } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import type { ProjectStatus } from '../../types';
+import { resolveRoleColor } from '../../types';
 import Avatar from '../common/Avatar';
 import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
 
@@ -14,17 +15,6 @@ const fadeUp = {
   }),
 };
 
-const roleColors: Record<string, { bg: string; text: string; dot: string }> = {
-  PM: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' },
-  BA: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400' },
-  SW_Architect: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-400' },
-  SW_Developer: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-400' },
-  SW_Tester: { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-400' },
-  UI_Designer: { bg: 'bg-pink-50', text: 'text-pink-700', dot: 'bg-pink-400' },
-  GUI: { bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-400' },
-  SysOps: { bg: 'bg-stone-100', text: 'text-stone-700', dot: 'bg-stone-400' },
-};
-
 const statusStyle: Record<ProjectStatus, { text: string; bar: string }> = {
   'On Track': { text: 'text-emerald-600', bar: '#10b981' },
   'At Risk':  { text: 'text-amber-600',  bar: '#f59e0b' },
@@ -34,7 +24,7 @@ const statusStyle: Record<ProjectStatus, { text: string; bar: string }> = {
 interface PicProject { id: string; name: string; status: ProjectStatus; progress: number; }
 
 export default function TeamView() {
-  const { selectedOrg, phaseBlocks, orgProjects, getRoleName } = useApp();
+  const { selectedOrg, phaseBlocks, orgProjects, getRoleName, orgRoles } = useApp();
 
   // #10: dự án member làm PIC chính (Project.picUserId ?? createdBy).
   const picProjectsByMember = useMemo(() => {
@@ -116,7 +106,7 @@ export default function TeamView() {
         {/* Role Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
           {Object.entries(roleGroups).map(([role, group], i) => {
-            const colors = roleColors[role] || { bg: 'bg-stone-50', text: 'text-stone-700', dot: 'bg-stone-400' };
+            const colors = resolveRoleColor(orgRoles, role || undefined);
             return (
               <motion.div key={role} custom={i} variants={fadeUp} initial="hidden" animate="visible"
                 className={`${colors.bg} border border-stone-200/40 rounded-2xl p-4`}>
@@ -140,7 +130,7 @@ export default function TeamView() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {members.map((member, i) => {
-            const colors = roleColors[member.jobRole ?? ''] || { bg: 'bg-stone-50', text: 'text-stone-700', dot: 'bg-stone-400' };
+            const colors = resolveRoleColor(orgRoles, member.jobRole);
             const picProjects = picProjectsByMember.get(member.id) || [];
             const involvement = involvementByMember.get(member.id) || { items: [], openTasks: 0, assignedTasks: 0 };
 

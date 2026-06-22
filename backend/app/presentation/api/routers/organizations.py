@@ -10,6 +10,7 @@ from app.application.use_cases.phase_definitions import (
     CreatePhaseDef,
     DeletePhaseDef,
     ListPhaseDefs,
+    PhaseCodeConflictError,
     PhaseDefInUseError,
     PhaseDefNotFoundError,
     ReorderPhaseDefs,
@@ -21,6 +22,7 @@ from app.application.use_cases.workspace_roles import (
     DeleteRole,
     ListRoles,
     ReorderRoles,
+    RoleCodeConflictError,
     RoleForbiddenError,
     RoleNotFoundError,
     UpdateRole,
@@ -252,6 +254,8 @@ async def update_phase(
         phase = await uc.execute(org_id, phase_id, body.model_dump(mode="json", exclude_unset=True))
     except PhaseDefNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase not found")
+    except PhaseCodeConflictError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"Mã phase '{e}' đã tồn tại")
     return PhaseDefinitionOut.from_entity(phase)
 
 
@@ -316,6 +320,8 @@ async def update_role(
         role = await uc.execute(org_id, role_id, body.model_dump(mode="json", exclude_unset=True))
     except RoleNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Role not found")
+    except RoleCodeConflictError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"Mã vai trò '{e}' đã tồn tại")
     return WorkspaceRoleOut.model_validate(role)
 
 

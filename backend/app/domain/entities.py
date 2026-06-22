@@ -51,6 +51,7 @@ class WorkspaceRoleDef:
     org_id: UUID
     code: str
     name: str
+    color: str = "gray"  # khóa palette — hiển thị màu role ở view Nhóm + badge
     position: int = 0
     created_at: datetime | None = None
 

@@ -18,6 +18,7 @@ export interface WorkspaceRoleDef {
   orgId: string;
   code: string;
   name: string;
+  color: string;       // khóa palette (dùng chung PHASE_PALETTE) — màu badge/role ở view Nhóm
   position: number;
 }
 
@@ -336,6 +337,15 @@ export interface ChecklistItem {
 export function resolveRoleName(roles: WorkspaceRoleDef[], code: string | undefined): string {
   if (!code) return 'Chung';
   return roles.find(r => r.code === code)?.name ?? code;
+}
+
+// Style badge của 1 role code (bg + text + dot), lấy theo màu role (PHASE_PALETTE).
+// Role chưa gán / code lạ → xám. Dùng chung cho view Nhóm + badge role.
+export function resolveRoleColor(roles: WorkspaceRoleDef[], code: string | undefined):
+  { bg: string; text: string; dot: string } {
+  const key = code ? roles.find(r => r.code === code)?.color : undefined;
+  const pal = PHASE_PALETTE[key ?? 'gray'] ?? PHASE_PALETTE.gray;
+  return { bg: pal.bg, text: pal.color, dot: pal.solid };
 }
 
 export interface PhaseBlock {

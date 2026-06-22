@@ -1,30 +1,74 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { PHASE_PALETTE, PHASE_COLOR_KEYS } from '../../types';
 import type { WorkspaceRoleDef } from '../../types';
 import { rolesApi, type RoleBody } from '../../api';
 import { ApiError } from '../../api/client';
 import { Users, Plus, Trash2, ChevronUp, ChevronDown, Check, AlertTriangle, X } from 'lucide-react';
 
-// Mỗi dòng role: đổi tên inline + sắp xếp + xóa (xóa kéo theo checklist/outcome mặc định).
-function RoleRow({ role, idx, total, onRename, onMove, onDelete }: {
+// Ô chọn màu role: nút cao bằng input (swatch + caret), click xổ xuống danh sách màu
+// (swatch + tên) — dùng chung PHASE_PALETTE.
+function ColorPicker({ color, onPick }: { color: string; onPick: (key: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const pal = PHASE_PALETTE[color] ?? PHASE_PALETTE.gray;
+  return (
+    <div className="relative flex-shrink-0">
+      <button type="button" onClick={() => setOpen(o => !o)} title="Màu vai trò"
+        className="flex items-center gap-1 px-1.5 py-1 bg-white border border-stone-200 rounded-md
+                   hover:border-stone-300 focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink">
+        <span className={`w-3.5 h-3.5 rounded ${pal.solid} ring-1 ring-inset ring-black/10`} />
+        <ChevronDown className="w-3 h-3 text-stone-400" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 top-8 left-0 w-40 max-h-64 overflow-y-auto py-1 bg-white rounded-lg shadow-lg border border-hairline">
+            {PHASE_COLOR_KEYS.map(key => (
+              <button key={key} type="button"
+                onClick={() => { onPick(key); setOpen(false); }}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-stone-50
+                  ${color === key ? 'bg-stone-50' : ''}`}>
+                <span className={`w-3.5 h-3.5 rounded ${PHASE_PALETTE[key].solid} ring-1 ring-inset ring-black/10 flex-shrink-0`} />
+                <span className="text-xs text-stone-700 flex-1">{PHASE_PALETTE[key].label}</span>
+                {color === key && <Check className="w-3.5 h-3.5 text-ink flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Mỗi dòng role: sửa MÃ viết tắt + TÊN đầy đủ inline + sắp xếp + xóa (xóa kéo theo
+// checklist/outcome mặc định). Đổi mã sẽ cascade cập nhật mọi tham chiếu (BE lo).
+function RoleRow({ role, idx, total, onUpdate, onMove, onDelete }: {
   role: WorkspaceRoleDef;
   idx: number;
   total: number;
-  onRename: (name: string) => void;
+  onUpdate: (body: Partial<RoleBody>) => void;
   onMove: (dir: -1 | 1) => void;
   onDelete: () => void;
 }) {
+  const [code, setCode] = useState(role.code);
   const [name, setName] = useState(role.name);
   const [confirm, setConfirm] = useState(false);
-  useEffect(() => { setName(role.name); }, [role.name]);
+  useEffect(() => { setCode(role.code); setName(role.name); }, [role.code, role.name]);
 
-  const commit = () => { const v = name.trim(); if (v && v !== role.name) onRename(v); else setName(role.name); };
+  const commitCode = () => { const v = code.trim(); if (v && v !== role.code) onUpdate({ code: v }); else setCode(role.code); };
+  const commitName = () => { const v = name.trim(); if (v && v !== role.name) onUpdate({ name: v }); else setName(role.name); };
 
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-white px-2 py-1.5">
-      <span className="font-mono text-[10px] text-stone-400 w-16 truncate flex-shrink-0" title={role.code}>{role.code}</span>
-      <input value={name} onChange={e => setName(e.target.value)} onBlur={commit}
+      <ColorPicker color={role.color} onPick={key => onUpdate({ color: key })} />
+      <input value={code} onChange={e => setCode(e.target.value)} onBlur={commitCode}
         onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        title="Mã viết tắt (vd PM)" placeholder="Mã"
+        className="font-mono w-20 px-2 py-1 bg-white border border-stone-200 rounded-md text-[11px] text-stone-500 flex-shrink-0
+                   focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
+      <input value={name} onChange={e => setName(e.target.value)} onBlur={commitName}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        title="Tên đầy đủ (vd Project Manager)"
         className="flex-1 min-w-0 px-2 py-1 bg-white border border-stone-200 rounded-md text-xs text-stone-700
                    focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
       <div className="flex flex-col flex-shrink-0">
@@ -94,6 +138,14 @@ export default function RoleManager({ orgId }: { orgId?: string } = {}) {
     await reorder(next.map(r => r.id));
   };
 
+  const handleUpdate = async (id: string, body: Partial<RoleBody>) => {
+    setError(null);
+    try { await update(id, body); }
+    catch (e) {
+      setError(e instanceof ApiError ? e.detail : (e instanceof Error ? e.message : 'Cập nhật thất bại'));
+    }
+  };
+
   const handleDelete = async (id: string) => {
     setError(null);
     try { await del(id); }
@@ -112,10 +164,10 @@ export default function RoleManager({ orgId }: { orgId?: string } = {}) {
         xóa luôn các đầu việc/sản phẩm mặc định gắn role đó.
       </p>
 
-      <div className="space-y-1.5 max-w-lg">
+      <div className="space-y-1.5">
         {roles.map((r, idx) => (
           <RoleRow key={r.id} role={r} idx={idx} total={roles.length}
-            onRename={name => update(r.id, { name })}
+            onUpdate={body => void handleUpdate(r.id, body)}
             onMove={dir => void move(idx, dir)}
             onDelete={() => void handleDelete(r.id)} />
         ))}

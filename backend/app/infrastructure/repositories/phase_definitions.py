@@ -1,7 +1,7 @@
 """SqlAlchemy cài đặt PhaseDefinitionRepository (#26 mảng A — phase động per-org)."""
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -77,6 +77,7 @@ class SqlAlchemyPhaseDefinitionRepository(PhaseDefinitionRepository):
         )
         if m is None:
             raise LookupError(f"PhaseDefinition {phase.id} not found")
+        m.code = phase.code
         m.name = phase.name
         m.full_name = phase.full_name
         m.description = phase.description
@@ -103,6 +104,18 @@ class SqlAlchemyPhaseDefinitionRepository(PhaseDefinitionRepository):
             .join(ProjectModel, ProjectModel.id == PhaseBlockModel.project_id)
             .where(ProjectModel.org_id == org_id, PhaseBlockModel.phase_type == code)
         ) or 0
+
+    async def cascade_rename_code(self, org_id: UUID, old_code: str, new_code: str) -> None:
+        """Đổi mã phase → block trong workspace đang dùng phase_type cũ chuyển sang mã mới."""
+        await self._session.execute(
+            update(PhaseBlockModel).where(
+                PhaseBlockModel.phase_type == old_code,
+                PhaseBlockModel.project_id.in_(
+                    select(ProjectModel.id).where(ProjectModel.org_id == org_id)
+                ),
+            ).values(phase_type=new_code)
+        )
+        await self._session.flush()
 
     async def seed_defaults(self, org_id: UUID) -> None:
         """Seed 7 phase mặc định cho 1 workspace mới (khi tạo org)."""

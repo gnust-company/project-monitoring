@@ -20,7 +20,7 @@ from app.infrastructure.db.models import (
 
 def _to_entity(m: WorkspaceRoleModel) -> WorkspaceRoleDef:
     return WorkspaceRoleDef(
-        id=m.id, org_id=m.org_id, code=m.code, name=m.name,
+        id=m.id, org_id=m.org_id, code=m.code, name=m.name, color=m.color,
         position=m.position, created_at=m.created_at,
     )
 
@@ -42,7 +42,8 @@ class SqlAlchemyWorkspaceRoleRepository(WorkspaceRoleRepository):
 
     async def create(self, role: WorkspaceRoleDef) -> WorkspaceRoleDef:
         m = WorkspaceRoleModel(
-            id=role.id, org_id=role.org_id, code=role.code, name=role.name, position=role.position,
+            id=role.id, org_id=role.org_id, code=role.code, name=role.name,
+            color=role.color, position=role.position,
         )
         self._session.add(m)
         await self._session.flush()
@@ -52,7 +53,9 @@ class SqlAlchemyWorkspaceRoleRepository(WorkspaceRoleRepository):
         m = await self._session.get(WorkspaceRoleModel, role.id)
         if m is None:
             raise LookupError(f"WorkspaceRole {role.id} not found")
+        m.code = role.code
         m.name = role.name
+        m.color = role.color
         m.position = role.position
         await self._session.flush()
         return _to_entity(m)
@@ -94,6 +97,35 @@ class SqlAlchemyWorkspaceRoleRepository(WorkspaceRoleRepository):
         )
         await self._session.flush()
 
+    async def cascade_rename_role(self, org_id: UUID, old_code: str, new_code: str) -> None:
+        """Đổi mã role → cập nhật mọi tham chiếu code trong workspace (giữ liên kết
+        Role↔Phase + job_role thành viên)."""
+        await self._session.execute(
+            update(PhaseDefinitionItemModel).where(
+                PhaseDefinitionItemModel.role == old_code,
+                PhaseDefinitionItemModel.phase_def_id.in_(
+                    select(PhaseDefinitionModel.id).where(PhaseDefinitionModel.org_id == org_id)
+                ),
+            ).values(role=new_code)
+        )
+        await self._session.execute(
+            update(PhaseItemModel).where(
+                PhaseItemModel.role == old_code,
+                PhaseItemModel.phase_block_id.in_(
+                    select(PhaseBlockModel.id)
+                    .join(ProjectModel, ProjectModel.id == PhaseBlockModel.project_id)
+                    .where(ProjectModel.org_id == org_id)
+                ),
+            ).values(role=new_code)
+        )
+        await self._session.execute(
+            update(OrganizationMemberModel).where(
+                OrganizationMemberModel.org_id == org_id,
+                OrganizationMemberModel.job_role == old_code,
+            ).values(job_role=new_code)
+        )
+        await self._session.flush()
+
     async def count_members_using(self, org_id: UUID, code: str) -> int:
         return await self._session.scalar(
             select(func.count()).select_from(OrganizationMemberModel).where(
@@ -103,7 +135,7 @@ class SqlAlchemyWorkspaceRoleRepository(WorkspaceRoleRepository):
         ) or 0
 
     async def seed_defaults(self, org_id: UUID) -> None:
-        for pos, (code, name) in enumerate(DEFAULT_ROLES):
+        for pos, (code, name, color) in enumerate(DEFAULT_ROLES):
             await self.create(WorkspaceRoleDef(
-                id=uuid4(), org_id=org_id, code=code, name=name, position=pos,
+                id=uuid4(), org_id=org_id, code=code, name=name, color=color, position=pos,
             ))

@@ -37,6 +37,11 @@ def _slugify(name: str) -> str:
     return base or "PHASE"
 
 
+def _normalize_code(raw: str) -> str:
+    """Chuẩn hóa mã phase do user nhập (gộp ký tự lạ thành '_', bỏ '_' thừa, cắt 32)."""
+    return re.sub(r"[^A-Za-z0-9]+", "_", raw).strip("_")[:32]
+
+
 def _unique_code(existing: set[str], desired: str | None, name: str) -> str:
     code = (desired or "").strip().upper() or _slugify(name)
     if code not in existing:
@@ -93,9 +98,19 @@ class UpdatePhaseDef:
         self._phases = phases
 
     async def execute(self, org_id: UUID, phase_id: UUID, payload: dict[str, Any]) -> PhaseDefinition:
-        phase = await self._phases.get(phase_id)
-        if phase is None or phase.org_id != org_id:
+        existing = await self._phases.list_by_org(org_id)
+        phase = next((p for p in existing if p.id == phase_id), None)
+        if phase is None:
             raise PhaseDefNotFoundError(str(phase_id))
+        old_code = phase.code
+        # Đổi MÃ phase (viết tắt): chuẩn hóa + chống trùng, cascade cập nhật phase_type của
+        # các block đang dùng (#26: cho phép sửa cả mã viết tắt lẫn tên đầy đủ).
+        if "code" in payload and payload["code"] is not None:
+            new_code = _normalize_code(payload["code"])
+            if new_code and new_code != old_code:
+                if any(p.code == new_code for p in existing if p.id != phase_id):
+                    raise PhaseCodeConflictError(new_code)
+                phase.code = new_code
         if "name" in payload:
             phase.name = payload["name"]
         if "full_name" in payload:
@@ -118,7 +133,10 @@ class UpdatePhaseDef:
                 outcomes = [{"text": i.text, "role": i.role}
                             for i in phase.items if i.kind == PhaseItemKind.OUTCOME]
             phase.items = _build_items(checklist, outcomes)
-        return await self._phases.update(phase, replace_items=replace)
+        updated = await self._phases.update(phase, replace_items=replace)
+        if updated.code != old_code:
+            await self._phases.cascade_rename_code(org_id, old_code, updated.code)
+        return updated
 
 
 class DeletePhaseDef:

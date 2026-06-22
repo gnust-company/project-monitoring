@@ -281,6 +281,11 @@ class PhaseDefinitionRepository(ABC):
         ...
 
     @abstractmethod
+    async def cascade_rename_code(self, org_id: UUID, old_code: str, new_code: str) -> None:
+        """Đổi MÃ phase: cập nhật phase_type của mọi block đang dùng old_code → new_code."""
+        ...
+
+    @abstractmethod
     async def seed_defaults(self, org_id: UUID) -> None:
         """Seed 7 phase mặc định cho 1 workspace mới."""
         ...
@@ -307,6 +312,12 @@ class WorkspaceRoleRepository(ABC):
     @abstractmethod
     async def cascade_remove_role(self, org_id: UUID, code: str) -> None:
         """Xóa role kéo theo checklist/outcome mặc định + gỡ khỏi item/membership."""
+        ...
+
+    @abstractmethod
+    async def cascade_rename_role(self, org_id: UUID, old_code: str, new_code: str) -> None:
+        """Đổi MÃ role: cập nhật mọi tham chiếu code (checklist/outcome mặc định, item
+        phase đang chạy, job_role thành viên) từ old_code sang new_code trong workspace."""
         ...
 
     @abstractmethod

@@ -98,8 +98,9 @@ CREATE TABLE organization_members (
 CREATE TABLE workspace_roles (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  code       VARCHAR(32) NOT NULL,    -- khóa duy nhất trong org (membership/item.role tham chiếu)
+  code       VARCHAR(32) NOT NULL,    -- khóa duy nhất trong org (membership/item.role tham chiếu); sửa được → cascade
   name       VARCHAR(255) NOT NULL,
+  color      VARCHAR(32) NOT NULL DEFAULT 'gray',  -- #26 mảng B+: khóa palette, màu role ở view Nhóm/badge
   position   INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (org_id, code)
