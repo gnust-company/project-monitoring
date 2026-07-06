@@ -21,6 +21,7 @@ def _to_entity(m: ProjectModel) -> Project:
         pic_user_id=m.pic_user_id,
         target_date=m.target_date,
         progress=m.progress,
+        position=m.position,
         created_at=m.created_at,
     )
 
@@ -34,8 +35,11 @@ class SqlAlchemyProjectRepository(ProjectRepository):
         return _to_entity(m) if m else None
 
     async def list_by_org(self, org_id: UUID) -> list[Project]:
+        # #31: thứ tự hiển thị = position (owner sắp), created_at là tie-break ổn định.
         result = await self._session.scalars(
-            select(ProjectModel).where(ProjectModel.org_id == org_id).order_by(ProjectModel.created_at)
+            select(ProjectModel)
+            .where(ProjectModel.org_id == org_id)
+            .order_by(ProjectModel.position, ProjectModel.created_at)
         )
         return [_to_entity(m) for m in result]
 
@@ -49,6 +53,14 @@ class SqlAlchemyProjectRepository(ProjectRepository):
         return {org_id: count for org_id, count in rows.all()}
 
     async def create(self, project: Project) -> Project:
+        # #31: dự án mới xuống cuối danh sách (position = max hiện có + 1).
+        next_pos = (
+            await self._session.scalar(
+                select(func.coalesce(func.max(ProjectModel.position), -1) + 1).where(
+                    ProjectModel.org_id == project.org_id
+                )
+            )
+        ) or 0
         m = ProjectModel(
             id=project.id,
             org_id=project.org_id,
@@ -58,6 +70,7 @@ class SqlAlchemyProjectRepository(ProjectRepository):
             start_date=project.start_date,
             target_date=project.target_date,
             progress=project.progress,
+            position=next_pos,
             created_by=project.created_by,
             pic_user_id=project.pic_user_id or project.created_by,
         )
@@ -81,3 +94,16 @@ class SqlAlchemyProjectRepository(ProjectRepository):
 
     async def delete(self, project_id: UUID) -> None:
         await self._session.execute(delete(ProjectModel).where(ProjectModel.id == project_id))
+
+    async def reorder(self, org_id: UUID, ordered_ids: list[UUID]) -> list[Project]:
+        # #31: gán lại position theo thứ tự ordered_ids; chỉ cập nhật dự án thuộc org.
+        result = await self._session.scalars(
+            select(ProjectModel).where(ProjectModel.org_id == org_id)
+        )
+        by_id = {m.id: m for m in result}
+        for pos, pid in enumerate(ordered_ids):
+            m = by_id.get(pid)
+            if m is not None and m.position != pos:
+                m.position = pos
+        await self._session.flush()
+        return await self.list_by_org(org_id)

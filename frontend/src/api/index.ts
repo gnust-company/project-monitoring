@@ -167,6 +167,10 @@ export const projectsApi = {
   async changePic(id: string, picUserId: string): Promise<Project> {
     return await api.patch<Project>(`/projects/${id}/pic`, { picUserId });
   },
+  // #31: owner sắp lại thứ tự hiển thị dự án (từ trên xuống); trả danh sách đã sắp.
+  async reorder(orgId: string, orderedIds: string[]): Promise<Project[]> {
+    return await api.post<Project[]>(`/organizations/${orgId}/projects/reorder`, { orderedIds });
+  },
   async activity(id: string): Promise<ActivityItem[]> {
     return (await api.get<ActivityDTO[]>(`/projects/${id}/activity`)).map(mapActivity);
   },

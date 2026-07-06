@@ -125,6 +125,7 @@ CREATE TABLE projects (
   start_date  DATE NOT NULL,
   target_date DATE,                       -- #20: NULL = dự án không có ngày kết thúc (deadline theo phase)
   progress    INTEGER NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+  position    INTEGER NOT NULL DEFAULT 0,  -- #31: thứ tự hiển thị trong workspace (owner kéo-thả; migration 0013, backfill theo created_at)
   created_by  UUID REFERENCES users(id) ON DELETE SET NULL,  -- #21 audit: NULLABLE (migration 0006) để SET NULL chạy khi xóa người tạo
   pic_user_id UUID REFERENCES users(id) ON DELETE SET NULL,  -- #11: PIC (mặc định = created_by, đổi được)
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),

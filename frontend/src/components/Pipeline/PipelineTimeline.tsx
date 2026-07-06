@@ -2,7 +2,7 @@ import { useRef, useMemo, useState, useCallback, useEffect, useLayoutEffect, typ
 import { useApp } from '../../context/AppContext';
 import type { PhaseBlock } from '../../types';
 import { getUserById } from '../../data/mockData';
-import { Search, X, MousePointer2, Hand, SquarePen, Eye, Save, RotateCcw } from 'lucide-react';
+import { Search, X, MousePointer2, Hand, SquarePen, Eye, Save, RotateCcw, GripVertical } from 'lucide-react';
 import {
   format, parseISO, differenceInDays, addDays, addMonths,
   eachWeekOfInterval, eachMonthOfInterval, startOfQuarter, getQuarter
@@ -77,6 +77,7 @@ export default function PipelineTimeline() {
     setSearchQuery, setZoomLevel,
     openPhaseDetail, openCreatePhase,
     openProjectDetail, updatePhaseBlock, phaseDefs, getPhaseMeta,
+    reorderProjects, isOwner, // #31: sắp lại thứ tự dự án (owner-only)
   } = useApp();
 
   const boardRef = useRef<HTMLDivElement>(null);
@@ -92,6 +93,13 @@ export default function PipelineTimeline() {
   // flush qua updatePhaseBlock; "Hủy" bỏ draft. start/end + displayRow của block đổi chỗ.
   const [pendingLayout, setPendingLayout] = useState<Map<string, { startDate: string; endDate: string; displayRow: number }>>(new Map());
   const [savingLayout, setSavingLayout] = useState(false);
+
+  // #31: staged reorder dự án (owner-only). pendingOrder = TOÀN BỘ id dự án theo thứ
+  // tự mới; null = chưa đổi. Kéo band ở cột trái trong mode "Sắp xếp" → stage, bấm Lưu.
+  const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
+  const [dragProjectId, setDragProjectId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; pos: 'before' | 'after' } | null>(null);
+  const canReorderProjects = isOwner && boardMode === 'layout';
 
   // Drag preview state (di chuyển hoặc resize block)
   const [dragPreview, setDragPreview] = useState<{
@@ -138,9 +146,18 @@ export default function PipelineTimeline() {
   // #15: useProjectFilter là nguồn sự thật chung cho sidebar + timeline.
   // displayRange = khoảng hiệu dụng (snap tuần + mở rộng phase bị cắt) → dùng cho cột.
   const { ctx: filterCtx, displayRange } = useProjectFilter();
+  // #31: áp thứ tự staged (nếu đang kéo-sắp) lên TOÀN BỘ dự án trước khi lọc, để cả
+  // cột trái lẫn band bên phải phản ánh thứ tự mới ngay khi kéo.
+  const orderedOrgProjects = useMemo(() => {
+    if (!pendingOrder) return orgProjects;
+    const idx = new Map(pendingOrder.map((id, i) => [id, i]));
+    return [...orgProjects].sort(
+      (a, b) => (idx.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (idx.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [orgProjects, pendingOrder]);
   const filteredProjects = useMemo(
-    () => filterVisibleProjects(orgProjects, filterCtx),
-    [orgProjects, filterCtx],
+    () => filterVisibleProjects(orderedOrgProjects, filterCtx),
+    [orderedOrgProjects, filterCtx],
   );
 
   // ─── Timeline range ───────────────────────────────────────────────
@@ -406,27 +423,51 @@ export default function PipelineTimeline() {
   // sync ngày bắt đầu dự án). Lỗi giữ pending để thử lại.
   const saveLayout = useCallback(async () => {
     const entries = Array.from(pendingLayout.entries());
-    if (entries.length === 0) return;
+    if (entries.length === 0 && !pendingOrder) return;
     setSavingLayout(true);
     try {
       for (const [id, e] of entries) {
         await updatePhaseBlock(id, { startDate: e.startDate, endDate: e.endDate, displayRow: e.displayRow });
       }
+      // #31: flush thứ tự dự án (nếu có) — 1 call cho cả workspace.
+      if (pendingOrder && selectedOrgId) {
+        await reorderProjects(selectedOrgId, pendingOrder);
+      }
       setPendingLayout(new Map());
       setManualRows(new Map());
+      setPendingOrder(null);
     } catch { /* giữ lại draft để user thử lại */ }
     finally { setSavingLayout(false); }
-  }, [pendingLayout, updatePhaseBlock]);
+  }, [pendingLayout, pendingOrder, selectedOrgId, updatePhaseBlock, reorderProjects]);
 
   const discardLayout = useCallback(() => {
     setPendingLayout(new Map());
     setManualRows(new Map());
+    setPendingOrder(null);
   }, []);
 
-  // #18: đổi workspace → bỏ draft kéo/giãn đang treo (tránh áp nhầm sang org khác).
+  // #31: kéo band dự án ở cột trái → chèn dragId cạnh targetId, ghi vào pendingOrder.
+  // Thao tác trên TOÀN BỘ danh sách (kể cả dự án đang bị lọc ẩn) để thứ tự bền vững.
+  const moveProject = useCallback((dragId: string, targetId: string, pos: 'before' | 'after') => {
+    if (dragId === targetId) return;
+    const base = pendingOrder ?? orgProjects.map(p => p.id);
+    const without = base.filter(id => id !== dragId);
+    let at = without.indexOf(targetId);
+    if (at < 0) return;
+    if (pos === 'after') at += 1;
+    without.splice(at, 0, dragId);
+    // Trùng thứ tự gốc → coi như không có thay đổi (ẩn thanh Lưu).
+    const same = without.length === orgProjects.length && without.every((id, i) => orgProjects[i]?.id === id);
+    setPendingOrder(same ? null : without);
+  }, [pendingOrder, orgProjects]);
+
+  // #18/#31: đổi workspace → bỏ mọi draft đang treo (tránh áp nhầm sang org khác).
   useEffect(() => {
     setPendingLayout(new Map());
     setManualRows(new Map());
+    setPendingOrder(null);
+    setDragProjectId(null);
+    setDropTarget(null);
   }, [selectedOrgId]);
 
   // ─── Board mousedown: pan (kéo dọc) hoặc tạo phase (kéo ngang) ────
@@ -727,7 +768,8 @@ export default function PipelineTimeline() {
             <span className="hidden lg:flex items-center gap-1.5 text-[11px] text-stone-400 font-light">
               <MousePointer2 className="w-3 h-3" />
               {boardMode === 'create' ? 'Kéo ngang trên hàng dự án để tạo phase'
-                : boardMode === 'layout' ? 'Kéo/giãn phase — bấm Lưu để áp dụng'
+                : boardMode === 'layout'
+                  ? (isOwner ? 'Kéo/giãn phase · kéo tên dự án để đổi thứ tự — bấm Lưu' : 'Kéo/giãn phase — bấm Lưu để áp dụng')
                 : 'Kéo chuột để di chuyển lịch'}
             </span>
             <div className="relative">
@@ -804,13 +846,46 @@ export default function PipelineTimeline() {
               const rd = projectRowData.get(project.id);
               const rowCount = rd?.rowCount ?? 1;
               const pbCount = rd?.pbs.length ?? 0;
+              const isDragged = dragProjectId === project.id;
+              const showIndicator = dropTarget?.id === project.id ? dropTarget.pos : null;
               return (
                 <div key={project.id}
-                  onClick={() => openProjectDetail(project.id)}
-                  title="Xem chi tiết dự án"
-                  className="px-4 border-b border-hairline bg-surface-soft hover:bg-white transition-colors flex items-center cursor-pointer"
+                  // #31: mode "Sắp xếp" + owner → kéo band để đổi thứ tự hiển thị dự án.
+                  draggable={canReorderProjects}
+                  onDragStart={canReorderProjects ? (e => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDragProjectId(project.id);
+                  }) : undefined}
+                  onDragOver={canReorderProjects && dragProjectId ? (e => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (project.id === dragProjectId) { setDropTarget(null); return; }
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const pos = e.clientY - r.top < r.height / 2 ? 'before' : 'after';
+                    setDropTarget(prev => (prev?.id === project.id && prev.pos === pos ? prev : { id: project.id, pos }));
+                  }) : undefined}
+                  onDrop={canReorderProjects && dragProjectId ? (e => {
+                    e.preventDefault();
+                    if (dropTarget) moveProject(dragProjectId, dropTarget.id, dropTarget.pos);
+                    setDragProjectId(null);
+                    setDropTarget(null);
+                  }) : undefined}
+                  onDragEnd={() => { setDragProjectId(null); setDropTarget(null); }}
+                  onClick={() => { if (!canReorderProjects) openProjectDetail(project.id); }}
+                  title={canReorderProjects ? 'Kéo để đổi thứ tự dự án' : 'Xem chi tiết dự án'}
+                  className={`relative px-4 border-b border-hairline bg-surface-soft transition-colors flex items-center
+                    ${canReorderProjects ? 'cursor-grab active:cursor-grabbing hover:bg-ink/[0.03]' : 'cursor-pointer hover:bg-white'}
+                    ${isDragged ? 'opacity-40' : ''}`}
                   style={{ height: rowCount * ROW_HEIGHT }}>
-                  <div className="w-full">
+                  {/* #31: chỉ báo vị trí chèn khi kéo-thả */}
+                  {showIndicator && (
+                    <div className={`absolute left-0 right-0 h-0.5 bg-ink z-10 pointer-events-none
+                      ${showIndicator === 'before' ? 'top-0' : 'bottom-0'}`} />
+                  )}
+                  {canReorderProjects && (
+                    <GripVertical className="w-3.5 h-3.5 text-stone-400 -ml-1 mr-1 flex-shrink-0" />
+                  )}
+                  <div className="w-full min-w-0">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                         (statusOf.get(project.id) ?? project.status) === 'On Track' ? 'bg-emerald-400' :
@@ -998,13 +1073,16 @@ export default function PipelineTimeline() {
           </div>
         </div>
 
-        {/* #18: thanh draft kéo/giãn — bấm Lưu mới áp dụng, Hủy để hoàn tác */}
-        {pendingLayout.size > 0 && (
+        {/* #18/#31: thanh draft kéo/giãn phase + sắp thứ tự dự án — Lưu mới áp dụng, Hủy để hoàn tác */}
+        {(pendingLayout.size > 0 || pendingOrder) && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3
                           bg-surface-dark text-white rounded-xl shadow-xl shadow-black/20 pl-4 pr-2 py-2
                           animate-in fade-in slide-in-from-bottom-2 duration-200">
             <span className="text-xs font-semibold whitespace-nowrap">
-              {pendingLayout.size} thay đổi chưa lưu
+              {[
+                pendingLayout.size > 0 ? `${pendingLayout.size} thay đổi phase` : null,
+                pendingOrder ? 'thứ tự dự án' : null,
+              ].filter(Boolean).join(' + ')} chưa lưu
             </span>
             <div className="flex items-center gap-1.5">
               <button onClick={discardLayout} disabled={savingLayout}

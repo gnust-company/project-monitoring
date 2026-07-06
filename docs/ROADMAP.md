@@ -21,11 +21,12 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | 4 | #15, #25, #23, #14, #18 | ✅ Xong |
 | 5 | #21, #22, #24, #26 | ✅ Xong |
 | 6 | #27 | ✅ Xong |
+| 7 | #31 | 🟡 Code xong — chờ test |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 > **Trạng thái GitHub**: #3, #8, #9, #10, #12, #14, #15, #17, #18, #21, #22, #23, #24, #25, #26, #27 đã đóng (#26 + #27 đóng 2026-06-22).
-> Còn OPEN: #28 (mời thành viên — tách từ #26), #29 (i18n — tách từ #3).
+> Còn OPEN: #31 (sắp thứ tự dự án — code xong 2026-07-06, chờ test), #28 (mời thành viên — tách từ #26), #29 (i18n — tách từ #3).
 
 ---
 
@@ -111,6 +112,14 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
   - [x] **C4 — FE quản lý (Admin view)**: tab "Thông báo" (`AdminAnnouncements`) — list + badge trạng thái (đang hiện/sắp tới/hết hạn) + form tạo/sửa (markdown + xem trước, date-range) + xóa. Markdown render tự viết (`lib/markdown.tsx`, an toàn, không `dangerouslySetInnerHTML`) — không thêm dependency.
   - [x] **C5 — FE modal hiển thị**: `AnnouncementModal` (mount ở `App`) 2 cột — trái list, phải chi tiết (markdown); footer "Không hiện lại hôm nay / tuần này". Tự bật khi user có thông báo active chưa ẩn.
   - **Ghi chú**: chỉ admin tạo; có sửa/xóa. Cân nhắc dùng chung hạ tầng này cho thông báo lời mời/chuyển quyền chủ ở [#28](https://github.com/gnust-company/project-monitoring/issues/28).
+
+## Wave 7 — Sắp thứ tự hiển thị dự án (#31)
+
+- [ ] [#31 — Kéo-thả đổi thứ tự dự án trong workspace](https://github.com/gnust-company/project-monitoring/issues/31) 🟡 *code xong 2026-07-06 (migration 0013), chờ user test*
+  - **Mô hình**: thứ tự dùng chung cả workspace, lưu ở `projects.position`. **Chỉ owner (hoặc superuser)** sắp lại được. Dự án mới xuống cuối. `list_by_org` sắp theo `position` → cả Pipeline, sidebar, dashboard đồng bộ 1 thứ tự.
+  - **Backend**: migration **0013** thêm `projects.position` (backfill theo `created_at` per-org). `ReorderProjects` use case + `POST /organizations/{orgId}/projects/reorder { orderedIds }` (ManageDep = owner-only). 4 test ở `test_reorder_projects.py`.
+  - **Frontend**: mode "Sắp xếp" của Pipeline — owner kéo band dự án ở cột trái (native DnD, grip + chỉ báo vị trí chèn), stage vào `pendingOrder`, tái dùng thanh Lưu/Hủy có sẵn (#18). Không phải owner: không kéo được (click vẫn mở chi tiết).
+  - **Ghi chú**: đã chốt là thứ tự **chung workspace** (không per-user) — bản "dự án tôi quan tâm" theo từng người để sau nếu cần.
 
 ---
 

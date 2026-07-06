@@ -233,9 +233,14 @@ class ProjectOut(CamelModel):
     start_date: date
     target_date: date | None = None  # #20: optional
     progress: int
+    position: int = 0  # #31: thứ tự hiển thị trong workspace
     created_by: UUID | None = None  # SET NULL khi người tạo bị xóa (#21 audit)
     pic_user_id: UUID | None = None  # #11: PIC (mặc định = created_by)
     created_at: datetime | None = None
+
+
+class ProjectReorderIn(CamelModel):
+    ordered_ids: list[UUID]  # #31: id dự án theo thứ tự mới (từ trên xuống dưới)
 
 
 class ProjectCreate(CamelModel):

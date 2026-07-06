@@ -79,6 +79,7 @@ class Project:
     # #20: dự án không bắt buộc có ngày kết thúc.
     target_date: date | None = None
     progress: int = 0  # 0-100
+    position: int = 0  # #31: thứ tự hiển thị trong workspace (owner kéo-thả sắp lại)
     created_at: datetime | None = None
 
     @property

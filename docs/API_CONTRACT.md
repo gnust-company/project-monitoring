@@ -146,8 +146,9 @@ Mọi member **đọc** được; thêm/sửa/xóa/sắp xếp là **owner-only*
 
 | Method | Path | Mô tả |
 |---|---|---|
-| GET | `/organizations/{orgId}/projects` | Dự án trong workspace |
-| POST | `/organizations/{orgId}/projects` | Body: `{ name, description, startDate, targetDate?, status? }` — `targetDate` optional (#20) |
+| GET | `/organizations/{orgId}/projects` | Dự án trong workspace — sắp theo `position` rồi `createdAt` (#31) |
+| POST | `/organizations/{orgId}/projects` | Body: `{ name, description, startDate, targetDate?, status? }` — `targetDate` optional (#20). Dự án mới xuống cuối (`position` = max+1) |
+| POST | `/organizations/{orgId}/projects/reorder` | #31: sắp lại thứ tự hiển thị. Body `{ orderedIds: [projectId…] }` → trả danh sách đã sắp. **Chỉ owner/superuser** → 200; khác → 403 |
 | GET | `/projects/{projectId}` | Chi tiết |
 | PATCH | `/projects/{projectId}` | Partial update (`name`/`description`/`status`/`progress`/`startDate`/`targetDate`). **Chỉ PIC/superuser** → 200; không phải → 403. `targetDate: null` = xóa ngày kết thúc |
 | PATCH | `/projects/{projectId}/pic` | Đổi PIC. Body `{ picUserId }`. PIC hiện tại / owner / superuser → 200; khác → 403 (#11) |
@@ -164,6 +165,7 @@ Mọi member **đọc** được; thêm/sửa/xóa/sắp xếp là **owner-only*
   "startDate": "2026-04-03",
   "targetDate": null,
   "progress": 55,
+  "position": 0,
   "createdBy": "uuid",
   "picUserId": "uuid"
 }

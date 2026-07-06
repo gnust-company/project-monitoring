@@ -196,6 +196,11 @@ class ProjectRepository(ABC):
     @abstractmethod
     async def delete(self, project_id: UUID) -> None: ...
 
+    @abstractmethod
+    async def reorder(self, org_id: UUID, ordered_ids: list[UUID]) -> list[Project]:
+        """#31: gán lại `position` theo thứ tự ordered_ids; trả danh sách đã sắp."""
+        ...
+
 
 class PhaseBlockRepository(ABC):
     @abstractmethod

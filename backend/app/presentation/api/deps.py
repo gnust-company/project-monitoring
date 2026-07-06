@@ -72,6 +72,7 @@ from app.application.use_cases.projects import (
     DeleteProject,
     GetProject,
     ListProjectsByOrg,
+    ReorderProjects,
     UpdateProject,
 )
 from app.application.use_cases.admin import (
@@ -304,6 +305,10 @@ def remove_member_uc(repo: OrgRepoDep, notifier: NotifierDep) -> RemoveMember:
 # ─── Project use cases ───────────────────────────────────────────────
 def list_projects_uc(repo: ProjectRepoDep) -> ListProjectsByOrg:
     return ListProjectsByOrg(repo)
+
+
+def reorder_projects_uc(repo: ProjectRepoDep) -> ReorderProjects:
+    return ReorderProjects(repo)
 
 
 def get_project_uc(repo: ProjectRepoDep) -> GetProject:

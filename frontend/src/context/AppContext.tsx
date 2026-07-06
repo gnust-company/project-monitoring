@@ -100,6 +100,7 @@ interface AppContextType extends AppState {
   updateProject: (id: string, updates: Partial<Project>) => Promise<Project>;
   changeProjectPic: (id: string, picUserId: string) => Promise<Project>; // #11
   deleteProject: (id: string, reason?: string) => Promise<void>;
+  reorderProjects: (orgId: string, orderedIds: string[]) => Promise<Project[]>; // #31
 
   // Phase block actions
   addPhaseBlock: (pb: PhaseBlockUI) => Promise<void>;
@@ -421,6 +422,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjectsState(prev => prev.filter(p => p.id !== id));
     setPbState(prev => prev.filter(pb => pb.projectId !== id));
     setState(prev => ({ ...prev, selectedProjectIds: prev.selectedProjectIds?.filter(pid => pid !== id) ?? null }));
+  }, []);
+
+  // #31: owner sắp lại thứ tự hiển thị dự án (dùng chung cả workspace). BE trả về
+  // danh sách đã sắp → thay thẳng state để mọi view (Pipeline/sidebar/dashboard) đồng bộ.
+  const reorderProjects = useCallback(async (orgId: string, orderedIds: string[]) => {
+    const ordered = await projectsApi.reorder(orgId, orderedIds);
+    setProjectsState(ordered);
+    return ordered;
   }, []);
 
   // ─── Phase blocks ─────────────────────────────────────────────────
@@ -747,7 +756,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openPhaseDetail, closePhaseDetail, openProjectDetail, closeProjectDetail,
       openCreateProject, closeCreateProject, openCreatePhase, closeCreatePhase,
       openCreateWorkspace, closeCreateWorkspace, openProfileModal, closeProfileModal, toggleSidebar,
-      addProject, updateProject, deleteProject, changeProjectPic,
+      addProject, updateProject, deleteProject, changeProjectPic, reorderProjects,
       addPhaseBlock, updatePhaseBlock, deletePhaseBlock,
       addPhaseItem, updatePhaseItem, deletePhaseItem,
       addPhaseComment, addPhaseLink, uploadPhaseFile, deletePhaseAttachment,

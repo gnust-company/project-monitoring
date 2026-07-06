@@ -14,23 +14,27 @@ from app.application.use_cases.projects import (
     ListProjectsByOrg,
     ProjectForbiddenError,
     ProjectNotFoundError,
+    ReorderProjects,
     UpdateProject,
 )
 from app.presentation.api.deps import (
     AccessDep,
     CurrentUser,
+    ManageDep,
     OrgRepoDep,
     change_project_pic_uc,
     create_project_uc,
     delete_project_uc,
     get_project_uc,
     list_projects_uc,
+    reorder_projects_uc,
     update_project_uc,
 )
 from app.presentation.api.schemas import (
     ProjectCreate,
     ProjectOut,
     ProjectPicUpdate,
+    ProjectReorderIn,
     ProjectUpdate,
 )
 
@@ -64,6 +68,17 @@ async def create_project(
         status=body.status, created_by=access.user.id,
     ))
     return ProjectOut.model_validate(project)
+
+
+@router.post("/organizations/{org_id}/projects/reorder", response_model=list[ProjectOut])
+async def reorder_projects(
+    org_id: UUID,
+    body: ProjectReorderIn,
+    access: ManageDep,  # #31: chỉ owner workspace (hoặc superuser) mới sắp lại thứ tự
+    uc: Annotated[ReorderProjects, Depends(reorder_projects_uc)],
+) -> list[ProjectOut]:
+    projects = await uc.execute(org_id, body.ordered_ids)
+    return [ProjectOut.model_validate(p) for p in projects]
 
 
 async def _require_project_access(

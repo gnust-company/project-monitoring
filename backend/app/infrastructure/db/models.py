@@ -120,6 +120,8 @@ class ProjectModel(Base):
     start_date: Mapped[date] = mapped_column(Date)
     target_date: Mapped[date | None] = mapped_column(Date)  # #20: nullable (dự án không định hạn)
     progress: Mapped[int] = mapped_column(Integer, default=0)
+    # #31: thứ tự hiển thị trong workspace (owner kéo-thả sắp lại; dùng chung cả org)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # nullable: SET NULL khi user tạo bị xóa (dự án thuộc workspace, không mất theo người).
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     # #11: PIC — mặc định = created_by, đổi được. NULL khi user bị xóa.

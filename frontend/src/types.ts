@@ -324,6 +324,7 @@ export interface Project {
   startDate: string;
   targetDate?: string | null; // #20: không bắt buộc (dự án có thể kéo dài không định hạn)
   progress: number; // 0-100
+  position?: number; // #31: thứ tự hiển thị trong workspace (owner kéo-thả sắp lại)
   createdBy: string; // userId
   picUserId?: string | null; // #11: PIC (mặc định = createdBy)
 }

@@ -68,6 +68,17 @@ class ListProjectsByOrg:
         return await self._projects.list_by_org(org_id)
 
 
+class ReorderProjects:
+    """#31: sắp lại thứ tự hiển thị dự án trong workspace (dùng chung cả org).
+    Quyền owner-only được chốt ở router (ManageDep)."""
+
+    def __init__(self, projects: ProjectRepository) -> None:
+        self._projects = projects
+
+    async def execute(self, org_id: UUID, ordered_ids: list[UUID]) -> list[Project]:
+        return await self._projects.reorder(org_id, ordered_ids)
+
+
 class GetProject:
     def __init__(self, projects: ProjectRepository) -> None:
         self._projects = projects
