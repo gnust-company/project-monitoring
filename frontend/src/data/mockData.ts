@@ -141,7 +141,8 @@ function makePb(project: Project, phaseType: string, title: string, startOffset:
     ...(chosenTag === 'Inprogress' && Math.random() > 0.5 ? { actualEndDate: formatDate(addDays(end, Math.floor(Math.random() * 8) + 1)) } : {}),
     createdBy: project.createdBy,
     assignee: project.createdBy,
-    participants: ['u1', 'u3', 'u4', 'u5'].slice(0, 2 + Math.floor(Math.random() * 3)),
+    participants: ['u1', 'u3', 'u4', 'u5'].slice(0, 2 + Math.floor(Math.random() * 3))
+      .map(userId => ({ userId, raci: 'R' as const })),
     checklist: generateChecklist(phaseType as DevPhase, pbIdCounter),
     outcomes: generateOutcomes(phaseType as DevPhase, pbIdCounter),
     comments: generateComments(2 + Math.floor(Math.random() * 3)),

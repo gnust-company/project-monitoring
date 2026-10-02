@@ -3,7 +3,7 @@ import { Mail, Shield, FolderKanban, Crown, ListTodo } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import type { ProjectStatus } from '../../types';
-import { resolveRoleColor } from '../../types';
+import { resolveRoleColor, participantUserIds } from '../../types';
 import Avatar from '../common/Avatar';
 import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
 
@@ -53,7 +53,7 @@ export default function TeamView() {
       let openTasks = 0;
       let assignedTasks = 0;
       phaseBlocks.forEach(pb => {
-        const involved = pb.participants.includes(member.id) || pb.createdBy === member.id;
+        const involved = participantUserIds(pb).includes(member.id) || pb.createdBy === member.id;
         if (!involved) return;
         const project = orgProjects.find(p => p.id === pb.projectId);
         if (!project) return;

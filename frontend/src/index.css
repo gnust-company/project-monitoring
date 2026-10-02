@@ -22,6 +22,11 @@
   }
 }
 
+/* #32: ô mật khẩu đã có nút hiện/ẩn riêng → ẩn nút "reveal" mặc định của Edge/IE
+   để không bị 2 con mắt chồng nhau. Chỉ áp cho input gắn class này. */
+input.no-native-reveal::-ms-reveal,
+input.no-native-reveal::-ms-clear { display: none; }
+
 /* ─── Scrollbar ──────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

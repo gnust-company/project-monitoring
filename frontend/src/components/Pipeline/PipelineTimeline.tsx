@@ -504,16 +504,24 @@ export default function PipelineTimeline() {
       : 0;
 
     let mode: 'pending' | 'pan' | 'create' = 'pending';
+    // #30: ở chế độ "Tạo phase", nhấn trên hàng dự án thì lịch ĐỨNG YÊN (không pan). Chuyển
+    // động dọc bị bỏ qua; chỉ khi kéo ngang vượt ngưỡng mới bắt đầu tạo, độ rộng lấy theo
+    // vị trí chuột hiện tại → kéo dọc rồi mới kéo ngang vẫn tạo được bình thường.
+    const lockedForCreate = boardMode === 'create' && !!targetProject;
 
     const handleMove = (me: MouseEvent) => {
       const dx = me.clientX - startClientX;
       const dy = me.clientY - startClientY;
 
       if (mode === 'pending') {
-        if (Math.abs(dx) <= DRAG_THRESHOLD && Math.abs(dy) <= DRAG_THRESHOLD) return;
-        // Chỉ chế độ "Tạo phase" mới kéo ngang trong hàng dự án để tạo; còn lại pan.
-        mode = boardMode === 'create' && targetProject && Math.abs(dx) >= Math.abs(dy) ? 'create' : 'pan';
-        if (mode === 'pan') board.style.cursor = 'grabbing';
+        if (lockedForCreate) {
+          if (Math.abs(dx) <= DRAG_THRESHOLD) return;
+          mode = 'create';
+        } else {
+          if (Math.abs(dx) <= DRAG_THRESHOLD && Math.abs(dy) <= DRAG_THRESHOLD) return;
+          mode = 'pan';
+          board.style.cursor = 'grabbing';
+        }
       }
 
       if (mode === 'pan') {
@@ -767,18 +775,18 @@ export default function PipelineTimeline() {
           <div className="flex items-center gap-2">
             <span className="hidden lg:flex items-center gap-1.5 text-[11px] text-stone-400 font-light">
               <MousePointer2 className="w-3 h-3" />
-              {boardMode === 'create' ? 'Kéo ngang trên hàng dự án để tạo phase'
+              {boardMode === 'create' ? 'Kéo ngang trên hàng dự án để tạo phase (lịch được giữ cố định)'
                 : boardMode === 'layout'
                   ? (isOwner ? 'Kéo/giãn phase · kéo tên dự án để đổi thứ tự — bấm Lưu' : 'Kéo/giãn phase — bấm Lưu để áp dụng')
                 : 'Kéo chuột để di chuyển lịch'}
             </span>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
-              <input type="text" placeholder="Tìm kiếm dự án..."
+              <input type="text" placeholder="Tìm dự án hoặc PIC..."
                 value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                 className={`pl-8 pr-8 py-1.5 bg-white border border-stone-200 rounded-lg text-sm
                            focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink
-                           w-44 transition-all ${searchQuery ? 'border-ink/30 bg-ink/[0.02]' : ''}`} />
+                           w-52 transition-all ${searchQuery ? 'border-ink/30 bg-ink/[0.02]' : ''}`} />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-md

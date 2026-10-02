@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
-import type { PhaseBlock, PhaseDefinition } from '../../types';
+import type { PhaseBlock, PhaseDefinition, PhaseParticipant } from '../../types';
 import { X, Plus, Calendar, Users, Trash2, Target, CheckSquare } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import Dropdown from '../common/Dropdown';
+import RaciParticipants from '../common/RaciParticipants';
 
 type DraftItem = { text: string; done: boolean; role?: string };
 
@@ -93,7 +94,7 @@ function DraftSection({ items, setItems, roles, icon, label }: {
 export default function CreatePhaseModal() {
   const {
     createPhaseOpen, closeCreatePhase, createPhaseProjectId, createPhaseDates,
-    orgProjects, addPhaseBlock, selectedOrg, currentUser, phaseDefs, getPhaseMeta, getRoleName,
+    orgProjects, addPhaseBlock, selectedOrg, currentUser, phaseDefs, getPhaseMeta, getUserById,
   } = useApp();
 
   const meId = currentUser?.id ?? '';
@@ -105,7 +106,10 @@ export default function CreatePhaseModal() {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(addDays(new Date(), 14), 'yyyy-MM-dd'));
-  const [participants, setParticipants] = useState<string[]>(meId ? [meId] : []);
+  // #34: người tạo mặc định là Responsible; thêm/đổi vai trò RACI hoặc người ngoài nền tảng ở bên dưới.
+  const [participants, setParticipants] = useState<PhaseParticipant[]>(
+    meId ? [{ userId: meId, raci: 'R' }] : [],
+  );
   const [showParticipants, setShowParticipants] = useState(false);
   const [checklistItems, setChecklistItems] = useState<DraftItem[]>([]);
   const [outcomeItems, setOutcomeItems] = useState<DraftItem[]>([]);
@@ -122,7 +126,7 @@ export default function CreatePhaseModal() {
     setDescription('');
     setStartDate(createPhaseDates?.startDate ?? format(new Date(), 'yyyy-MM-dd'));
     setEndDate(createPhaseDates?.endDate ?? format(addDays(new Date(), 14), 'yyyy-MM-dd'));
-    setParticipants(meId ? [meId] : []);
+    setParticipants(meId ? [{ userId: meId, raci: 'R' }] : []);
     setShowParticipants(false);
     setChecklistItems(draftFromDef(firstDef, 'checklist'));
     setOutcomeItems(draftFromDef(firstDef, 'outcomes'));
@@ -134,10 +138,6 @@ export default function CreatePhaseModal() {
     const def = phaseDefs.find(p => p.code === code);
     setChecklistItems(draftFromDef(def, 'checklist'));
     setOutcomeItems(draftFromDef(def, 'outcomes'));
-  };
-
-  const toggleParticipant = (uid: string) => {
-    setParticipants(prev => prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -264,22 +264,9 @@ export default function CreatePhaseModal() {
                 <span className="text-stone-400">{showParticipants ? '▲' : '▼'}</span>
               </button>
               {showParticipants && (
-                <div className="bg-white border border-stone-200 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto">
-                  {orgMembers.map(member => {
-                    const isSelected = participants.includes(member.id);
-                    return (
-                      <button key={member.id} type="button" onClick={() => toggleParticipant(member.id)}
-                        className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left transition-colors
-                          ${isSelected ? 'bg-stone-100 text-ink' : 'hover:bg-stone-50 text-stone-600'}`}>
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0
-                          ${isSelected ? 'bg-ink border-ink' : 'border-stone-300'}`}>
-                          {isSelected && <span className="text-white text-[10px]">✓</span>}
-                        </div>
-                        <span className="text-xs font-medium">{member.name}</span>
-                        <span className="text-[10px] text-stone-400 ml-auto">{getRoleName(member.jobRole)}</span>
-                      </button>
-                    );
-                  })}
+                <div className="bg-white border border-stone-200 rounded-lg p-2.5">
+                  <RaciParticipants value={participants} onChange={setParticipants}
+                    members={orgMembers} getUserById={getUserById} />
                 </div>
               )}
             </div>

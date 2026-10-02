@@ -16,6 +16,28 @@ const fadeUp = {
   }),
 };
 
+// #33: validate phía client để báo lỗi rõ từng ô, thay vì tooltip thô của trình duyệt / JSON thô từ API.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function emailError(v: string): string | undefined {
+  const t = v.trim();
+  if (!t) return 'Vui lòng nhập email.';
+  if (!EMAIL_RE.test(t)) return 'Email không đúng định dạng (ví dụ: ten@congty.com).';
+  return undefined;
+}
+
+type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'confirm', string>>;
+
+function FieldError({ msg }: { msg?: string }) {
+  return msg ? <p className="text-[11px] text-error mt-1" role="alert">{msg}</p> : null;
+}
+
+// Lỗi từ API/mạng → câu tiếng Việt dễ hiểu.
+function friendlyError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.status === 401) return 'Email hoặc mật khẩu không đúng.';
+  if (err instanceof TypeError) return 'Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.';
+  return err instanceof Error ? err.message : fallback;
+}
+
 export default function LoginPage() {
   const { login, register, goToLanding } = useApp();
   const [mode, setMode] = useState<'login' | 'register'>(
@@ -23,6 +45,8 @@ export default function LoginPage() {
   );
   const switchMode = (m: 'login' | 'register') => {
     setMode(m);
+    setError(null);
+    setFieldErrors({});
     window.history.pushState({}, '', m === 'register' ? '/register' : '/login');
   };
 
@@ -38,15 +62,25 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const clearField = (k: keyof FieldErrors) =>
+    setFieldErrors(prev => (prev[k] ? { ...prev, [k]: undefined } : prev));
+  const errCls = (k: keyof FieldErrors) => (fieldErrors[k] ? '!border-error focus:!ring-error/20' : '');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    const errs: FieldErrors = {
+      email: emailError(email),
+      password: password ? undefined : 'Vui lòng nhập mật khẩu.',
+    };
+    setFieldErrors(errs);
+    if (errs.email || errs.password) return;
+    setLoading(true);
     try {
-      await login(email, password);
+      await login(email.trim(), password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
+      setError(friendlyError(err, 'Đăng nhập thất bại'));
     } finally {
       setLoading(false);
     }
@@ -54,25 +88,32 @@ export default function LoginPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (regPassword !== regConfirm) return;
-    setLoading(true);
     setError(null);
+    const errs: FieldErrors = {
+      name: regName.trim() ? undefined : 'Vui lòng nhập họ tên.',
+      email: emailError(regEmail),
+      password: regPassword.length >= 6 ? undefined : 'Mật khẩu tối thiểu 6 ký tự.',
+      confirm: regPassword === regConfirm ? undefined : 'Mật khẩu không khớp.',
+    };
+    setFieldErrors(errs);
+    if (Object.values(errs).some(Boolean)) return;
+    setLoading(true);
     try {
-      await register(regEmail, regPassword, regName);
+      await register(regEmail.trim(), regPassword, regName.trim());
     } catch (err) {
       // Phòng vệ #4.4: 409 = email đã tồn tại (thường do lần submit trước tạo user xong
       // nhưng afterAuth lỗi nên UI kẹt). Tự thử login với cùng credential thay vì báo lỗi cứng.
       if (err instanceof ApiError && err.status === 409) {
         try {
-          await login(regEmail, regPassword);
+          await login(regEmail.trim(), regPassword);
           return;
         } catch (loginErr) {
-          setError(loginErr instanceof Error
-            ? loginErr.message
-            : 'Email đã được đăng ký. Vui lòng đăng nhập.');
+          setError(loginErr instanceof ApiError && loginErr.status === 401
+            ? 'Email này đã được đăng ký. Vui lòng đăng nhập.'
+            : friendlyError(loginErr, 'Email đã được đăng ký. Vui lòng đăng nhập.'));
         }
       } else {
-        setError(err instanceof Error ? err.message : 'Đăng ký thất bại');
+        setError(friendlyError(err, 'Đăng ký thất bại'));
       }
     } finally {
       setLoading(false);
@@ -170,27 +211,35 @@ export default function LoginPage() {
                   <p className="text-sm text-muted mt-1.5">Chào mừng trở lại! Nhập thông tin để tiếp tục.</p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-4">
+                <form onSubmit={handleLogin} noValidate className="space-y-4">
                   <div>
                     <label className="text-xs font-medium text-body mb-1.5 block">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                      <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                        placeholder="you@company.com" required className={inputClass} />
+                      <input type="email" value={email}
+                        onChange={e => { setEmail(e.target.value); clearField('email'); }}
+                        placeholder="you@company.com" autoComplete="email"
+                        aria-invalid={!!fieldErrors.email}
+                        className={`${inputClass} ${errCls('email')}`} />
                     </div>
+                    <FieldError msg={fieldErrors.email} />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-body mb-1.5 block">Mật khẩu</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input type={showPassword ? 'text' : 'password'}
-                        value={password} onChange={e => setPassword(e.target.value)}
-                        placeholder="••••••••" required className={`${inputClass} pr-11`} />
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); clearField('password'); }}
+                        placeholder="••••••••" autoComplete="current-password"
+                        aria-invalid={!!fieldErrors.password}
+                        className={`no-native-reveal ${inputClass} pr-11 ${errCls('password')}`} />
                       <button type="button" onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition-colors">
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
+                    <FieldError msg={fieldErrors.password} />
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -244,47 +293,59 @@ export default function LoginPage() {
                   <p className="text-sm text-muted mt-1.5">Tạo tài khoản để bắt đầu sử dụng ProjectHub.</p>
                 </div>
 
-                <form onSubmit={handleRegister} className="space-y-4">
+                <form onSubmit={handleRegister} noValidate className="space-y-4">
                   <div>
                     <label className="text-xs font-medium text-body mb-1.5 block">Họ tên</label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                      <input type="text" value={regName} onChange={e => setRegName(e.target.value)}
-                        placeholder="Nguyễn Văn A" required className={inputClass} />
+                      <input type="text" value={regName}
+                        onChange={e => { setRegName(e.target.value); clearField('name'); }}
+                        placeholder="Nguyễn Văn A" autoComplete="name"
+                        aria-invalid={!!fieldErrors.name}
+                        className={`${inputClass} ${errCls('name')}`} />
                     </div>
+                    <FieldError msg={fieldErrors.name} />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-body mb-1.5 block">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-                      <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)}
-                        placeholder="you@company.com" required className={inputClass} />
+                      <input type="email" value={regEmail}
+                        onChange={e => { setRegEmail(e.target.value); clearField('email'); }}
+                        placeholder="you@company.com" autoComplete="email"
+                        aria-invalid={!!fieldErrors.email}
+                        className={`${inputClass} ${errCls('email')}`} />
                     </div>
+                    <FieldError msg={fieldErrors.email} />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-body mb-1.5 block">Mật khẩu</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input type={showPassword ? 'text' : 'password'}
-                        value={regPassword} onChange={e => setRegPassword(e.target.value)}
-                        placeholder="Tối thiểu 6 ký tự" required minLength={6} className={inputClass} />
+                        value={regPassword}
+                        onChange={e => { setRegPassword(e.target.value); clearField('password'); }}
+                        placeholder="Tối thiểu 6 ký tự" autoComplete="new-password"
+                        aria-invalid={!!fieldErrors.password}
+                        className={`${inputClass} ${errCls('password')}`} />
                     </div>
+                    <FieldError msg={fieldErrors.password} />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-body mb-1.5 block">Xác nhận mật khẩu</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input type={showPassword ? 'text' : 'password'}
-                        value={regConfirm} onChange={e => setRegConfirm(e.target.value)}
-                        placeholder="Nhập lại mật khẩu" required
-                        className={`${inputClass} ${regConfirm && regConfirm !== regPassword ? '!border-error !focus:border-error !focus:ring-error/15' : ''}`} />
+                        value={regConfirm}
+                        onChange={e => { setRegConfirm(e.target.value); clearField('confirm'); }}
+                        placeholder="Nhập lại mật khẩu" autoComplete="new-password"
+                        aria-invalid={!!fieldErrors.confirm || (!!regConfirm && regConfirm !== regPassword)}
+                        className={`${inputClass} ${regConfirm && regConfirm !== regPassword ? '!border-error focus:!ring-error/20' : errCls('confirm')}`} />
                     </div>
-                    {regConfirm && regConfirm !== regPassword && (
-                      <p className="text-[11px] text-error mt-1">Mật khẩu không khớp</p>
-                    )}
+                    <FieldError msg={regConfirm && regConfirm !== regPassword ? 'Mật khẩu không khớp.' : fieldErrors.confirm} />
                   </div>
 
-                  <button type="submit" disabled={loading || (regConfirm !== regPassword)}
+                  <button type="submit" disabled={loading}
                     className="w-full py-3.5 bg-ink text-white text-sm font-semibold rounded-lg
                                hover:bg-[#242424] active:scale-[0.98]
                                disabled:opacity-60 disabled:cursor-not-allowed

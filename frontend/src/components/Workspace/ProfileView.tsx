@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import Avatar from '../common/Avatar';
+import { participantUserIds } from '../../types';
 import { FolderKanban, GitBranch, CheckSquare, ListTodo, ChevronRight, Settings2, ShieldCheck } from 'lucide-react';
 
 const fadeUp = {
@@ -24,7 +25,7 @@ export default function ProfileView() {
   const myJobRole = selectedOrg?.members.find(m => m.id === meId)?.jobRole ?? '';
 
   const assignedBlocks = useMemo(
-    () => phaseBlocks.filter(pb => pb.assignee === meId || pb.participants.includes(meId)),
+    () => phaseBlocks.filter(pb => pb.assignee === meId || participantUserIds(pb).includes(meId)),
     [phaseBlocks, meId],
   );
 

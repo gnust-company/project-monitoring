@@ -42,6 +42,9 @@ CREATE TYPE attachment_kind AS ENUM ('file', 'link');
 
 CREATE TYPE phase_item_kind AS ENUM ('checklist', 'outcome');
 
+-- #34: vai trò RACI của người tham gia phase (R=Responsible, A=Accountable, C=Consulted, I=Informed)
+CREATE TYPE raci_role AS ENUM ('R', 'A', 'C', 'I');
+
 -- Cấp quyền trong workspace (độc lập với user_role là vai trò công việc)
 CREATE TYPE workspace_role AS ENUM ('owner', 'member');
 
@@ -164,13 +167,24 @@ CREATE INDEX idx_phase_blocks_dates   ON phase_blocks(start_date, end_date);
 
 ### phase_participants
 
+Người tham gia phase theo ma trận **RACI** (#34). Mỗi dòng là **hoặc** user trong nền tảng (`user_id`) **hoặc** người ngoài nền tảng chỉ ghi tên (`display_name`, text thuần — để phục vụ logging) — đúng một trong hai.
+
 ```sql
 CREATE TABLE phase_participants (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phase_block_id UUID NOT NULL REFERENCES phase_blocks(id) ON DELETE CASCADE,
-  user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  PRIMARY KEY (phase_block_id, user_id)
+  user_id        UUID REFERENCES users(id) ON DELETE CASCADE,
+  display_name   VARCHAR(120),
+  raci           raci_role NOT NULL DEFAULT 'R',
+  CONSTRAINT ck_phase_participants_identity CHECK ((user_id IS NOT NULL) <> (display_name IS NOT NULL))
 );
+
+CREATE INDEX ix_phase_participants_phase_block_id ON phase_participants(phase_block_id);
+-- một user chỉ xuất hiện 1 lần / phase (tên tự do thì không ràng buộc ở DB)
+CREATE UNIQUE INDEX uq_phase_participants_user ON phase_participants(phase_block_id, user_id) WHERE user_id IS NOT NULL;
 ```
+
+Migration `0014` backfill participant cũ = `R`.
 
 ### phase_items — checklist & outcomes
 

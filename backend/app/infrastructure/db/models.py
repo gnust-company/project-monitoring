@@ -10,15 +10,18 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -30,6 +33,7 @@ from app.domain.value_objects import (
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
+    RaciRole,
     WorkspaceRole,
 )
 
@@ -176,13 +180,32 @@ class PhaseBlockModel(Base):
 
 
 class PhaseParticipantModel(Base):
+    """#34: người tham gia phase theo RACI — hoặc user hệ thống (`user_id`) hoặc tên tự do
+    (`display_name`, người ngoài nền tảng). Đúng một trong hai."""
     __tablename__ = "phase_participants"
-
-    phase_block_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("phase_blocks.id", ondelete="CASCADE"), primary_key=True
+    __table_args__ = (
+        CheckConstraint(
+            "(user_id IS NOT NULL) <> (display_name IS NOT NULL)",
+            name="ck_phase_participants_identity",
+        ),
+        # Một user chỉ xuất hiện 1 lần / phase (tên tự do thì không ràng buộc ở DB).
+        Index(
+            "uq_phase_participants_user", "phase_block_id", "user_id", unique=True,
+            postgresql_where=text("user_id IS NOT NULL"),
+        ),
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    phase_block_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("phase_blocks.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    raci: Mapped[RaciRole] = mapped_column(
+        Enum(RaciRole, name="raci_role", values_callable=lambda e: [m.value for m in e]),
+        default=RaciRole.RESPONSIBLE, server_default=RaciRole.RESPONSIBLE.value,
     )
 
 

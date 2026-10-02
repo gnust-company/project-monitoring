@@ -80,7 +80,7 @@ Nguồn cho **Profile view** (FE: trang Hồ sơ mở từ avatar/sidebar).
 |---|---|---|
 | GET | `/users/me/stats` | `{ workspaces, projects, assignedPhases, openTasks }` — số liệu tổng quan cá nhân |
 
-`openTasks` = số checklist item `done=false` trong các phase block đang hoạt động (`tag ∈ Backlog/Todo/Inprogress`) mà user là assignee hoặc participant.
+`openTasks` = số checklist item `done=false` trong các phase block đang hoạt động (`tag ∈ Backlog/Todo/Inprogress`) mà user là assignee hoặc participant (chỉ tính participant là user trong nền tảng).
 
 ### Organizations (Workspace)
 
@@ -183,7 +183,7 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
 | GET | `/projects/{projectId}/phase-blocks` | Theo dự án |
 | POST | `/projects/{projectId}/phase-blocks` | Tạo block (xem body dưới) |
 | GET | `/phase-blocks/{blockId}` | Chi tiết đầy đủ (items, comments, attachments, activity) |
-| PATCH | `/phase-blocks/{blockId}` | Partial update: `title, description, tag, phaseType, startDate, endDate, actualEndDate, displayRow, assignee, participantIds` — dùng cho cả kéo-thả/resize trên timeline |
+| PATCH | `/phase-blocks/{blockId}` | Partial update: `title, description, tag, phaseType, startDate, endDate, actualEndDate, displayRow, assignee, participants` — dùng cho cả kéo-thả/resize trên timeline |
 | DELETE | `/phase-blocks/{blockId}` | → 204 |
 
 **POST body** — `phaseType` là `code` của một phase definition trong workspace (#26 mảng A). Nếu không gửi `checklist`/`outcomes`, BE tự sinh từ checklist/outcome mặc định của phase definition đó; `assignee` mặc định = người tạo:
@@ -197,7 +197,7 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
   "startDate": "2026-06-10",
   "endDate": "2026-06-24",
   "assignee": "uuid?",
-  "participantIds": ["uuid"],
+  "participants": [ { "userId": "uuid", "raci": "R" }, { "name": "Nguyễn Văn A (khách hàng)", "raci": "C" } ],
   "checklist": [ { "text": "Design wireframes", "role": "UI_Designer", "done": false } ],
   "outcomes":  [ { "text": "Wireframes & GUI Design", "role": "UI_Designer", "done": false } ]
 }
@@ -219,12 +219,14 @@ Nguồn thay thế chính cho `phaseBlocks` trong `AppContext`.
   "displayRow": 0,
   "createdBy": "uuid",
   "assignee": "uuid",
-  "participantIds": ["uuid"],
+  "participants": [ { "userId": "uuid", "name": null, "raci": "R" }, { "userId": null, "name": "Nguyễn Văn A (khách hàng)", "raci": "C" } ],
   "progressPct": 40,
   "checklist": [ { "id": "uuid", "text": "...", "done": true, "role": "BA" } ],
   "outcomes":  [ { "id": "uuid", "text": "...", "done": false, "role": "BA" } ]
 }
 ```
+
+**`participants` (#34)**: mỗi phần tử là `{ userId | name, raci }` với `raci` ∈ `R | A | C | I`. Đúng **một** trong `userId` (user trong nền tảng) hoặc `name` (người ngoài nền tảng, text thuần 1–120 ký tự) — vi phạm → 422. BE khử trùng (cùng `userId`, hoặc cùng `name` không phân biệt hoa thường → giữ bản đầu). `PATCH` gửi `participants` thì **thay toàn bộ** danh sách; không gửi thì giữ nguyên. Thay đổi được ghi changelog: `added participant` / `removed participant` / `changed participant role` với target `"<userId hoặc tên> — <R|A|C|I>"`.
 
 `phaseType` = `code` của phase definition trong workspace (động, #26 mảng A — không còn enum cố định; xem `GET /organizations/{orgId}/phases`) · `tag` ∈ `Backlog | Todo | Inprogress | Complete | Canceled`
 
@@ -369,7 +371,7 @@ Các số liệu này không lưu DB, tính khi đọc. Định nghĩa thống n
 
 - **Tiến độ phase block** (`progressPct`) = `(done checklist + done outcomes) / (total checklist + total outcomes)`, làm tròn %. Phase không có items → 0% (#8).
 - **Tiến độ dự án** (`projects.progress`) = hiện do người dùng đặt thủ công (slider trong Project Detail). BE giữ là cột lưu trực tiếp, không auto-tính.
-- **Workload thành viên** (Team view) = số checklist item `done=false` trong các phase block **đang hoạt động** (`tag ∈ {Backlog, Todo, Inprogress}`) mà user là `assignee` **hoặc** có trong `participantIds`. Quy đổi %: `min(100, openTasks / CAPACITY * 100)` với `CAPACITY = 15` task mở ≈ 100%.
+- **Workload thành viên** (Team view) = số checklist item `done=false` trong các phase block **đang hoạt động** (`tag ∈ {Backlog, Todo, Inprogress}`) mà user là `assignee` **hoặc** là participant (có `userId`, mọi vai trò RACI). Quy đổi %: `min(100, openTasks / CAPACITY * 100)` với `CAPACITY = 15` task mở ≈ 100%.
 - **Phân bổ phase** (Dashboard) = đếm phase block theo `phaseType` trong workspace.
 - **Deadline sắp tới** (Dashboard) = phase block có `tag ∉ {Complete, Canceled}`, sắp theo `endDate` tăng dần, lọc còn ≥ -5 ngày so với hôm nay.
 

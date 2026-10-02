@@ -19,9 +19,10 @@ from app.domain.entities import (
     PhaseBlock,
     PhaseDefinitionItem,
     PhaseItem,
+    PhaseParticipant,
     User,
 )
-from app.domain.value_objects import AttachmentKind, PhaseItemKind, PhaseTag
+from app.domain.value_objects import AttachmentKind, PhaseItemKind, PhaseTag, RaciRole
 
 
 class PhaseBlockNotFoundError(Exception):
@@ -54,7 +55,8 @@ class CreatePhaseBlockInput:
     assignee: UUID | None = None
     actual_end_date: date | None = None
     display_row: int | None = None
-    participant_ids: list[UUID] = field(default_factory=list)
+    # #34: [{user_id | name, raci}] — hoặc user hệ thống (user_id) hoặc tên tự do (name)
+    participants: list[dict[str, Any]] = field(default_factory=list)
     # None = seed từ template; [] = cố tình rỗng; list = dùng nguyên
     checklist: list[dict[str, Any]] | None = None
     outcomes: list[dict[str, Any]] | None = None
@@ -63,6 +65,24 @@ class CreatePhaseBlockInput:
 def _role(value: Any) -> str | None:
     # #26 mảng B: role là code workspace role (string), không ép enum nữa.
     return str(value) if value else None
+
+
+def _participants_from(raw: list[dict[str, Any]]) -> list[PhaseParticipant]:
+    """#34: dict thô (đã qua DTO) → entity, khử trùng theo định danh (user_id / tên không phân
+    biệt hoa thường), giữ bản xuất hiện đầu."""
+    out: dict[str, PhaseParticipant] = {}
+    for d in raw:
+        uid = d.get("user_id")
+        name = (d.get("name") or "").strip() or None
+        p = PhaseParticipant(
+            raci=RaciRole(d.get("raci") or RaciRole.RESPONSIBLE),
+            user_id=UUID(str(uid)) if uid else None,
+            name=None if uid else name,
+        )
+        if p.user_id is None and p.name is None:
+            continue
+        out.setdefault(p.key, p)
+    return list(out.values())
 
 
 def _items_from(
@@ -109,7 +129,7 @@ class CreatePhaseBlock:
             title=data.title, description=data.description, start_date=data.start_date,
             end_date=data.end_date, created_by=data.created_by, assignee=assignee,
             actual_end_date=data.actual_end_date, display_row=data.display_row,
-            participant_ids=data.participant_ids, items=items,
+            participants=_participants_from(data.participants), items=items,
         )
         created = await self._blocks.create(block)
         await self._activity.add(ActivityEntry(
@@ -159,13 +179,19 @@ def _diffs(block: PhaseBlock, payload: dict[str, Any]) -> list[tuple[str, str]]:
         out.append(("changed end date", f"{block.end_date.isoformat()} → {payload['end_date']}"))
     if "assignee" in payload and str(block.assignee) != str(payload["assignee"]):
         out.append(("reassigned phase", str(payload["assignee"])))
-    if "participant_ids" in payload:
-        old = {str(u) for u in block.participant_ids}
-        new = {str(u) for u in payload["participant_ids"]}
-        for added in new - old:
-            out.append(("added participant", added))
-        for removed in old - new:
-            out.append(("removed participant", removed))
+    if "participants" in payload:
+        # target = "<uuid hoặc tên> — <R|A|C|I>"; FE đổi uuid → tên người.
+        old = {p.key: p for p in block.participants}
+        new = {p.key: p for p in _participants_from(payload["participants"])}
+        label = lambda p: f"{p.user_id or p.name} — {p.raci.value}"  # noqa: E731
+        for k, p in new.items():
+            if k not in old:
+                out.append(("added participant", label(p)))
+            elif old[k].raci != p.raci:
+                out.append(("changed participant role", label(p)))
+        for k, p in old.items():
+            if k not in new:
+                out.append(("removed participant", label(p)))
     return out
 
 
@@ -189,8 +215,8 @@ def _apply_block_updates(block: PhaseBlock, payload: dict[str, Any]) -> PhaseBlo
         block.display_row = payload["display_row"]
     if "assignee" in payload and payload["assignee"]:
         block.assignee = UUID(str(payload["assignee"]))
-    if "participant_ids" in payload:
-        block.participant_ids = [UUID(str(u)) for u in payload["participant_ids"]]
+    if "participants" in payload:
+        block.participants = _participants_from(payload["participants"])
     return block
 
 

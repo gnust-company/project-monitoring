@@ -4,6 +4,7 @@
 import { useMemo } from 'react';
 import { startOfWeek, endOfWeek, isBefore, isAfter, parseISO, format } from 'date-fns';
 import type { Project, ProjectStatus, PhaseBlock, User } from '../types';
+import { participantUserIds } from '../types';
 import { computeProjectStatus } from './projectStatus';
 import { useApp } from '../context/AppContext';
 
@@ -19,6 +20,7 @@ export interface ProjectFilterCtx {
   rangeEnd: string | null;
   currentUser: User | null;
   phaseBlocks: PhaseBlock[];
+  getUserById: (id: string) => User | undefined; // #34: tra PIC để tìm theo tên/username
 }
 
 export interface DisplayRange { start: Date; end: Date; }
@@ -33,7 +35,7 @@ function isMine(p: Project, me: string | undefined, phaseBlocks: PhaseBlock[]): 
   if (!me) return false;
   if (p.picUserId === me) return true;
   return phaseBlocks.some(pb => pb.projectId === p.id
-    && (pb.createdBy === me || pb.participants.includes(me)));
+    && (pb.createdBy === me || participantUserIds(pb).includes(me)));
 }
 
 /** Phase có giao [start, end] không (so chuỗi YYYY-MM-DD). */
@@ -41,9 +43,23 @@ function overlapsRange(pb: PhaseBlock, start: string | null, end: string | null)
   return (!start || pb.endDate >= start) && (!end || pb.startDate <= end);
 }
 
+/** Bỏ dấu + hạ chữ thường để tìm tiếng Việt thoải mái ("nguyen" khớp "Nguyễn"). */
+function fold(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+}
+
+/** #34: khớp tên dự án, hoặc PIC của dự án (tên hiển thị / username = email). */
+function matchesSearch(p: Project, query: string, getUserById: ProjectFilterCtx['getUserById']): boolean {
+  const q = fold(query.trim());
+  if (!q) return true;
+  if (fold(p.name).includes(q)) return true;
+  const pic = getUserById(p.picUserId ?? p.createdBy);
+  return !!pic && (fold(pic.name).includes(q) || fold(pic.email ?? '').includes(q));
+}
+
 export function isProjectVisible(p: Project, ctx: ProjectFilterCtx): boolean {
-  const { searchQuery, statusFilter, selectedProjectIds, onlyMine, rangeStart, rangeEnd, currentUser, phaseBlocks } = ctx;
-  const ms = !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const { searchQuery, statusFilter, selectedProjectIds, onlyMine, rangeStart, rangeEnd, currentUser, phaseBlocks, getUserById } = ctx;
+  const ms = matchesSearch(p, searchQuery, getUserById);
   const mst = statusFilter === 'All' || computeProjectStatus(p, phaseBlocks) === statusFilter;
   const mproj = selectedProjectIds === null || selectedProjectIds.includes(p.id);
   const mmine = !onlyMine || isMine(p, currentUser?.id, phaseBlocks);
@@ -109,7 +125,7 @@ export function computeDisplayRange(
 export function useProjectFilter(): { ctx: ProjectFilterCtx; displayRange: DisplayRange | null } {
   const {
     searchQuery, statusFilter, selectedProjectIds, onlyMine,
-    rangeStart, rangeEnd, currentUser, phaseBlocks,
+    rangeStart, rangeEnd, currentUser, phaseBlocks, getUserById,
   } = useApp();
   const displayRange = useMemo(
     () => computeDisplayRange(rangeStart, rangeEnd, phaseBlocks),
@@ -119,7 +135,7 @@ export function useProjectFilter(): { ctx: ProjectFilterCtx; displayRange: Displ
     searchQuery, statusFilter, selectedProjectIds, onlyMine,
     rangeStart: displayRange ? format(displayRange.start, 'yyyy-MM-dd') : null,
     rangeEnd: displayRange ? format(displayRange.end, 'yyyy-MM-dd') : null,
-    currentUser, phaseBlocks,
-  }), [searchQuery, statusFilter, selectedProjectIds, onlyMine, displayRange, currentUser, phaseBlocks]);
+    currentUser, phaseBlocks, getUserById,
+  }), [searchQuery, statusFilter, selectedProjectIds, onlyMine, displayRange, currentUser, phaseBlocks, getUserById]);
   return { ctx, displayRange };
 }

@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 from app.domain.entities import User
@@ -16,6 +16,7 @@ from app.domain.value_objects import (
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
+    RaciRole,
 )
 
 
@@ -397,6 +398,31 @@ class PhaseReorderIn(CamelModel):
 
 
 # ─── Phase blocks ────────────────────────────────────────────────────
+class PhaseParticipantIn(CamelModel):
+    """#34: người tham gia phase theo RACI — hoặc user hệ thống (`userId`) hoặc tên tự do
+    (`name`, người ngoài nền tảng). Đúng một trong hai."""
+    user_id: UUID | None = None
+    name: str | None = Field(default=None, max_length=120)
+    raci: RaciRole = RaciRole.RESPONSIBLE
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str | None) -> str | None:
+        return (v.strip() or None) if v is not None else None
+
+    @model_validator(mode="after")
+    def _exactly_one_identity(self) -> "PhaseParticipantIn":
+        if (self.user_id is None) == (self.name is None):
+            raise ValueError("Cần đúng một trong userId hoặc name")
+        return self
+
+
+class PhaseParticipantOut(CamelModel):
+    user_id: UUID | None = None
+    name: str | None = None
+    raci: RaciRole
+
+
 class PhaseBlockOut(CamelModel):
     id: UUID
     project_id: UUID
@@ -410,7 +436,7 @@ class PhaseBlockOut(CamelModel):
     display_row: int | None = None
     created_by: UUID | None = None  # SET NULL khi người tạo bị xóa (#21 audit)
     assignee: UUID | None = None  # #13: chỉ là note; PIC phase = created_by
-    participant_ids: list[UUID] = []
+    participants: list[PhaseParticipantOut] = []  # #34: RACI
     progress_pct: int = 0
     checklist: list[PhaseItemOut] = []
     outcomes: list[PhaseItemOut] = []
@@ -428,7 +454,8 @@ class PhaseBlockOut(CamelModel):
             id=b.id, project_id=b.project_id, phase_type=b.phase_type, tag=b.tag,
             title=b.title, description=b.description, start_date=b.start_date, end_date=b.end_date,
             actual_end_date=b.actual_end_date, display_row=b.display_row, created_by=b.created_by,
-            assignee=b.assignee, participant_ids=b.participant_ids, progress_pct=b.progress_pct,
+            assignee=b.assignee, progress_pct=b.progress_pct,
+            participants=[PhaseParticipantOut.model_validate(p) for p in b.participants],
             checklist=checklist, outcomes=outcomes,
             comments=[CommentOut.model_validate(c) for c in b.comments] if full else None,
             attachments=[AttachmentOut.model_validate(a) for a in b.attachments] if full else None,
@@ -445,7 +472,7 @@ class PhaseBlockCreate(CamelModel):
     assignee: UUID | None = None
     actual_end_date: date | None = None
     display_row: int | None = None
-    participant_ids: list[UUID] = []
+    participants: list[PhaseParticipantIn] = []
     checklist: list[PhaseItemSeed] | None = None
     outcomes: list[PhaseItemSeed] | None = None
 
@@ -460,4 +487,4 @@ class PhaseBlockUpdate(CamelModel):
     actual_end_date: date | None = None
     display_row: int | None = None
     assignee: UUID | None = None
-    participant_ids: list[UUID] | None = None
+    participants: list[PhaseParticipantIn] | None = None
