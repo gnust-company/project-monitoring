@@ -363,6 +363,35 @@ export function resolveRoleColor(roles: WorkspaceRoleDef[], code: string | undef
   return { bg: pal.bg, text: pal.color, dot: pal.solid };
 }
 
+// #34: ma trận RACI cho người tham gia phase — khớp backend RaciRole.
+export type RaciRole = 'R' | 'A' | 'C' | 'I';
+export const RACI_ROLES: RaciRole[] = ['R', 'A', 'C', 'I'];
+export const RACI_META: Record<RaciRole, { label: string; en: string; hint: string; chip: string }> = {
+  R: { label: 'Thực hiện',        en: 'Responsible', hint: 'Trực tiếp làm',            chip: 'bg-blue-50 text-blue-700 border-blue-200' },
+  A: { label: 'Chịu trách nhiệm', en: 'Accountable', hint: 'Chịu trách nhiệm cuối/duyệt', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
+  C: { label: 'Tham vấn',         en: 'Consulted',   hint: 'Được hỏi ý kiến',          chip: 'bg-violet-50 text-violet-700 border-violet-200' },
+  I: { label: 'Được thông báo',   en: 'Informed',    hint: 'Chỉ cần nắm tình hình',    chip: 'bg-slate-50 text-slate-600 border-slate-200' },
+};
+
+/** Người tham gia phase: hoặc user hệ thống (`userId`) hoặc tên tự do (`name`, người ngoài nền tảng). */
+export interface PhaseParticipant {
+  userId?: string | null;
+  name?: string | null;
+  raci: RaciRole;
+}
+
+/** Khóa định danh để so sánh/khử trùng (uuid của user, hoặc tên không phân biệt hoa thường). */
+export const participantKey = (p: PhaseParticipant): string =>
+  p.userId ? p.userId : (p.name ?? '').trim().toLowerCase();
+
+/** Chữ ký thứ-tự-không-quan-trọng của danh sách participant — để so "có thay đổi không". */
+export const participantsSignature = (list: PhaseParticipant[]): string =>
+  list.map(p => `${participantKey(p)}:${p.raci}`).sort().join('|');
+
+/** Chỉ các participant là user hệ thống — dùng cho workload/"của tôi"/lọc. */
+export const participantUserIds = (pb: Pick<PhaseBlock, 'participants'>): string[] =>
+  pb.participants.flatMap(p => (p.userId ? [p.userId] : []));
+
 export interface PhaseBlock {
   id: string;
   projectId: string;
@@ -375,7 +404,7 @@ export interface PhaseBlock {
   actualEndDate?: string;   // ISO — ngày kết thúc thực tế (nếu có)
   createdBy: string; // userId — PIC phase (#11/#13)
   assignee?: string | null; // userId — giờ chỉ là "note" (#13); PIC = createdBy
-  participants: string[]; // userIds
+  participants: PhaseParticipant[]; // #34: RACI (user hệ thống hoặc tên tự do)
   checklist: ChecklistItem[];
   outcomes: ChecklistItem[];
   comments: Comment[];

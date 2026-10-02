@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.application.ports import PhaseBlockRepository
-from app.domain.entities import Attachment, Comment, PhaseBlock, PhaseItem
+from app.domain.entities import Attachment, Comment, PhaseBlock, PhaseItem, PhaseParticipant
 from app.domain.value_objects import AttachmentKind
 from app.infrastructure.db.models import (
     AttachmentModel,
@@ -20,6 +20,14 @@ from app.infrastructure.db.models import (
 
 def _item_to_entity(m: PhaseItemModel) -> PhaseItem:
     return PhaseItem(id=m.id, kind=m.kind, text=m.text, done=m.done, role=m.role, position=m.position)
+
+
+def _participant_to_entity(m: PhaseParticipantModel) -> PhaseParticipant:
+    return PhaseParticipant(raci=m.raci, user_id=m.user_id, name=m.display_name)
+
+
+def _participant_to_model(p: PhaseParticipant) -> PhaseParticipantModel:
+    return PhaseParticipantModel(user_id=p.user_id, display_name=p.name, raci=p.raci)
 
 
 def _comment_to_entity(m: CommentModel) -> Comment:
@@ -38,7 +46,7 @@ def _block_to_entity(m: PhaseBlockModel, *, full: bool = True) -> PhaseBlock:
         title=m.title, description=m.description, start_date=m.start_date, end_date=m.end_date,
         created_by=m.created_by, assignee=m.assignee, actual_end_date=m.actual_end_date,
         display_row=m.display_row,
-        participant_ids=[p.user_id for p in m.participants],
+        participants=[_participant_to_entity(p) for p in m.participants],
         items=[_item_to_entity(i) for i in m.items],
     )
     if full:
@@ -96,7 +104,7 @@ class SqlAlchemyPhaseBlockRepository(PhaseBlockRepository):
             PhaseItemModel(id=i.id, kind=i.kind, text=i.text, done=i.done, role=i.role, position=i.position)
             for i in block.items
         ]
-        m.participants = [PhaseParticipantModel(user_id=uid) for uid in block.participant_ids]
+        m.participants = [_participant_to_model(p) for p in block.participants]
         self._session.add(m)
         await self._session.flush()
         return await self.get(block.id)  # reload with relationships
@@ -119,8 +127,9 @@ class SqlAlchemyPhaseBlockRepository(PhaseBlockRepository):
         m.assignee = block.assignee
         # thay toàn bộ participants
         m.participants.clear()
-        for uid in block.participant_ids:
-            m.participants.append(PhaseParticipantModel(user_id=uid))
+        await self._session.flush()  # xóa hàng cũ trước khi chèn lại (tránh đụng unique user/phase)
+        for p in block.participants:
+            m.participants.append(_participant_to_model(p))
         await self._session.flush()
         return await self.get(block.id)
 

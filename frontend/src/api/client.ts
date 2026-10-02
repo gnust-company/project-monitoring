@@ -45,12 +45,40 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
   };
 }
 
+// #33: FastAPI trả 422 với `detail` là mảng [{ loc, msg, type, ctx }] — trước đây hiện nguyên
+// JSON thô. Dịch sang câu tiếng Việt rõ ràng theo trường; trường lạ thì dùng `msg` gốc.
+const FIELD_LABEL: Record<string, string> = {
+  email: 'Email', password: 'Mật khẩu', name: 'Họ tên', title: 'Tiêu đề',
+};
+
+interface ValidationIssue { loc?: (string | number)[]; msg?: string; type?: string; ctx?: Record<string, unknown>; }
+
+function describeIssue(i: ValidationIssue): string {
+  const field = [...(i.loc ?? [])].reverse().find(x => typeof x === 'string' && x !== 'body') as string | undefined;
+  const label = (field && FIELD_LABEL[field]) || field || 'Dữ liệu';
+  switch (i.type) {
+    case 'missing': return `Vui lòng nhập ${label.toLowerCase()}.`;
+    case 'string_too_short': return `${label} quá ngắn (tối thiểu ${i.ctx?.min_length ?? '?'} ký tự).`;
+    case 'string_too_long': return `${label} quá dài (tối đa ${i.ctx?.max_length ?? '?'} ký tự).`;
+  }
+  if (field === 'email') return 'Email không đúng định dạng (ví dụ: ten@congty.com).';
+  return i.msg ? `${label}: ${i.msg}` : `${label} không hợp lệ.`;
+}
+
+export function formatApiDetail(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0 && detail.every(d => d && typeof d === 'object' && 'msg' in d)) {
+    return Array.from(new Set((detail as ValidationIssue[]).map(describeIssue))).join(' ');
+  }
+  return JSON.stringify(detail);
+}
+
 async function parse<T>(resp: Response): Promise<T> {
   const text = await resp.text();
   const data = text ? JSON.parse(text) : null;
   if (!resp.ok) {
     const detail = (data && (data.detail || data.message)) || resp.statusText;
-    throw new ApiError(resp.status, typeof detail === 'string' ? detail : JSON.stringify(detail));
+    throw new ApiError(resp.status, formatApiDetail(detail));
   }
   return data as T;
 }
@@ -114,7 +142,7 @@ export const api = {
         } else {
           const d = data as { detail?: string; message?: string } | null;
           const detail = (d && (d.detail || d.message)) || xhr.statusText;
-          reject(new ApiError(xhr.status, typeof detail === 'string' ? detail : JSON.stringify(detail)));
+          reject(new ApiError(xhr.status, formatApiDetail(detail)));
         }
       };
       xhr.onerror = () => reject(new ApiError(0, 'Lỗi mạng khi tải tệp'));

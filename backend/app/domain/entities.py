@@ -16,6 +16,7 @@ from app.domain.value_objects import (
     PhaseItemKind,
     PhaseTag,
     ProjectStatus,
+    RaciRole,
     WorkspaceRole,
 )
 
@@ -162,6 +163,23 @@ class PhaseDefinition:
 
 
 @dataclass(slots=True)
+class PhaseParticipant:
+    """Người tham gia một phase, phân loại theo RACI (#34).
+
+    Đúng MỘT trong hai: `user_id` (tài khoản trong nền tảng) hoặc `name` (người ngoài
+    nền tảng, chỉ để ghi nhận/logging — text thuần).
+    """
+    raci: RaciRole
+    user_id: UUID | None = None
+    name: str | None = None
+
+    @property
+    def key(self) -> str:
+        """Định danh để so sánh/khử trùng: uuid của user hoặc tên (không phân biệt hoa thường)."""
+        return str(self.user_id) if self.user_id else (self.name or "").casefold()
+
+
+@dataclass(slots=True)
 class PhaseBlock:
     """Aggregate root của một phase block trên timeline."""
     id: UUID
@@ -177,11 +195,16 @@ class PhaseBlock:
     assignee: UUID | None = None
     actual_end_date: date | None = None
     display_row: int | None = None  # hàng hiển thị trên timeline (FE quản lý)
-    participant_ids: list[UUID] = field(default_factory=list)
+    participants: list[PhaseParticipant] = field(default_factory=list)  # #34: RACI
     items: list[PhaseItem] = field(default_factory=list)  # checklist + outcomes
     comments: list[Comment] = field(default_factory=list)
     attachments: list[Attachment] = field(default_factory=list)
     activity_log: list[ActivityEntry] = field(default_factory=list)
+
+    @property
+    def participant_ids(self) -> list[UUID]:
+        """Chỉ các participant là user hệ thống (người ngoài nền tảng không có id)."""
+        return [p.user_id for p in self.participants if p.user_id is not None]
 
     @property
     def progress_pct(self) -> int:

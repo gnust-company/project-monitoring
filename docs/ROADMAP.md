@@ -21,12 +21,13 @@ Repo: <https://github.com/gnust-company/project-monitoring>
 | 4 | #15, #25, #23, #14, #18 | ✅ Xong |
 | 5 | #21, #22, #24, #26 | ✅ Xong |
 | 6 | #27 | ✅ Xong |
-| 7 | #31 | 🟡 Code xong — chờ test |
+| 7 | #31 | ✅ Xong (đóng 2026-07-22) |
+| 8 | #30, #32, #33, #34 | 🟡 Code xong — chờ test (1 PR) |
 
 Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 > **Trạng thái GitHub**: #3, #8, #9, #10, #12, #14, #15, #17, #18, #21, #22, #23, #24, #25, #26, #27 đã đóng (#26 + #27 đóng 2026-06-22).
-> Còn OPEN: #31 (sắp thứ tự dự án — code xong 2026-07-06, chờ test), #28 (mời thành viên — tách từ #26), #29 (i18n — tách từ #3).
+> #31 đã đóng 2026-07-22. Còn OPEN: #28 (mời thành viên — tách từ #26), #29 (i18n — tách từ #3), và nhóm #30/#32/#33/#34 (Wave 8, gom 1 PR — code xong, chờ test).
 
 ---
 
@@ -115,11 +116,27 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 
 ## Wave 7 — Sắp thứ tự hiển thị dự án (#31)
 
-- [ ] [#31 — Kéo-thả đổi thứ tự dự án trong workspace](https://github.com/gnust-company/project-monitoring/issues/31) 🟡 *code xong 2026-07-06 (migration 0013), chờ user test*
+- [x] [#31 — Kéo-thả đổi thứ tự dự án trong workspace](https://github.com/gnust-company/project-monitoring/issues/31) ✅ *code xong 2026-07-06 (migration 0013), đóng 2026-07-22*
   - **Mô hình**: thứ tự dùng chung cả workspace, lưu ở `projects.position`. **Chỉ owner (hoặc superuser)** sắp lại được. Dự án mới xuống cuối. `list_by_org` sắp theo `position` → cả Pipeline, sidebar, dashboard đồng bộ 1 thứ tự.
   - **Backend**: migration **0013** thêm `projects.position` (backfill theo `created_at` per-org). `ReorderProjects` use case + `POST /organizations/{orgId}/projects/reorder { orderedIds }` (ManageDep = owner-only). 4 test ở `test_reorder_projects.py`.
   - **Frontend**: mode "Sắp xếp" của Pipeline — owner kéo band dự án ở cột trái (native DnD, grip + chỉ báo vị trí chèn), stage vào `pendingOrder`, tái dùng thanh Lưu/Hủy có sẵn (#18). Không phải owner: không kéo được (click vẫn mở chi tiết).
   - **Ghi chú**: đã chốt là thứ tự **chung workspace** (không per-user) — bản "dự án tôi quan tâm" theo từng người để sau nếu cần.
+
+## Wave 8 — Polish đăng nhập/timeline + RACI & tìm theo PIC (#30, #32, #33, #34)
+
+Gom 1 PR. #34 là phần duy nhất đụng schema (migration **0014**).
+
+- [ ] [#30 — Kéo tạo phase khó khăn](https://github.com/gnust-company/project-monitoring/issues/30) 🟡 *chờ test*
+  - Ở mode "Tạo phase", nhấn trên hàng dự án thì **lịch đứng yên** (không pan). Chuyển động dọc bị bỏ qua; chỉ khi kéo ngang vượt ngưỡng mới bắt đầu tạo, độ rộng theo vị trí chuột hiện tại → kéo dọc rồi mới kéo ngang vẫn tạo bình thường. Muốn di chuyển lịch: chuyển sang mode "Chỉ xem" (hoặc cuộn).
+- [ ] [#32 — Hiển thị 2 con mắt ở ô mật khẩu](https://github.com/gnust-company/project-monitoring/issues/32) 🟡 *chờ test*
+  - Nguyên nhân: nút hiện/ẩn riêng + nút "reveal" mặc định của Edge/IE. Thêm class `no-native-reveal` (CSS ẩn `::-ms-reveal`) cho ô có nút riêng (Login, ResetPasswordModal). Chỉ xác minh được trên Edge thật — Chromium không vẽ nút này.
+- [ ] [#33 — Lỗi thô khi email sai định dạng](https://github.com/gnust-company/project-monitoring/issues/33) 🟡 *chờ test*
+  - Form login/đăng ký `noValidate` + validate phía client, báo lỗi **ngay dưới từng ô** (email trống/sai định dạng, mật khẩu trống/<6, họ tên trống). 401 → "Email hoặc mật khẩu không đúng."; mất mạng → thông báo kết nối. `api/client.ts` dịch lỗi 422 của FastAPI (`detail` dạng mảng) thành câu tiếng Việt thay vì JSON thô (`formatApiDetail`).
+- [ ] [#34 — Tìm theo PIC + người tham gia theo RACI](https://github.com/gnust-company/project-monitoring/issues/34) 🟡 *chờ test (migration 0014)*
+  - **Tìm theo PIC**: ô tìm kiếm Pipeline khớp tên dự án **hoặc** PIC của dự án (tên hiển thị / email), không phân biệt hoa-thường và dấu tiếng Việt ("tran" khớp "Trần"). Dùng chung cho sidebar.
+  - **Participant theo RACI**: `phase_participants` thêm `id` PK, `raci` (R/A/C/I), `display_name`; `user_id` nullable → thêm được **người ngoài nền tảng** bằng tên text thuần. Backfill participant cũ = `R`. API `participants: [{ userId | name, raci }]` thay `participantIds` (xem API_CONTRACT). Changelog thêm `changed participant role`.
+  - **FE**: component `RaciParticipants` (4 dòng R/A/C/I, popover chọn thành viên hoặc gõ tên người ngoài) dùng ở CreatePhaseModal + PhaseDetailModal (chỉ PIC sửa được, người khác chỉ xem). Một người chỉ ở 1 vai trò trong 1 phase.
+  - **Quyết định**: mỗi người **một** vai trò RACI / phase (không gộp A/R); không ép "đúng 1 Accountable".
 
 ---
 
@@ -135,4 +152,4 @@ Chú thích: ⬜ chưa bắt đầu · 🟡 đang làm · ✅ xong
 - Epic: [#7 — Listing Issue, góp ý từ user (#8–#20)](https://github.com/gnust-company/project-monitoring/issues/7)
 - Tổng hợp: [#3 — Tổng hợp Issue](https://github.com/gnust-company/project-monitoring/issues/3) *(đã đóng 2026-06-22; i18n tách sang [#29](https://github.com/gnust-company/project-monitoring/issues/29))*
 - Issue mới (Wave 5): [#21](https://github.com/gnust-company/project-monitoring/issues/21), [#22](https://github.com/gnust-company/project-monitoring/issues/22), [#24](https://github.com/gnust-company/project-monitoring/issues/24), [#26](https://github.com/gnust-company/project-monitoring/issues/26)
-- Tồn đọng (chưa làm): [#27](https://github.com/gnust-company/project-monitoring/issues/27) (kênh thông báo Admin), [#28](https://github.com/gnust-company/project-monitoring/issues/28) (mời thành viên — tách từ #26), [#29](https://github.com/gnust-company/project-monitoring/issues/29) (i18n — tách từ #3)
+- Tồn đọng (chưa làm): [#28](https://github.com/gnust-company/project-monitoring/issues/28) (mời thành viên — tách từ #26), [#29](https://github.com/gnust-company/project-monitoring/issues/29) (i18n — tách từ #3)

@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { isPhaseComplete } from '../../lib/projectStatus';
+import { participantUserIds } from '../../types';
 import {
   Mail, FolderKanban, GitBranch, CheckSquare, Layers,
   Pencil, Check, ChevronRight, Camera, Lock, Trash2, AlertTriangle,
@@ -53,7 +54,7 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
   const stats = useMemo(() => {
     if (!currentUser) return { workspaces: 0, projects: 0, assignedPhases: 0, openTasks: 0 };
     const myPbs = phaseBlocks.filter(pb =>
-      pb.assignee === currentUser.id || pb.participants.includes(currentUser.id));
+      pb.assignee === currentUser.id || participantUserIds(pb).includes(currentUser.id));
     const projectIds = new Set(myPbs.map(pb => pb.projectId));
     const assignedPhases = phaseBlocks.filter(pb => pb.assignee === currentUser.id);
     const openTasks = myPbs

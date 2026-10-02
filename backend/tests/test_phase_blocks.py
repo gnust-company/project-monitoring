@@ -239,3 +239,56 @@ async def test_dashboard_feed_merges_phase_and_project_events(client: AsyncClien
     actions = [a["action"] for a in feed.json()]
     assert "commented" in actions
     assert "created project" in actions
+
+
+# ─── #34: người tham gia theo RACI (user hệ thống + tên tự do) ───────
+async def test_create_block_with_raci_participants(client: AsyncClient, make_user):
+    token, user, _, proj = await _setup(client, make_user)
+    block = await _make_block(client, token, proj["id"], participants=[
+        {"userId": user["id"], "raci": "A"},
+        {"name": "  Nguyễn Văn Khách  ", "raci": "C"},
+        {"userId": user["id"], "raci": "R"},          # trùng user → giữ bản đầu
+        {"name": "nguyễn văn khách", "raci": "I"},    # trùng tên (không phân biệt hoa thường)
+    ])
+    assert block["participants"] == [
+        {"userId": user["id"], "name": None, "raci": "A"},
+        {"userId": None, "name": "Nguyễn Văn Khách", "raci": "C"},
+    ]
+    # round-trip qua GET list
+    listed = (await client.get(f"{API}/projects/{proj['id']}/phase-blocks", headers=auth(token))).json()
+    assert listed[0]["participants"] == block["participants"]
+
+
+async def test_participant_requires_exactly_one_identity(client: AsyncClient, make_user):
+    token, user, _, proj = await _setup(client, make_user)
+    for bad in ({"raci": "R"}, {"userId": user["id"], "name": "Ai đó", "raci": "R"},
+                {"name": "   ", "raci": "R"}, {"name": "X", "raci": "Z"}):
+        resp = await client.post(f"{API}/projects/{proj['id']}/phase-blocks", json={
+            "phaseType": "SD", "title": "T", "startDate": "2026-06-10", "endDate": "2026-06-24",
+            "participants": [bad],
+        }, headers=auth(token))
+        assert resp.status_code == 422, bad
+
+
+async def test_patch_participants_replaces_and_logs_changes(client: AsyncClient, make_user):
+    token, user, _, proj = await _setup(client, make_user)
+    block = await _make_block(client, token, proj["id"], participants=[
+        {"name": "Khách A", "raci": "C"}, {"userId": user["id"], "raci": "R"},
+    ])
+    resp = await client.patch(f"{API}/phase-blocks/{block['id']}", json={"participants": [
+        {"userId": user["id"], "raci": "A"},      # đổi vai trò
+        {"name": "Khách B", "raci": "I"},         # thêm mới; Khách A bị gỡ
+    ]}, headers=auth(token))
+    assert resp.status_code == 200, resp.text
+    assert {(p["userId"], p["name"], p["raci"]) for p in resp.json()["participants"]} == {
+        (user["id"], None, "A"), (None, "Khách B", "I"),
+    }
+    acts = (await client.get(f"{API}/phase-blocks/{block['id']}/activity", headers=auth(token))).json()
+    got = {(a["action"], a["target"]) for a in acts}
+    assert ("added participant", "Khách B — I") in got
+    assert ("removed participant", "Khách A — C") in got
+    assert ("changed participant role", f"{user['id']} — A") in got
+
+    # PATCH không gửi participants → giữ nguyên
+    keep = await client.patch(f"{API}/phase-blocks/{block['id']}", json={"title": "Mới"}, headers=auth(token))
+    assert len(keep.json()["participants"]) == 2

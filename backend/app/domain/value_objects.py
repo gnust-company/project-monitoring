@@ -36,6 +36,14 @@ class PhaseTag(StrEnum):
     CANCELED = "Canceled"
 
 
+class RaciRole(StrEnum):
+    """Vai trò RACI của người tham gia phase (#34)."""
+    RESPONSIBLE = "R"  # trực tiếp làm
+    ACCOUNTABLE = "A"  # chịu trách nhiệm cuối / duyệt
+    CONSULTED = "C"    # được tham vấn
+    INFORMED = "I"     # được thông báo
+
+
 class ProjectStatus(StrEnum):
     ON_TRACK = "On Track"
     AT_RISK = "At Risk"

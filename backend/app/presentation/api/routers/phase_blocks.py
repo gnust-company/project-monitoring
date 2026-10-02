@@ -93,7 +93,7 @@ async def create_block(
         start_date=body.start_date, end_date=body.end_date, created_by=access.user.id,
         tag=body.tag, description=body.description, assignee=body.assignee,
         actual_end_date=body.actual_end_date, display_row=body.display_row,
-        participant_ids=body.participant_ids,
+        participants=[p.model_dump(mode="json", by_alias=False) for p in body.participants],
         checklist=[s.model_dump(mode="json") for s in body.checklist] if body.checklist is not None else None,
         outcomes=[s.model_dump(mode="json") for s in body.outcomes] if body.outcomes is not None else None,
     ))

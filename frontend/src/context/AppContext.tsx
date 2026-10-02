@@ -452,7 +452,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const body: CreatePhaseBody = {
       phaseType: pb.phaseType, title: pb.title, startDate: pb.startDate, endDate: pb.endDate,
       tag: pb.tag, description: pb.description, assignee: pb.assignee || undefined,
-      participantIds: pb.participants,
+      participants: pb.participants,
       checklist: pb.checklist.map(c => ({ text: c.text, role: c.role, done: c.done })),
       outcomes: pb.outcomes.map(o => ({ text: o.text, role: o.role, done: o.done })),
     };
@@ -470,7 +470,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     for (const k of ['title', 'description', 'tag', 'phaseType', 'startDate', 'endDate', 'actualEndDate', 'displayRow', 'assignee'] as const) {
       if (k in updates && updates[k] !== undefined) body[k] = updates[k];
     }
-    if ('participants' in updates && updates.participants) body.participantIds = updates.participants;
+    if ('participants' in updates && updates.participants) body.participants = updates.participants;
     // optimistic
     let projectIdOfBlock: string | undefined;
     setPbState(prev => {

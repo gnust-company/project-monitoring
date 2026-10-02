@@ -95,7 +95,7 @@ export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
                     autoFocus
                     onChange={e => { setPassword(e.target.value); setConfirm(false); }}
                     placeholder="Tối thiểu 6 ký tự"
-                    className="w-full h-10 pl-3 pr-20 rounded-lg border border-hairline bg-white text-sm text-ink
+                    className="no-native-reveal w-full h-10 pl-3 pr-20 rounded-lg border border-hairline bg-white text-sm text-ink
                                focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 transition-all" />
                   <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     <button type="button" onClick={() => setShow(s => !s)}

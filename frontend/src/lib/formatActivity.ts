@@ -1,6 +1,6 @@
 // #24: rà soát changelog — biến (action, target) thô của BE thành câu tiếng Việt
 // dễ đọc: dịch hành động, đổi UUID → tên người, ISO date → dd/MM/yyyy, tag → nhãn.
-import { PHASE_TAG_META, type User } from '../types';
+import { PHASE_TAG_META, RACI_META, type RaciRole, type User } from '../types';
 
 export interface FormattedActivity {
   /** Cụm động từ tiếng Việt, vd "đã thêm người tham gia". */
@@ -24,6 +24,7 @@ const VERB: Record<string, string> = {
   'reassigned phase': 'đã giao phase cho',
   'added participant': 'đã thêm người tham gia',
   'removed participant': 'đã gỡ người tham gia',
+  'changed participant role': 'đã đổi vai trò RACI của',
   'added checklist': 'đã thêm mục checklist',
   'added outcome': 'đã thêm mục kết quả',
   'completed item': 'đã hoàn thành mục',
@@ -40,7 +41,11 @@ const VERB: Record<string, string> = {
 };
 
 // Hành động mà `target` là 1 UUID người dùng cần đổi sang tên.
-const USER_TARGET = new Set(['reassigned phase', 'added participant', 'removed participant']);
+const USER_TARGET = new Set([
+  'reassigned phase', 'added participant', 'removed participant', 'changed participant role',
+]);
+// #34: các hành động participant có hậu tố " — R|A|C|I" (vai trò RACI).
+const RACI_TARGET = new Set(['added participant', 'removed participant', 'changed participant role']);
 // Hành động mà `target` là "ISO → ISO".
 const DATE_TARGET = new Set(['changed start date', 'changed end date']);
 
@@ -76,9 +81,16 @@ export function formatActivity(
   if (USER_TARGET.has(action)) {
     // target là UUID người dùng → gộp tên vào verb cho đọc tự nhiên
     // ("đã thêm người tham gia Nguyễn A"), không dùng dấu " — ".
-    const id = raw.split(/\s|—/)[0].trim();
-    const name = UUID_RE.test(id) ? resolveUser(id, getUserById) : raw;
-    return { verb: `${verb} ${name}`, detail: null };
+    let who = raw;
+    let raci = '';
+    const m = RACI_TARGET.has(action) ? raw.match(/^(.*?)\s+—\s+([RACI])$/) : null;
+    if (m) {
+      who = m[1].trim();
+      raci = ` (${RACI_META[m[2] as RaciRole].label})`;
+    }
+    const id = who.split(/\s|—/)[0].trim();
+    const name = UUID_RE.test(id) ? resolveUser(id, getUserById) : who;
+    return { verb: `${verb} ${name}${raci}`, detail: null };
   }
 
   if (DATE_TARGET.has(action)) {

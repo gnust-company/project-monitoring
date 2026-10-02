@@ -1,7 +1,7 @@
 // Endpoint functions + ánh xạ DTO (backend camelCase) → type frontend.
 import { api, setToken, clearToken } from './client';
 import type {
-  User, Organization, Project, PhaseBlock, ChecklistItem, Comment, Attachment,
+  User, Organization, Project, PhaseBlock, PhaseParticipant, ChecklistItem, Comment, Attachment,
   ActivityItem, Notification, PhaseTag, ProjectStatus, PhaseDefinition, WorkspaceRoleDef,
   AdminStats, AdminUserInfo, AdminWorkspaceInfo, Announcement, DismissScope,
 } from '../types';
@@ -18,7 +18,7 @@ interface PhaseDefDTO {
 interface PhaseBlockDTO {
   id: string; projectId: string; phaseType: string; tag: PhaseTag; title: string; description: string;
   startDate: string; endDate: string; actualEndDate: string | null; displayRow: number | null;
-  createdBy: string | null; assignee: string; participantIds: string[]; progressPct: number;
+  createdBy: string | null; assignee: string; participants: PhaseParticipant[]; progressPct: number;
   checklist: PhaseItemDTO[]; outcomes: PhaseItemDTO[];
   comments?: CommentDTO[] | null; attachments?: AttachmentDTO[] | null;
 }
@@ -63,7 +63,8 @@ export function mapPhaseBlock(d: PhaseBlockDTO): PhaseBlock {
     id: d.id, projectId: d.projectId, phaseType: d.phaseType, tag: d.tag, title: d.title,
     description: d.description, startDate: d.startDate, endDate: d.endDate,
     actualEndDate: d.actualEndDate ?? undefined, createdBy: d.createdBy ?? '', assignee: d.assignee,
-    participants: d.participantIds ?? [], checklist: (d.checklist ?? []).map(mapItem),
+    participants: (d.participants ?? []).map(p => ({ userId: p.userId ?? null, name: p.name ?? null, raci: p.raci })),
+    checklist: (d.checklist ?? []).map(mapItem),
     outcomes: (d.outcomes ?? []).map(mapItem),
     comments: (d.comments ?? []).map(mapComment), attachments: (d.attachments ?? []).map(mapAttachment),
     activityLog: [], displayRow: d.displayRow ?? undefined, progressPct: d.progressPct,
@@ -179,7 +180,7 @@ export const projectsApi = {
 // ─── Phase blocks ────────────────────────────────────────────────────
 export interface CreatePhaseBody {
   phaseType: string; title: string; startDate: string; endDate: string;
-  tag?: PhaseTag; description?: string; assignee?: string | null; participantIds?: string[];
+  tag?: PhaseTag; description?: string; assignee?: string | null; participants?: PhaseParticipant[];
   checklist?: { text: string; role?: string; done?: boolean }[] | null;
   outcomes?: { text: string; role?: string; done?: boolean }[] | null;
 }

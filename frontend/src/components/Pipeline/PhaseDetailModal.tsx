@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getUserById } from '../../data/mockData';
-import type { ChecklistItem } from '../../types';
+import { participantsSignature, type ChecklistItem, type PhaseParticipant } from '../../types';
 import {
   X, CheckSquare, Square, MessageSquare, Paperclip, Clock,
   Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check,
@@ -11,6 +11,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import Avatar from '../common/Avatar';
 import Dropdown from '../common/Dropdown';
+import RaciParticipants from '../common/RaciParticipants';
 import DeleteReasonDialog from '../ui/DeleteReasonDialog';
 import FileUploadModal from '../ui/FileUploadModal';
 import { formatActivity } from '../../lib/formatActivity';
@@ -45,12 +46,11 @@ export default function PhaseDetailModal() {
   // Inline editing
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
-  const [showAddParticipant, setShowAddParticipant] = useState(false);
 
   // #14: gom mọi edit metadata vào 1 draft — chỉ áp khi bấm "Lưu" (không auto-apply).
   const [meta, setMeta] = useState({
     title: '', description: '', phaseType: '',
-    startDate: '', endDate: '', assignee: null as string | null, participants: [] as string[],
+    startDate: '', endDate: '', assignee: null as string | null, participants: [] as PhaseParticipant[],
   });
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -129,7 +129,7 @@ export default function PhaseDetailModal() {
     || meta.startDate !== selectedPhaseBlock.startDate
     || meta.endDate !== selectedPhaseBlock.endDate
     || (meta.assignee ?? '') !== (selectedPhaseBlock.assignee ?? '')
-    || meta.participants.join(',') !== selectedPhaseBlock.participants.join(',')
+    || participantsSignature(meta.participants) !== participantsSignature(selectedPhaseBlock.participants)
   );
 
   // #19: click backdrop KHÔNG đóng modal (chỉ nút X đóng). Esc chỉ đóng khi KHÔNG có
@@ -292,15 +292,10 @@ export default function PhaseDetailModal() {
   const phasePicId = meta.assignee ?? selectedPhaseBlock.createdBy; // hiển thị theo draft
   const picUser = getUserById(phasePicId);
   const canEditPhase = !!currentUser && (currentUser.isSuperuser || origPicId === currentUser.id);
-  const participants = meta.participants;
-  const addableMembers = orgMembers.filter(m => !participants.includes(m.id));
 
   // #14: control sửa → ghi vào draft, KHÔNG gọi API ngay; bấm "Lưu" mới áp dụng.
   const changePic = (uid: string) => setMeta(m => ({ ...m, assignee: uid }));
-  const addParticipant = (uid: string) =>
-    setMeta(m => ({ ...m, participants: Array.from(new Set([...m.participants, uid])) }));
-  const removeParticipant = (uid: string) =>
-    setMeta(m => ({ ...m, participants: m.participants.filter(p => p !== uid) }));
+  const changeParticipants = (next: PhaseParticipant[]) => setMeta(m => ({ ...m, participants: next }));
 
   const resetMeta = () => setMeta({
     title: selectedPhaseBlock.title,
@@ -320,7 +315,7 @@ export default function PhaseDetailModal() {
     if (meta.startDate !== b.startDate) updates.startDate = meta.startDate;
     if (meta.endDate !== b.endDate) updates.endDate = meta.endDate;
     if ((meta.assignee ?? '') !== (b.assignee ?? '')) updates.assignee = meta.assignee;
-    if (meta.participants.join(',') !== b.participants.join(',')) updates.participants = meta.participants;
+    if (participantsSignature(meta.participants) !== participantsSignature(b.participants)) updates.participants = meta.participants;
     if (Object.keys(updates).length > 0) updatePhaseBlock(b.id, updates);
     setEditingTitle(false);
     setEditingDesc(false);
@@ -482,70 +477,15 @@ export default function PhaseDetailModal() {
                     <span className="text-xs text-gray-400">—</span>
                   )}
                 </div>
+              </div>
 
-                {/* Participants — avatar stack, hover expand + tooltip tên + add/remove */}
-                <div className="flex items-center gap-2 group/parts">
-                  <span className="text-xs text-gray-400 flex items-center gap-1 shrink-0">
-                    <Users className="w-3.5 h-3.5" /> Người tham gia
-                  </span>
-                  <div className="flex items-center">
-                    {participants.map((uid, idx) => {
-                      const u = getUserById(uid);
-                      return (
-                        <div key={uid}
-                          style={{ zIndex: participants.length - idx }}
-                          className="relative -ml-2 first:ml-0 transition-all duration-200 group-hover/parts:ml-0 group/member">
-                          <Avatar name={u?.name} src={u?.avatar}
-                            className="w-6 h-6 border-2 border-white ring-1 ring-gray-200 cursor-default" />
-                          {/* tooltip tên */}
-                          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5
-                            whitespace-nowrap rounded bg-slate-900 px-1.5 py-0.5 text-[10px] text-white
-                            opacity-0 group-hover/member:opacity-100 transition-opacity z-20">
-                            {u?.name ?? 'Người dùng'}
-                          </span>
-                          {/* nút xóa (chỉ PIC) */}
-                          {canEditPhase && (
-                            <button onClick={() => removeParticipant(uid)} title={`Xóa ${u?.name ?? ''}`}
-                              className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full
-                                flex items-center justify-center opacity-0 group-hover/member:opacity-100
-                                hover:bg-red-600 transition-opacity z-20">
-                              <X className="w-2 h-2" />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {/* nút thêm (chỉ PIC) */}
-                    {canEditPhase && (
-                      <div className="relative -ml-2 transition-all duration-200 group-hover/parts:ml-0">
-                        <button onClick={() => setShowAddParticipant(s => !s)}
-                          title="Thêm người tham gia"
-                          className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 text-gray-400
-                            hover:border-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors">
-                          <Plus className="w-3 h-3" />
-                        </button>
-                        {showAddParticipant && (
-                          <>
-                            <div className="fixed inset-0 z-30" onClick={() => setShowAddParticipant(false)} />
-                            <div className="absolute left-0 top-full mt-1 z-40 w-48 max-h-48 overflow-y-auto
-                              bg-white rounded-lg border border-gray-200 shadow-lg py-1">
-                              {addableMembers.length === 0 ? (
-                                <p className="px-3 py-2 text-[11px] text-gray-400">Đã thêm đủ thành viên.</p>
-                              ) : addableMembers.map(m => (
-                                <button key={m.id}
-                                  onClick={() => { addParticipant(m.id); }}
-                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 text-left">
-                                  <Avatar name={m.name} src={m.avatar} className="w-5 h-5" />
-                                  <span className="text-xs text-slate-700 truncate">{m.name}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {/* #34: người tham gia theo RACI (thành viên workspace hoặc tên người ngoài nền tảng) */}
+              <div>
+                <span className="text-xs text-gray-400 flex items-center gap-1 mb-1.5">
+                  <Users className="w-3.5 h-3.5" /> Người tham gia (RACI)
+                </span>
+                <RaciParticipants value={meta.participants} onChange={changeParticipants}
+                  members={orgMembers} getUserById={getUserById} readOnly={!canEditPhase} />
               </div>
             </div>
 
