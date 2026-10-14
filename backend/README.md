@@ -46,7 +46,7 @@ Quy tắc:
 Một lệnh dựng Postgres + MinIO + backend + frontend:
 
 ```bash
-cp .env.example .env          # ở thư mục gốc repo
+cp .env.example .env          # ở thư mục gốc repo — nguồn cấu hình duy nhất
 docker compose up --build
 ```
 
@@ -63,6 +63,8 @@ cd backend
 uv sync --extra dev
 # Postgres + MinIO qua docker compose:
 docker compose up -d postgres minio minio-setup
+# Backend đọc <repo>/.env; .env trỏ host theo mạng docker → ghi đè sang localhost:
+export POSTGRES_HOST=localhost:5432 MINIO_ENDPOINT=http://localhost:9000
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
 ```

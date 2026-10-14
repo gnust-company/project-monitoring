@@ -11,6 +11,8 @@ Most design docs are written in Vietnamese and are the source of truth — read 
 
 ## Commands
 
+**All configuration lives in the repo-root `.env`** (copy of `.env.example`, every key documented there). `docker-compose.yml` has no `environment:` blocks — every service gets `.env` via `env_file`, and the published ports are `${VAR:?}` read from `.env` too. The backend reads `<repo>/.env` directly (absolute path in `app/core/config.py`) and fails fast on missing required keys; Vite reads it via `envDir: '..'` (only `VITE_*` reach the browser). Shell env vars override `.env`.
+
 Full stack (Postgres + MinIO + backend + frontend) from repo root:
 ```bash
 cp .env.example .env
@@ -30,6 +32,9 @@ Backend ([backend/](backend/)), uses **uv**:
 ```bash
 uv sync --extra dev
 docker compose up -d postgres minio minio-setup   # deps for running locally
+# .env targets the docker network (POSTGRES_HOST=postgres, MINIO_ENDPOINT=http://minio:9000);
+# outside docker, point them at the published ports for this shell:
+export POSTGRES_HOST=localhost:5432 MINIO_ENDPOINT=http://localhost:9000
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
 uv run ruff check .
@@ -42,7 +47,7 @@ docker exec project-monitoring-postgres-1 psql -U projecthub -c "CREATE DATABASE
 uv run pytest -q
 uv run pytest tests/test_phase_blocks.py::test_name   # single test
 ```
-The MinIO attachment/avatar tests require `minio` + `minio-setup` to be running. Override the test DB with `TEST_DATABASE_URL`.
+Tests are hermetic: `tests/conftest.py` sets localhost config via `os.environ.setdefault` before importing the app, so the developer's `.env` doesn't leak in (export a var to override). The MinIO attachment/avatar tests require `minio` + `minio-setup` to be running. Override the test DB with `TEST_DATABASE_URL`.
 
 ## Backend architecture (Clean Architecture)
 

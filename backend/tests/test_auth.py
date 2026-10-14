@@ -18,8 +18,9 @@ def email_allowlist(monkeypatch):
 
 @pytest.fixture
 def no_email_allowlist(monkeypatch):
-    """Ép allowlist rỗng (= không giới hạn) cho đúng test này."""
-    monkeypatch.delenv("ALLOWED_EMAIL_DOMAINS", raising=False)
+    """Ép allowlist rỗng (= không giới hạn) cho đúng test này. Đặt chuỗi rỗng thay vì xoá
+    biến — xoá thì Settings sẽ rơi về giá trị trong `.env` của máy dev."""
+    monkeypatch.setenv("ALLOWED_EMAIL_DOMAINS", "")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

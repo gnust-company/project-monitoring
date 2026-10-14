@@ -1,16 +1,17 @@
+# All configuration lives in `.env` (copy from `.env.example`) — compose sets no values of its own:
+#   - `env_file: .env`  → environment variables for each container
+#   - `${VAR}` in this file (ports only) → also read by compose from `.env`
+# A missing variable makes compose/backend fail immediately instead of silently using a default.
 services:
   postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-projecthub}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-projecthub}
-      POSTGRES_DB: ${POSTGRES_DB:-projecthub}
+    env_file: .env          # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:?POSTGRES_PORT is missing in .env}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-projecthub}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -18,12 +19,10 @@ services:
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    env_file: .env          # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"       # S3 API
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"   # web console
+      - "${MINIO_API_PORT:?MINIO_API_PORT is missing in .env}:9000"           # S3 API
+      - "${MINIO_CONSOLE_PORT:?MINIO_CONSOLE_PORT is missing in .env}:9001"   # web console
     volumes:
       - miniodata:/data
     healthcheck:
@@ -32,15 +31,16 @@ services:
       timeout: 5s
       retries: 10
 
-  # Tạo sẵn bucket attachments + avatars rồi thoát
+  # Creates the attachments + avatars buckets, then exits
   minio-setup:
     image: minio/mc:latest
+    env_file: .env
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
       mc mb -p local/attachments;
       mc mb -p local/avatars;
       mc anonymous set download local/avatars;
@@ -50,48 +50,28 @@ services:
 
   backend:
     build: ./backend
-    image: projecthub-backend:latest   # tên cố định để save/load hoặc push registry
+    image: projecthub-backend:latest   # fixed name so the image can be saved/loaded or pushed to a registry
+    env_file: .env          # POSTGRES_*, JWT_SECRET, CORS_ORIGINS, MINIO_* …
     depends_on:
       postgres:
         condition: service_healthy
       minio:
         condition: service_healthy
-    environment:
-      # Mặc định trỏ service `postgres` trong compose. Dùng DB ngoài (đã comment service
-      # postgres) thì đặt DATABASE_URL trong .env, vd:
-      #   DATABASE_URL=postgresql+asyncpg://projecthub:projecthub@192.168.1.10:5432/projecthub
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-projecthub}:${POSTGRES_PASSWORD:-projecthub}@postgres:5432/${POSTGRES_DB:-projecthub}}
-      JWT_SECRET: ${JWT_SECRET:-change-me}
-      # phải khớp host:port mà trình duyệt mở frontend (đổi FRONTEND_PORT thì sửa luôn)
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173}}
-      # Allowlist domain email (#5): CSV. Rỗng = không giới hạn. /auth/setup luôn được qua.
-      ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-}
-      # MinIO nội bộ container dùng để upload. Dùng MinIO ngoài thì đặt MINIO_ENDPOINT trong .env.
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      # URL trình duyệt tải file/avatar (đổi MINIO_API_PORT thì sửa luôn)
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:${MINIO_API_PORT:-9000}}
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${BACKEND_PORT:?BACKEND_PORT is missing in .env}:8000"
     command: >
       /bin/sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        # chỉ là fallback nướng vào bundle; URL thật đặt ở `environment` bên dưới
-        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:${BACKEND_PORT:-8000}/api/v1}
-    image: projecthub-frontend:latest   # tên cố định để save/load hoặc push registry
-    environment:
-      # Cấu hình lúc CHẠY — FE đọc qua /runtime-env.js. Đổi IP/port chỉ cần sửa
-      # biến này (vd trong .env) rồi `docker compose up -d frontend`, KHÔNG build lại.
-      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:${BACKEND_PORT:-8000}/api/v1}
+    build: ./frontend
+    image: projecthub-frontend:latest   # fixed name so the image can be saved/loaded or pushed to a registry
+    # VITE_API_BASE is read at RUNTIME (runtime-env.js) — to change the IP/port just edit .env and
+    # run `docker compose up -d frontend`; NO image rebuild needed.
+    env_file: .env
     depends_on:
       - backend
     ports:
-      - "${FRONTEND_PORT:-5173}:80"
+      - "${FRONTEND_PORT:?FRONTEND_PORT is missing in .env}:80"
 
 volumes:
   pgdata:
