@@ -1,6 +1,6 @@
 # ProjectHub — Development Process Pipeline
 
-Nền tảng theo dõi và quản lý quy trình phát triển phần mềm qua 7 phase chuẩn (PA → SA → SD → SI → ST → DEP → OM) trên timeline Gantt tương tác.
+Nền tảng theo dõi quy trình phát triển phần mềm theo phase: mọi dự án trên một timeline Gantt, đi qua các phase (mặc định 7 phase PA → SA → SD → SI → ST → DEP → OM, mỗi workspace tuỳ biến được) với checklist theo vai trò, PIC rõ ràng và trạng thái tự cảnh báo khi dự án chậm.
 
 Mô tả sản phẩm đầy đủ: [docs/APP_DESCRIPTION.md](docs/APP_DESCRIPTION.md)
 
@@ -8,12 +8,13 @@ Mô tả sản phẩm đầy đủ: [docs/APP_DESCRIPTION.md](docs/APP_DESCRIPTI
 
 ```
 project-monitoring/
-├── frontend/        # React 19 + TypeScript + Vite + Tailwind (hiện chạy mock data)
+├── frontend/        # React 19 + TypeScript + Vite + Tailwind
 ├── backend/         # Python 3.12 + FastAPI + PostgreSQL — Clean Architecture
 └── docs/
     ├── APP_DESCRIPTION.md   # Sản phẩm là gì, giải quyết vấn đề gì, kiến trúc hệ thống
     ├── API_CONTRACT.md      # Hợp đồng REST API v1 giữa FE và BE
     ├── SCHEMA.md            # Schema PostgreSQL (DDL + mapping với FE types)
+    ├── ROADMAP.md           # Tiến độ các issue theo wave
     └── UX_DESIGN.md
 ```
 
@@ -55,14 +56,13 @@ npm run dev                  # http://localhost:5173
 
 Chi tiết kiến trúc Clean Architecture và trạng thái implement: [backend/README.md](backend/README.md)
 
-## Tính năng chính (frontend)
+## Tính năng chính
 
-- **Pipeline Timeline** — Gantt theo Tuần/Tháng/Quý; 2 chế độ: Xem (pan) và Tạo phase (kéo-thả trên hàng dự án để tạo)
-- **Phase Block** — kéo di chuyển, resize 2 đầu; block bị va chạm tự xuống dòng mới, không lệch lịch
-- **Checklist & Outcomes theo role** — tự sinh từ nguồn chuẩn theo loại phase, tracking tiến độ
-- **Document** — đính kèm file hoặc link tài liệu ngoài
-- **Workspace đa tổ chức** — sidebar thu gọn được, lọc theo dự án
+- **Pipeline Gantt** — mọi dự án của workspace trên một timeline; zoom 3 ngày/tuần/tháng/quý; 3 chế độ Chỉ xem · Sắp xếp (kéo/giãn rồi Lưu/Hủy) · Tạo phase; phase trùng lịch tự xuống hàng; lọc theo tên/PIC, trạng thái, khoảng thời gian, "của tôi"
+- **Quy trình tuỳ biến** — phase và vai trò công việc theo từng workspace, kèm checklist/outcome mặc định theo vai trò; wizard tạo workspace 3 bước
+- **Phase Detail** — checklist & outcome theo vai trò (outcome cần tài liệu mới được tick), tài liệu file/link, bình luận, người tham gia theo RACI (kể cả người ngoài hệ thống), lịch sử thay đổi
+- **PIC & quyền** — chỉ PIC/admin sửa thông tin dự án & phase; ai cũng tick việc, bình luận
+- **Sức khỏe tự động** — Đúng tiến độ / Có rủi ro / Chậm tiến độ tự tính từ phase; Dashboard, trang Nhóm (khối lượng việc)
+- **Quản trị** — bảng admin (workspace, người dùng, quyền admin), thông báo in-app và thông báo hệ thống
 
-## Lộ trình thay mock data
-
-FE đang dùng dữ liệu in-memory tại `frontend/src/data/mockData.ts`. Việc chuyển sang data thật bám theo [docs/API_CONTRACT.md](docs/API_CONTRACT.md) và [docs/SCHEMA.md](docs/SCHEMA.md) — xem mục "Lộ trình thay mock data" trong APP_DESCRIPTION.md.
+Mô tả đầy đủ: [docs/APP_DESCRIPTION.md](docs/APP_DESCRIPTION.md) · tiến độ issue: [docs/ROADMAP.md](docs/ROADMAP.md)

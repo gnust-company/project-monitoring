@@ -455,18 +455,18 @@ export default function LivePipelinePreview() {
             <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
             <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
           </div>
-          <span className="text-[11px] text-white/30 ml-1">TechNova Solutions · Pipeline</span>
+          <span className="hidden sm:inline text-[11px] text-white/30 ml-1 whitespace-nowrap">TechNova Solutions · Pipeline</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-white/[0.04] rounded-lg p-0.5">
             <button onClick={scrollToToday}
-              className="px-2 py-1 text-[10px] font-bold rounded-md text-white/80 hover:bg-white/[0.08] transition-colors">
+              className="px-2 py-1 text-[10px] font-bold rounded-md text-white/80 whitespace-nowrap hover:bg-white/[0.08] transition-colors">
               Hôm nay
             </button>
             <div className="w-px h-3 bg-white/10 mx-0.5" />
             {(['week', 'month', 'quarter'] as const).map(z => (
               <button key={z} onClick={() => { setZoomLevel(z); hasScrolled.current = false; }}
-                className={`px-2 py-1 text-[10px] font-semibold rounded-md transition-colors
+                className={`px-2 py-1 text-[10px] font-semibold rounded-md whitespace-nowrap transition-colors
                   ${zoomLevel === z ? 'bg-white/[0.08] text-white' : 'text-white/30 hover:text-white/50'}`}>
                 {z === 'week' ? 'Tuần' : z === 'month' ? 'Tháng' : 'Quý'}
               </button>
