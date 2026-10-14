@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { DEV_PHASES, PHASE_META } from '../../types';
 import { ApiError } from '../../api/client';
+import { HERO } from './landingContent';
 import {
   Layers, Eye, EyeOff, ArrowRight, Mail, Lock, User,
   ChevronRight, Sparkles
@@ -152,19 +153,19 @@ export default function LoginPage() {
           <div className="space-y-6">
             <motion.div custom={0} variants={fadeUp} initial="hidden" animate="visible">
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full text-[10px] text-on-dark-soft">
-                <Sparkles className="w-3 h-3 text-white/40" /> 7-Phase Process Pipeline
+                <Sparkles className="w-3 h-3 text-white/40" /> {HERO.badge}
               </div>
             </motion.div>
             <motion.h2 custom={1} variants={fadeUp} initial="hidden" animate="visible"
               className="text-3xl xl:text-4xl font-semibold text-white leading-tight tracking-tight">
-              Quản lý quy trình<br />
-              phát triển phần mềm<br />
-              toàn diện.
+              {HERO.title[0]}<br />
+              {HERO.title[1]}<br />
+              <span className="text-white/45">{HERO.title[2]}</span>
             </motion.h2>
             <motion.p custom={2} variants={fadeUp} initial="hidden" animate="visible"
               className="text-sm text-on-dark-soft leading-relaxed max-w-sm">
-              Từ đánh giá dự án đến vận hành — theo dõi mọi giai đoạn với timeline trực quan,
-              kéo thả mượt mà, và hợp tác nhóm.
+              Checklist theo vai trò, người chịu trách nhiệm rõ ràng, và trạng thái tự cảnh báo
+              khi dự án bắt đầu chậm — từ đánh giá đến vận hành.
             </motion.p>
 
             <motion.div custom={3} variants={fadeUp} initial="hidden" animate="visible"

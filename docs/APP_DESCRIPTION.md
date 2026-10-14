@@ -2,172 +2,141 @@
 
 ## 1. ProjectHub là gì?
 
-**ProjectHub** là nền tảng **theo dõi và quản lý quy trình phát triển phần mềm** dành cho các đội ngũ phát triển (development teams) và quản lý dự án (project managers).
+**ProjectHub** là nền tảng **theo dõi quy trình phát triển phần mềm theo phase**, dành cho đội phát triển và người quản lý dự án. Mỗi dự án được đặt lên một **timeline Gantt** và đi qua các phase — mặc định 7 phase PA → SA → SD → SI → ST → DEP → OM, mỗi workspace tuỳ biến được.
 
 Hệ thống trả lời 3 câu hỏi cốt lõi:
 
-1. **Dự án đang ở đâu?** — Visualize toàn bộ lifecycle qua 7 phase chuẩn
-2. **Ai đang làm gì?** — Tracking người tham gia, task, deadline theo thời gian thực
-3. **Có rủi ro không?** — Cảnh báo sớm dự án At Risk / Delayed
+1. **Dự án đang ở đâu?** — Mọi dự án của workspace trên một timeline, theo từng phase
+2. **Ai đang làm gì?** — PIC cho mỗi dự án/phase, checklist theo vai trò, người tham gia theo RACI
+3. **Có rủi ro không?** — Trạng thái Đúng tiến độ / Có rủi ro / Chậm tiến độ tự tính từ phase
 
 ---
 
 ## 2. Vấn đề đang giải quyết
 
-### Pain points của PM / Team Lead:
-- **Không có cái nhìn tổng thể** — Nhiều dự án, nhiều phase, không biết cái nào đang
-- **Communication gap** — Developer không biết phase trước đã xong chưa, tester không biết khi nào bắt đầu
-- **Deadline mờ nhạt** — Không có visual timeline → dễ miss deadline
-- **Status meeting lãng phí** — Mỗi tuần họp 30 phút chỉ để hỏi "Đâu rồi?" → thay bằng 1 cái nhìn dashboard
+### PM / Team Lead
+- **Không có cái nhìn tổng thể** — nhiều dự án, nhiều phase, không biết cái nào đang chậm
+- **Communication gap** — developer không biết phase trước xong chưa, tester không biết khi nào bắt đầu
+- **Deadline mờ nhạt** — không có timeline trực quan → dễ trễ hạn
+- **Status meeting lãng phí** — họp chỉ để hỏi "đến đâu rồi?" → thay bằng một cái nhìn Dashboard
 
-### Pain points của Developer / Tester:
-- **Không rõ context** — Không biết phase mình làm nằm ở đâu trong tổng thể
-- **Checklist phân tán** — Task rải rác trong Excel, Jira, Slack, email
-- **Không thấy progress** — Làm xong task nhưng không thấy nó contribute thế nào vào phase
+### Developer / Tester
+- **Không rõ context** — không biết phase mình làm nằm ở đâu trong tổng thể
+- **Checklist phân tán** — việc rải rác trong Excel, Jira, chat, email
+- **Không thấy progress** — làm xong việc nhưng không thấy nó đóng góp gì vào phase
 
 ---
 
 ## 3. Target Users
 
-| User | Role | Mục đích chính |
-|------|------|----------------|
-| **Project Manager** | Quản lý nhiều dự án | Overview, tracking, risk management, reporting |
-| **Team Lead** | Quản lý 1 dự án cụ thể | Phase tracking, task assignment, timeline |
-| **Business Analyst** | Phân tích yêu cầu | PA, SA phases — requirements, BRD |
-| **Developer** | Code implementation | SI phase — task checklist, code tracking |
-| **UI/UX Designer** | Thiết kế giao diện | SD phase — wireframes, design handoff |
-| **Tester** | Kiểm thử | ST phase — test cases, bug tracking |
-| **SysOps** | Vận hành hệ thống | DEP, OM phases — deployment, monitoring |
+| User | Mục đích chính |
+|------|----------------|
+| **Project Manager / Team Lead** | Tổng quan workspace, tạo dự án/phase, theo dõi rủi ro và deadline |
+| **Business Analyst** | PA, SA, SD — yêu cầu, BRD, SRS |
+| **SW Architect / Developer** | SD, SI — thiết kế, mã nguồn |
+| **UI / GUI Designer** | SD — wireframe, giao diện |
+| **Tester** | SI, ST — test case, test report |
+| **SysOps** | SA, SI, DEP, OM — hạ tầng, triển khai, vận hành |
+| **Admin hệ thống** | Quản lý workspace, người dùng, quyền admin, thông báo hệ thống |
+
+Vai trò công việc là **theo từng workspace** và tuỳ biến được (8 vai trò mặc định ở trên).
 
 ---
 
 ## 4. Core Features
 
-### 4.1. 7-Phase Development Pipeline
-Hệ thống xây dựng quy trình chuẩn 7 phase cho MỖI dự án:
+### 4.1. Quy trình theo phase — tuỳ biến theo workspace
+- Mỗi workspace có **bộ phase riêng** (`phase_definitions`): mã, tên đầy đủ, màu, thứ tự, mô tả. Mặc định seed 7 phase:
 
 ```
 PA → SA → SD → SI → ST → DEP → OM
-│    │    │    │    │    │     │
 │    │    │    │    │    │     └── Operation & Maintenance
-│    │    │    │    │    └──────── Deployment
-│    │    │    │    └───────────── Software Test
+│    │    │    │    │    └──────── Software Deployment
+│    │    │    │    └───────────── Software Testing
 │    │    │    └────────────────── Software Implementation
 │    │    └─────────────────────── Software Design
 │    └──────────────────────────── Software Analysis
 └───────────────────────────────── Project Assessment
 ```
 
-**Mỗi phase có:**
-- Checklist công việc cụ thể
-- Người tham gia (participants)
-- Timeline (start → end date)
-- Attachments (tài liệu)
-- Comments (thảo luận)
-- Activity log (lịch sử thay đổi)
+- Mỗi phase mang **checklist + outcome mặc định theo vai trò** — tạo phase là có sẵn danh sách việc.
+- **Vai trò công việc** (8 mặc định, có màu) cũng tuỳ biến theo workspace; đổi mã vai trò/phase tự cập nhật mọi tham chiếu.
+- Tạo workspace qua **wizard 3 bước**: Thông tin → Vai trò → Phase.
 
-### 4.2. Interactive Pipeline Timeline
-- **Visual Gantt-like** — Thấy toàn bộ phase blocks trên timeline
-- **Zoom levels** — Week / Month / Quarter — từ chi tiết đến tổng quan
-- **Drag & Drop** — Kéo phase block để điều chỉnh timeline
-- **Resize** — Kéo 2 đầu để thay đổi start/end date
-- **Today marker** — Biết chính xác "bây giờ đang ở đâu"
-- **Overlap detection** — Tự mở rộng hàng khi phase trùng thời gian
+### 4.2. Pipeline Timeline
+- **Gantt cho mọi dự án** của workspace; zoom **3 ngày / tuần / tháng / quý**; vạch **Hôm nay**.
+- **3 chế độ**: *Chỉ xem* (kéo để di chuyển lịch) · *Sắp xếp* (kéo/giãn phase, thay đổi chỉ áp dụng khi bấm **Lưu**, có **Hủy**) · *Tạo phase* (kéo ngang trên hàng dự án, lịch giữ cố định).
+- Phase trùng lịch **tự xuống hàng mới**, không xô lệch ngày.
+- **Lọc & tìm**: theo tên dự án hoặc PIC (không phân biệt dấu), trạng thái, khoảng thời gian, "chỉ dự án của tôi"; sidebar đồng bộ với timeline.
+- Owner **kéo-thả sắp thứ tự** dự án (dùng chung cho cả workspace).
 
-### 4.3. Workspace & Organization
-- **Multi-workspace** — Mỗi workspace là 1 tổ chức/công ty
-- **Multi-project** — Mỗi workspace có nhiều dự án
-- **Team management** — Xem thành viên, vai trò, assignment, workload
-- **Role-based** — PM, BA, Developer, Tester, Designer, SysOps (chọn vai trò ngay khi đăng ký account)
-- **Workspace Settings** — View riêng (mở từ sidebar): đổi tên workspace, mời/xóa thành viên, xóa workspace (cascade projects + phase blocks)
+### 4.3. Phase Detail
+- **Checklist & outcome theo vai trò**; tiến độ phase = (checklist + outcome đã xong) / tổng.
+- **Outcome cần bằng chứng**: chỉ đánh dấu xong khi đã đính kèm tài liệu.
+- **Tài liệu**: tải file lên (MinIO, có thanh tiến độ) hoặc đính kèm link ngoài; gắn với phase hoặc với từng outcome.
+- **Bình luận**; người liên quan nhận thông báo.
+- **Người tham gia theo RACI** (Thực hiện / Chịu trách nhiệm / Tham vấn / Được thông báo); thêm được **người ngoài hệ thống** chỉ bằng tên.
+- Sửa thông tin phase theo kiểu **nháp → Lưu**; **xoá phải nêu lý do**.
 
-### 4.4. Project Dashboard (Tổng quan cho quản lý)
-Thiết kế để sếp/PM nhìn 5 giây nắm tình hình:
-- **KPI cards** — Tổng dự án · On Track · At Risk · Delayed; số chạy count-up; click card lọc thẳng sang Pipeline theo trạng thái
-- **Sức khỏe workspace** — Vòng tiến độ (progress ring) tiến độ trung bình + phân bổ trạng thái có thanh tỷ trọng
-- **Deadline sắp tới** — Phase chưa hoàn thành, sắp theo độ gấp, color-code đỏ/vàng
-- **Phân bổ Phase** — Bar chart phát hiện bottleneck (phase nào dồn nhiều block)
-- **Quick stats** — Thành viên, phase đang In progress, % task toàn workspace
-- **Hoạt động gần đây + Dự án gần đây**
-- Animation: stagger fade-up, count-up số, ring/bar animate khi vào view
+### 4.4. Dự án & PIC
+- Mỗi dự án có **PIC** (mặc định là người tạo, đổi được). Dự án **không có ngày kết thúc** — mốc tham chiếu là `endDate` xa nhất của các phase.
+- **Trạng thái tự tính** (`computeProjectStatus`):
+  - **Chậm tiến độ** — có phase quá `endDate` mà chưa hoàn tất
+  - **Có rủi ro** — tiến độ thực (checklist + outcome) chậm hơn tiến độ theo lịch
+  - **Đúng tiến độ** — còn lại
+- **Project Detail Modal**: sửa thông tin, đổi PIC, tiến độ theo phase / theo ngày, changelog dự án, xoá có lý do.
 
-### 4.5. User Profile
-- View riêng (mở từ avatar ở header hoặc sidebar)
-- **Sửa inline**: tên; **đổi vai trò** (role); avatar
-- **Stats cá nhân**: số workspace, dự án tham gia, phase được giao, task đang mở
-- **Danh sách phase được giao** — click nhảy thẳng tới phase trong Pipeline
+### 4.5. Dashboard
+- **KPI**: Tổng dự án · Đúng tiến độ · Có rủi ro · Chậm tiến độ (click để lọc sang Pipeline).
+- **Sức khỏe workspace** (vòng tiến độ + phân bổ trạng thái), **Deadline sắp tới**, **Phân bổ phase**, **Hoạt động gần đây** (gộp sự kiện phase + vòng đời dự án), **Dự án gần đây**.
 
-### 4.7. Project Detail Modal
-- Click vào dự án (panel trái của Pipeline hoặc card trên Dashboard) → modal giữa màn hình
-- **Sửa inline**: tên, mô tả, trạng thái, ngày bắt đầu/mục tiêu, tiến độ (slider)
-- **Stats nhanh**: số phase, phase hoàn thành, ngày còn lại tới deadline, phân bố phase theo loại
-- **Xóa dự án** — xác nhận 2 bước, xóa kèm toàn bộ phase blocks
+### 4.6. Nhóm & hồ sơ
+- **Trang Nhóm**: thành viên, vai trò, dự án đang tham gia, **khối lượng việc** (số việc đang mở; 15 việc ≈ 100%).
+- **Hồ sơ**: tài khoản toàn cục (tên, avatar, đổi mật khẩu) tách khỏi **hồ sơ trong workspace** (thống kê, tự đổi vai trò, danh sách phase của tôi).
 
-### 4.8. Collaboration
-- **Checklist** — Task breakdown trong mỗi phase
-- **Comments** — Thảo luận trực tiếp trên phase
-- **Attachments** — Đính kèm tài liệu (file lưu MinIO) hoặc link tài liệu ngoài
-- **Activity Log** — Ai đã làm gì, khi nào
+### 4.7. Quyền
+- **Admin hệ thống (superuser)**: tài khoản đầu tiên tạo qua màn hình *thiết lập lần đầu*; cấp/thu hồi quyền admin cho người khác.
+- **Trong workspace**: `owner` quản lý workspace (đổi tên, thành viên, vai trò, phase, xoá); `member` tham gia bình thường. Hiện owner **thêm thẳng** thành viên bằng email (luồng mời có accept/từ chối: #28).
+- **Theo PIC**: chỉ PIC (hoặc admin) sửa/xoá **thông tin** dự án & phase; **ai cũng** tick checklist/outcome, đính kèm và bình luận — mọi thao tác được ghi lại. *(Hàng đợi duyệt thay đổi cũ đã bỏ.)*
 
-### 4.9. Permissions & first-run setup
-- **First run**: khi hệ thống chưa có tài khoản nào → hiện view *tạo super-user*. Tài khoản
-  đầu tiên là **admin toàn cục** (toàn quyền).
-- **2 chiều quyền độc lập**: *vai trò công việc* (PM/BA/Dev/Tester... — dùng sinh checklist)
-  tách khỏi *cấp quyền* trong workspace.
-- **Workspace creator (owner)**: toàn quyền với workspace và artifact bên trong (dự án, phase,
-  thành viên).
-- **Member**: tham gia, tạo dự án/phase được; nhưng **sửa/xóa dự án phải owner duyệt**, và
-  không sửa được cài đặt workspace / thành viên.
+### 4.8. Thông báo
+- **In-app**: được thêm vào workspace, được giao phase, có bình luận… — badge số chưa đọc, đánh dấu đã đọc (FE poll 30 giây).
+- **Thông báo hệ thống** từ admin: nội dung markdown, khoảng thời gian hiển thị; người dùng ẩn được "hôm nay" hoặc "tuần này".
 
-### 4.10. Approval queue (duyệt thay đổi)
-Member bấm sửa/xóa dự án → tạo **Change Request** trạng thái *pending*; owner nhận thông báo,
-bấm **Duyệt** (áp dụng) hoặc **Từ chối**. Có lịch sử, người yêu cầu được báo kết quả.
+### 4.9. Bảng quản trị (admin)
+- Tổng quan số liệu, danh sách workspace, người dùng (đặt lại mật khẩu, cấp/thu hồi admin, xoá người dùng), thông báo hệ thống.
 
-### 4.11. Notifications (thông báo in-app)
-Sự kiện sinh thông báo: được thêm vào workspace, được giao phase, có bình luận, change-request
-được tạo/duyệt/từ chối... FE poll định kỳ, hiện badge số chưa đọc, đánh dấu đã đọc.
+### 4.10. Changelog 2 cấp
+- **Phase**: đổi ngày, đổi trạng thái, thêm/gỡ người tham gia, đổi vai trò RACI, hoàn thành việc, tài liệu… — hiển thị thành câu tiếng Việt dễ đọc.
+- **Dự án**: tạo / sửa / xoá phase (dòng "đã xoá phase X" vẫn giữ sau khi phase bị xoá), tạo/đổi tên dự án.
 
-### 4.12. Changelog 2 cấp
-- **Changelog phase** (trong Phase Detail): chi tiết khi sửa 1 phase — đổi ngày, thêm người,
-  đổi trạng thái...
-- **Changelog dự án** (trong Project Detail Modal): ai đã tạo / sửa / xóa phase. Dòng "đã xóa
-  phase X" vẫn giữ lại sau khi phase bị xóa.
+### 4.11. Đăng ký & bảo mật
+- Đăng ký bằng email/mật khẩu (JWT); có thể **giới hạn domain email** (`ALLOWED_EMAIL_DOMAINS`).
+- Form đăng nhập/đăng ký báo lỗi rõ từng ô.
 
 ---
 
 ## 5. User Journey
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Landing     │───→│  Login/      │───→│  Workspace       │───→│  Workspace      │
-│  Page        │    │  Register    │    │  Selector        │    │  (Dashboard)    │
-└─────────────┘    └─────────────┘    └──────────────────┘    └────────┬────────┘
-                                                                            │
-                                          ┌─────────────────────────────────┤
-                                          │                                  │
-                                          ▼                                  ▼
-                                   ┌─────────────┐                    ┌─────────────┐
-                                   │  Pipeline    │                    │  Team View  │
-                                   │  Timeline    │                    │             │
-                                   └──────┬──────┘                    └─────────────┘
-                                          │
-                                    ┌─────┴──────┐
-                                    │            │
-                                    ▼            ▼
-                              ┌───────────┐ ┌───────────┐
-                              │  Create   │ │  Phase    │
-              │  Phase   │ │  Detail   │
-                              └───────────┘ └───────────┘
+Landing ──→ Đăng nhập / Đăng ký ──→ Chọn workspace (hoặc tạo mới) ──→ Workspace
+                                                                         │
+                     ┌───────────────┬───────────────┬───────────────────┤
+                     ▼               ▼               ▼                   ▼
+                 Dashboard       Pipeline          Nhóm         Cài đặt workspace
+                                     │                          (owner: thành viên,
+                          ┌──────────┴──────────┐                vai trò, phase)
+                          ▼                     ▼
+                     Tạo phase             Phase Detail
 ```
 
-### Flow chi tiết:
-1. **Landing Page** — Hiểu ProjectHub là gì, features, CTA đăng ký/dùng thử
-2. **Login** — Xác thực (email/password hoặc SSO)
-3. **Workspace Selector** — Chọn workspace hoặc tạo mới
-4. **Dashboard** — Tổng quan workspace: projects, stats, upcoming deadlines
-5. **Pipeline Timeline** — Xem và tương tác với Gantt chart
-6. **Phase Detail** — Click vào phase → xem checklist, comments, attachments
-7. **Team View** — Xem thành viên, vai trò, assignment
+1. **Landing** — ProjectHub là gì; theo chân một dự án qua 7 phase; demo Pipeline chạy trên trình duyệt
+2. **Đăng nhập / Đăng ký** — email + mật khẩu (lần đầu chạy hệ thống: tạo admin)
+3. **Chọn workspace** — hoặc tạo mới qua wizard 3 bước
+4. **Dashboard** — tổng quan, rủi ro, deadline, hoạt động
+5. **Pipeline** — xem và thao tác trên Gantt
+6. **Phase Detail** — checklist, outcome, tài liệu, bình luận, RACI, lịch sử
+7. **Nhóm** — thành viên, vai trò, khối lượng việc
 
 ---
 
@@ -175,33 +144,36 @@ Sự kiện sinh thông báo: được thêm vào workspace, được giao phase
 
 | Feature | Jira / Azure DevOps | ProjectHub |
 |---------|---------------------|------------|
-| Visual pipeline | Gantt chart cơ bản | 7-phase Gantt với drag & drop realtime |
-| Phase structure | Custom, không chuẩn | 7 phase chuẩn hóa cho software dev |
-| Learning curve | Cao — nhiều config | Thấp — ready-to-use |
-| Timeline zoom | Giới hạn | Week / Month / Quarter seamless |
+| Visual pipeline | Gantt cơ bản | Gantt theo phase, kéo-thả có Lưu/Hủy |
+| Phase structure | Tuỳ biến tự do, không định hướng | 7 phase mặc định cho software dev, tuỳ biến theo workspace |
+| Việc trong phase | Tự tạo ticket | Checklist + outcome mặc định theo vai trò |
+| Trạng thái dự án | Cập nhật tay | Tự tính từ phase |
+| Learning curve | Cao — nhiều cấu hình | Thấp — dùng được ngay |
 | Focus | Issue tracking | Process pipeline tracking |
 
 ---
 
 ## 7. Design Principles
 
-1. **Clarity over density** — Mỗi screen chỉ show thông tin user cần RIGHT NOW
-2. **Progressive disclosure** — Không dump hết data, mở dần theo tương tác
-3. **Status at a glance** — 1 giây nhìn thấy cái gì OK, cái nào cần attention
-4. **Context-aware actions** — Action buttons xuất hiện khi cần, không lúc nào cũng hiện
-5. **Vietnamese-first UI** — Giữ technical terms (Phase, Pipeline, Dashboard) nhưng labels tiếng Việt
+1. **Clarity over density** — mỗi màn hình chỉ hiện thông tin cần ngay lúc đó
+2. **Progressive disclosure** — mở dần theo tương tác
+3. **Status at a glance** — một giây biết cái gì ổn, cái gì cần chú ý
+4. **Context-aware actions** — nút hành động xuất hiện khi cần
+5. **Vietnamese-first UI** — giữ thuật ngữ kỹ thuật (Phase, Pipeline, Dashboard), nhãn tiếng Việt (song ngữ EN/VI: #29)
 
 ---
 
 ## 8. Kiến trúc hệ thống
 
-Monorepo 2 phần, giao tiếp qua REST API:
+Monorepo 2 phần, giao tiếp qua REST API v1 ([API_CONTRACT.md](./API_CONTRACT.md)):
 
 ```
 project-monitoring/
-├── frontend/    # React SPA (hiện chạy mock data)
+├── frontend/    # React SPA
 ├── backend/     # Python API (Clean Architecture)
-└── docs/        # APP_DESCRIPTION.md · API_CONTRACT.md · SCHEMA.md
+├── docs/        # APP_DESCRIPTION · API_CONTRACT · SCHEMA · ROADMAP · UX_DESIGN
+├── docker-compose.yml
+└── .env.example # nguồn cấu hình duy nhất
 ```
 
 ### Frontend
@@ -209,25 +181,22 @@ project-monitoring/
 | Thành phần | Công nghệ |
 |---|---|
 | Framework | React 19 + TypeScript + Vite |
-| Styling | Tailwind CSS (Linear/Cal.com design system) |
+| Styling | Tailwind CSS + Radix UI (shadcn-style) |
 | Animation | framer-motion |
-| State | React Context (`AppContext`) — hiện dùng mock data trong `src/data/mockData.ts` |
+| State | React Context (`AppContext`) — dữ liệu thật từ API (`src/api/`); `src/data/mockData.ts` chỉ còn phục vụ bản demo ở landing |
 
 ### Backend
 
 | Thành phần | Công nghệ |
 |---|---|
 | Ngôn ngữ / Framework | Python 3.12 · FastAPI |
-| Kiến trúc | **Clean Architecture** — 4 tầng: `domain → application → infrastructure / presentation` |
-| Database | **PostgreSQL 16** · SQLAlchemy 2.0 (async) + asyncpg |
-| Migrations | Alembic |
-| Auth | JWT (python-jose) |
+| Kiến trúc | **Clean Architecture** — `domain → application → infrastructure / presentation` |
+| Database | **PostgreSQL 16** · SQLAlchemy 2.0 (async) + asyncpg · Alembic |
+| Lưu file | **MinIO** (S3-compatible) — tài liệu đính kèm, avatar |
+| Auth | JWT |
 
-Quy tắc phụ thuộc: tầng trong không biết tầng ngoài — `domain` (entities thuần) ← `application` (use cases + ports) ← `infrastructure` (PostgreSQL repos) / `presentation` (FastAPI routers). Chi tiết: `backend/README.md`.
+Quy tắc phụ thuộc: tầng trong không biết tầng ngoài — `domain` (entities thuần) ← `application` (use cases + ports) ← `infrastructure` (PostgreSQL/MinIO) / `presentation` (FastAPI routers). Chi tiết: `backend/README.md`.
 
-### Lộ trình thay mock data
-
-1. **Hợp đồng trước, code sau** — FE và BE cùng bám [API_CONTRACT.md](./API_CONTRACT.md); database theo [SCHEMA.md](./SCHEMA.md)
-2. BE implement các router theo contract (Projects đã có làm mẫu end-to-end)
-3. Seed `phase_task_templates` từ `PHASE_ROLE_TASKS`/`PHASE_ROLE_OUTCOMES` (frontend/src/types.ts)
-4. FE thay `mockData.ts` bằng API client (fetch theo contract), `AppContext` giữ nguyên interface để components không phải sửa
+### Triển khai
+- `docker compose up -d` dựng Postgres + MinIO + backend + frontend; backend tự chạy migration khi khởi động.
+- Mọi cấu hình nằm trong **một file `.env`** ở gốc repo (xem `.env.example`).

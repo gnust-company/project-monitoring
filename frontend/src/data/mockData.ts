@@ -1,7 +1,8 @@
 import type { User, Organization, Project, PhaseBlock, ActivityItem, PhaseTag, ChecklistItem, DevPhase } from '../types';
 import { DEV_PHASES, PHASE_ROLE_TASKS, PHASE_ROLE_OUTCOMES } from '../types';
 
-const today = new Date('2026-06-02');
+// Neo theo HÔM NAY (không cố định ngày) — preview ở landing luôn có phase quanh vạch "Hôm nay".
+const today = new Date();
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
