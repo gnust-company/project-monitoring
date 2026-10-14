@@ -17,22 +17,40 @@ project-monitoring/
     └── UX_DESIGN.md
 ```
 
-## Chạy Frontend
+## Cấu hình
+
+Toàn bộ cấu hình nằm trong **một file `.env` ở gốc repo** — mọi biến đều được giải thích trong `.env.example`:
 
 ```bash
-cd frontend
-npm install
-npm run dev          # http://localhost:5173
+cp .env.example .env     # rồi sửa giá trị (JWT_SECRET, IP/port khi deploy…)
 ```
 
-## Chạy Backend
+- `docker compose` nạp `.env` cho mọi service (`env_file`) và đọc cổng từ đó; compose không đặt giá trị riêng.
+- Backend chạy ngoài docker đọc thẳng `<repo>/.env`; frontend `npm run dev` đọc `VITE_API_BASE` từ đó.
+- Thiếu biến bắt buộc → compose/backend báo lỗi ngay, không âm thầm dùng mặc định.
+
+## Chạy cả stack (khuyến nghị)
 
 ```bash
+docker compose up --build    # FE :5173 · API/Swagger :8000/docs · MinIO console :9001
+```
+
+## Chạy riêng để dev
+
+```bash
+docker compose up -d postgres minio minio-setup
+
+# Backend (uv). `.env` trỏ host theo mạng docker → ghi đè sang localhost cho phiên shell này:
 cd backend
-python -m venv .venv && .venv\Scripts\activate
-pip install -e ".[dev]"
-copy .env.example .env          # sửa DATABASE_URL trỏ tới PostgreSQL
-uvicorn app.main:app --reload   # http://localhost:8000/docs
+uv sync --extra dev
+export POSTGRES_HOST=localhost:5432 MINIO_ENDPOINT=http://localhost:9000
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload --port 8000
+
+# Frontend
+cd frontend
+npm install
+npm run dev                  # http://localhost:5173
 ```
 
 Chi tiết kiến trúc Clean Architecture và trạng thái implement: [backend/README.md](backend/README.md)

@@ -26,7 +26,7 @@ export default function FilterPopover() {
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border whitespace-nowrap transition-colors
           ${hasFilters
             ? 'bg-ink text-white border-ink shadow-sm'
             : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700'}`}>

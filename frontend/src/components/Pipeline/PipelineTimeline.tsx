@@ -766,20 +766,30 @@ export default function PipelineTimeline() {
   return (
     <div className="flex-1 flex flex-col bg-white min-h-0 overflow-hidden relative">
       {/* Header */}
+      {/* Header — co giãn theo độ rộng màn hình: đủ chỗ thì 1 hàng; thiếu thì cụm điều khiển
+          xuống hàng 2 (và tự xuống tiếp nếu vẫn thiếu) thay vì bóp chữ trong nút xuống dòng.
+          Gợi ý thao tác có basis 0 + min-w: chỉ hiện khi còn ≥ 10rem, không bao giờ đẩy
+          cụm điều khiển xuống hàng. */}
       <div className="flex-shrink-0 bg-white border-b border-hairline px-5 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
             <h1 className="text-base font-bold text-ink">Development Pipeline</h1>
             <span className="text-xs text-stone-400 font-light">{filteredProjects.length} dự án · {phaseBlocks.length} phase</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden lg:flex items-center gap-1.5 text-[11px] text-stone-400 font-light">
-              <MousePointer2 className="w-3 h-3" />
-              {boardMode === 'create' ? 'Kéo ngang trên hàng dự án để tạo phase (lịch được giữ cố định)'
-                : boardMode === 'layout'
-                  ? (isOwner ? 'Kéo/giãn phase · kéo tên dự án để đổi thứ tự — bấm Lưu' : 'Kéo/giãn phase — bấm Lưu để áp dụng')
-                : 'Kéo chuột để di chuyển lịch'}
-            </span>
+          {(() => {
+            const hint = boardMode === 'create' ? 'Kéo ngang trên hàng dự án để tạo phase (lịch được giữ cố định)'
+              : boardMode === 'layout'
+                ? (isOwner ? 'Kéo/giãn phase · kéo tên dự án để đổi thứ tự — bấm Lưu' : 'Kéo/giãn phase — bấm Lưu để áp dụng')
+              : 'Kéo chuột để di chuyển lịch';
+            return (
+              <span title={hint}
+                className="hidden md:flex flex-1 basis-0 min-w-[10rem] items-center gap-1.5 text-[11px] text-stone-400 font-light">
+                <MousePointer2 className="w-3 h-3 shrink-0" />
+                <span className="truncate">{hint}</span>
+              </span>
+            );
+          })()}
+          <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
               <input type="text" placeholder="Tìm dự án hoặc PIC..."
@@ -798,27 +808,27 @@ export default function PipelineTimeline() {
             {/* #15: bộ lọc người + khoảng thời gian (gộp 1 nút để gọn toolbar) */}
             <FilterPopover />
             {/* Chế độ tương tác: Chỉ xem (pan) / Sắp xếp (kéo-giãn) / Tạo phase (#18) */}
-            <div className="flex items-center bg-stone-100 rounded-lg p-0.5">
+            <div className="flex items-center shrink-0 bg-stone-100 rounded-lg p-0.5">
               <button onClick={() => setBoardMode('readonly')}
                 title="Chỉ xem — chỉ di chuyển lịch, không kéo/giãn/tạo phase"
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md whitespace-nowrap transition-colors
                   ${boardMode === 'readonly' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
                 <Eye className="w-3.5 h-3.5" /> Chỉ xem
               </button>
               <button onClick={() => setBoardMode('layout')}
                 title="Sắp xếp — kéo/giãn phase rồi bấm Lưu để áp dụng"
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md whitespace-nowrap transition-colors
                   ${boardMode === 'layout' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
                 <Hand className="w-3.5 h-3.5" /> Sắp xếp
               </button>
               <button onClick={() => setBoardMode('create')}
                 title="Tạo phase — kéo ngang trên hàng dự án để tạo phase"
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md whitespace-nowrap transition-colors
                   ${boardMode === 'create' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
                 <SquarePen className="w-3.5 h-3.5" /> Tạo phase
               </button>
             </div>
-            <div className="flex items-center bg-stone-100 rounded-lg p-0.5">
+            <div className="flex items-center shrink-0 bg-stone-100 rounded-lg p-0.5">
               <button onClick={() => {
                 const el = boardRef.current;
                 if (!el) return;
@@ -826,13 +836,13 @@ export default function PipelineTimeline() {
                 const target = Math.max(0, Math.min(todayPos - el.clientWidth / 2, maxScroll));
                 smoothScrollTo(target);
               }}
-                className="px-2.5 py-1 text-xs font-bold rounded-md text-ink hover:bg-ink/[0.06] transition-colors">
+                className="px-2.5 py-1 text-xs font-bold rounded-md text-ink whitespace-nowrap hover:bg-ink/[0.06] transition-colors">
                 Hôm nay
               </button>
               <div className="w-px h-4 bg-stone-300 mx-0.5" />
               {(['3day', 'week', 'month', 'quarter'] as const).map(z => (
                 <button key={z} onClick={() => { setZoomLevel(z); hasScrolled.current = false; }}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize transition-colors
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize whitespace-nowrap transition-colors
                     ${zoomLevel === z ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
                   {z === '3day' ? '3 ngày' : z === 'week' ? 'Tuần' : z === 'month' ? 'Tháng' : 'Quý'}
                 </button>

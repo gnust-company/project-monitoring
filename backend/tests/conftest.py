@@ -13,9 +13,22 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.infrastructure.db.models import Base
-from app.infrastructure.db.session import get_session
-from app.main import app
+# Test chạy kín: cấu hình trỏ localhost, ghi đè giá trị trong `.env` ở gốc repo của máy dev
+# (biến môi trường luôn thắng file .env). Muốn khác thì export trước khi chạy pytest.
+# Phải đặt TRƯỚC khi import app (session/engine đọc Settings lúc import).
+for _key, _val in {
+    "POSTGRES_USER": "projecthub", "POSTGRES_PASSWORD": "projecthub", "POSTGRES_DB": "projecthub",
+    "POSTGRES_HOST": "localhost:5432",
+    "JWT_SECRET": "test-secret", "CORS_ORIGINS": "http://localhost:5173",
+    "ALLOWED_EMAIL_DOMAINS": "",
+    "MINIO_ENDPOINT": "http://localhost:9000", "MINIO_PUBLIC_URL": "http://localhost:9000",
+    "MINIO_ROOT_USER": "minioadmin", "MINIO_ROOT_PASSWORD": "minioadmin",
+}.items():
+    os.environ.setdefault(_key, _val)
+
+from app.infrastructure.db.models import Base  # noqa: E402
+from app.infrastructure.db.session import get_session  # noqa: E402
+from app.main import app  # noqa: E402
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",

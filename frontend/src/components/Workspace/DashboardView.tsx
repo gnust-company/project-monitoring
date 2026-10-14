@@ -218,11 +218,12 @@ export default function DashboardView() {
           ))}
         </div>
 
-        {/* Health row: Ring + Deadline */}
-        <div className="grid lg:grid-cols-5 gap-6 mb-6">
+        {/* Health row: Ring + Deadline — chỉ chia 2 cột khi đủ rộng (xl); hẹp hơn thì xếp chồng,
+            tránh cột "Sức khỏe" bị bóp làm chữ trạng thái/số liệu xuống dòng. */}
+        <div className="grid xl:grid-cols-5 gap-6 mb-6">
           {/* Tiến độ trung bình */}
           <motion.div custom={4} variants={fadeUp} initial="hidden" animate="visible"
-            className="lg:col-span-2 bg-surface-card rounded-xl border border-hairline p-6 flex flex-col">
+            className="xl:col-span-2 bg-surface-card rounded-xl border border-hairline p-6 flex flex-col">
             <h2 className="text-sm font-semibold text-ink flex items-center gap-2 mb-2">
               <Gauge className="w-4 h-4" /> Sức khỏe workspace
             </h2>
@@ -236,7 +237,7 @@ export default function DashboardView() {
                   <span className="text-[10px] text-stone-400">tiến độ TB</span>
                 </div>
               </div>
-              <div className="flex-1 space-y-3">
+              <div className="flex-1 min-w-0 space-y-3">
                 {(['On Track', 'At Risk', 'Delayed'] as const).map(status => {
                   const cfg = statusConfig[status];
                   const count = status === 'On Track' ? stats.onTrack : status === 'At Risk' ? stats.atRisk : stats.delayed;
@@ -246,8 +247,8 @@ export default function DashboardView() {
                       className="w-full group text-left">
                       <div className="flex items-center gap-2 mb-1">
                         <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-                        <span className="text-xs text-body flex-1 group-hover:text-ink transition-colors">{status}</span>
-                        <span className="text-xs font-semibold text-ink">{count} · {pct}%</span>
+                        <span className="text-xs text-body flex-1 whitespace-nowrap group-hover:text-ink transition-colors">{status}</span>
+                        <span className="text-xs font-semibold text-ink whitespace-nowrap">{count} · {pct}%</span>
                       </div>
                       <div className="h-1 bg-stone-100 rounded-full overflow-hidden">
                         <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
@@ -263,7 +264,7 @@ export default function DashboardView() {
 
           {/* Deadline sắp tới */}
           <motion.div custom={5} variants={fadeUp} initial="hidden" animate="visible"
-            className="lg:col-span-3 bg-surface-card rounded-xl border border-hairline p-6">
+            className="xl:col-span-3 bg-surface-card rounded-xl border border-hairline p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
                 <Clock className="w-4 h-4 text-ink" />
