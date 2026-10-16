@@ -143,10 +143,11 @@ async def test_delete_phase_in_use_requires_force(client: AsyncClient, make_user
         "startDate": "2026-06-10", "endDate": "2026-06-24",
     }, headers=auth(token))
 
-    # xóa không force → 409 kèm count
+    # xóa không force → 409 kèm mã lỗi + count (#29)
     denied = await client.delete(f"{API}/organizations/{org['id']}/phases/{sd['id']}", headers=auth(token))
     assert denied.status_code == 409
-    assert denied.json()["detail"]["count"] == 1
+    assert denied.json()["code"] == "phase_def.in_use"
+    assert denied.json()["params"]["count"] == 1
 
     # force → 204
     forced = await client.delete(

@@ -1,6 +1,7 @@
 // #14: hộp thoại xác nhận xóa + bắt buộc nhập lý do (log vào activity thành phần cha).
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 
 export default function DeleteReasonDialog({
@@ -11,6 +12,7 @@ export default function DeleteReasonDialog({
   onCancel: () => void;
   onConfirm: (reason: string) => void;
 }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState('');
   const valid = reason.trim().length >= 3;
 
@@ -41,10 +43,10 @@ export default function DeleteReasonDialog({
 
           <div className="mt-4">
             <label className="text-xs font-semibold text-gray-500 mb-1.5 block">
-              Lý do xóa <span className="text-red-500">*</span>
+              {t('deleteDialog.reason')} <span className="text-red-500">*</span>
             </label>
             <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} autoFocus
-              placeholder="Nhập lý do (sẽ được ghi vào lịch sử)…"
+              placeholder={t('deleteDialog.placeholder')}
               className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700
                          focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-red-400 resize-none" />
           </div>
@@ -53,12 +55,12 @@ export default function DeleteReasonDialog({
         <div className="flex items-center justify-end gap-2 px-5 py-3 bg-gray-50 border-t border-gray-100">
           <button onClick={onCancel}
             className="px-3.5 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-200 transition-colors">
-            Hủy
+            {t('common.cancel')}
           </button>
           <button onClick={() => valid && onConfirm(reason.trim())} disabled={!valid}
             className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-red-500 rounded-lg
                        hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-            <Trash2 className="w-3.5 h-3.5" /> Xóa
+            <Trash2 className="w-3.5 h-3.5" /> {t('common.delete')}
           </button>
         </div>
       </motion.div>

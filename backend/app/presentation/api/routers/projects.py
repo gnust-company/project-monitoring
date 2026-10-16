@@ -2,7 +2,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.application.authz import can_access_workspace
 from app.application.use_cases.projects import (
@@ -37,6 +37,7 @@ from app.presentation.api.schemas import (
     ProjectReorderIn,
     ProjectUpdate,
 )
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1", tags=["projects"])
 
@@ -89,10 +90,10 @@ async def _require_project_access(
     try:
         project = await get_uc.execute(project_id)
     except ProjectNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "project.not_found", "Project not found")
     membership = await orgs.get_membership(project.org_id, current.id)
     if not can_access_workspace(current, membership):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Not a member of this workspace")
+        raise ApiError(status.HTTP_403_FORBIDDEN, "workspace.not_member", "Not a member of this workspace")
     return project, membership
 
 
@@ -121,9 +122,9 @@ async def update_project(
     try:
         project = await uc.execute(project_id, payload, current)
     except ProjectNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "project.not_found", "Project not found")
     except ProjectForbiddenError as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ApiError(status.HTTP_403_FORBIDDEN, "project.forbidden_edit", str(e))
     return ProjectOut.model_validate(project)
 
 
@@ -140,9 +141,9 @@ async def delete_project(
     try:
         await uc.execute(project_id, current, reason)
     except ProjectNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "project.not_found", "Project not found")
     except ProjectForbiddenError as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ApiError(status.HTTP_403_FORBIDDEN, "project.forbidden_delete", str(e))
     return None
 
 
@@ -159,7 +160,7 @@ async def change_pic(
     try:
         project = await uc.execute(project_id, body.pic_user_id, current, membership)
     except ProjectNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "project.not_found", "Project not found")
     except ProjectForbiddenError as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ApiError(status.HTTP_403_FORBIDDEN, "project.forbidden_pic", str(e))
     return ProjectOut.model_validate(project)

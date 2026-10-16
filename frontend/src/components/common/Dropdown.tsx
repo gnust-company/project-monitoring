@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Check } from 'lucide-react';
 
 export interface DropdownOption {
@@ -23,9 +24,10 @@ interface DropdownProps {
 
 // Dropdown tùy biến dùng chung — thay cho <select> gốc để đồng bộ bo góc/style
 export default function Dropdown({
-  value, options, onChange, placeholder = 'Chọn...',
+  value, options, onChange, placeholder,
   className = '', align = 'left', renderTrigger,
 }: DropdownProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find(o => o.value === value);
@@ -49,7 +51,7 @@ export default function Dropdown({
             {selected?.avatar && <img src={selected.avatar} className="w-5 h-5 rounded-full flex-shrink-0" alt="" />}
             {selected?.dotClass && <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${selected.dotClass}`} />}
             <span className={`flex-1 text-left truncate ${selected ? (selected.labelClass ?? 'text-stone-700 font-medium') : 'text-stone-400'}`}>
-              {selected?.label ?? placeholder}
+              {selected?.label ?? placeholder ?? t('common.choose')}
             </span>
             {selected?.hint && <span className="text-[10px] text-stone-400 flex-shrink-0">{selected.hint}</span>}
           </>

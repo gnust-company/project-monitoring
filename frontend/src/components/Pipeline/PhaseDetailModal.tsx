@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
+import { formatDate } from '../../i18n/format';
 import { getUserById } from '../../data/mockData';
 import { participantsSignature, type ChecklistItem, type PhaseParticipant } from '../../types';
 import {
@@ -8,7 +10,6 @@ import {
   Send, HelpCircle, Users, Calendar, Plus, Trash2, Pencil, Check,
   Link2, ExternalLink, FileText, ChevronDown, Target, UserCircle2, Download
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import Avatar from '../common/Avatar';
 import Dropdown from '../common/Dropdown';
 import RaciParticipants from '../common/RaciParticipants';
@@ -27,6 +28,7 @@ function buildGroups(items: ChecklistItem[], roles: string[]): Array<{ role: str
 }
 
 export default function PhaseDetailModal() {
+  const { t } = useTranslation();
   const {
     selectedPhaseBlock, phaseDetailOpen, closePhaseDetail,
     updatePhaseBlock, deletePhaseBlock, orgProjects,
@@ -350,12 +352,12 @@ export default function PhaseDetailModal() {
                 </span>
               )}
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 border border-gray-200">
-                {phasePct}% hoàn thành
+                {t('common.percentDone', { pct: phasePct })}
               </span>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={handleDelete}
-                className="p-1.5 hover:bg-red-50 rounded-lg transition-colors group" title="Xóa">
+                className="p-1.5 hover:bg-red-50 rounded-lg transition-colors group" title={t('common.delete')}>
                 <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-500" />
               </button>
               <button onClick={closePhaseDetail} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
@@ -385,7 +387,7 @@ export default function PhaseDetailModal() {
                 </div>
               )}
               <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                <span>Dự án: <span className="font-medium text-slate-700">{project?.name}</span></span>
+                <span>{t('phase.projectLabel')} <span className="font-medium text-slate-700">{project?.name}</span></span>
               </div>
             </div>
 
@@ -394,7 +396,7 @@ export default function PhaseDetailModal() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-400 mb-1 block flex items-center gap-1">
-                    <Calendar className="w-3 h-3" /> Bắt đầu
+                    <Calendar className="w-3 h-3" /> {t('phase.start')}
                   </label>
                   <input type="date"
                     value={meta.startDate}
@@ -404,7 +406,7 @@ export default function PhaseDetailModal() {
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 mb-1 block flex items-center gap-1">
-                    <Calendar className="w-3 h-3" /> Kết thúc
+                    <Calendar className="w-3 h-3" /> {t('phase.end')}
                   </label>
                   <input type="date"
                     value={meta.endDate}
@@ -426,17 +428,17 @@ export default function PhaseDetailModal() {
                   <div className="flex justify-end gap-2">
                     <button onClick={() => setEditingDesc(false)}
                       className="px-3 py-1.5 bg-slate-900 text-white text-xs rounded-lg hover:bg-slate-800 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Xong
+                      <Check className="w-3 h-3" /> {t('common.done')}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className={`group rounded-lg -mx-1 px-1 py-1 transition-colors ${canEditPhase ? 'cursor-pointer hover:bg-gray-50' : ''}`}
                   onClick={() => canEditPhase && setEditingDesc(true)}>
-                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{meta.description || 'Thêm mô tả...'}</p>
+                  <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{meta.description || t('phase.addDescription')}</p>
                   {canEditPhase && (
                     <span className="text-[10px] text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
-                      <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa
+                      <Pencil className="w-2.5 h-2.5" /> {t('phase.clickToEdit')}
                     </span>
                   )}
                 </div>
@@ -482,7 +484,7 @@ export default function PhaseDetailModal() {
               {/* #34: người tham gia theo RACI (thành viên workspace hoặc tên người ngoài nền tảng) */}
               <div>
                 <span className="text-xs text-gray-400 flex items-center gap-1 mb-1.5">
-                  <Users className="w-3.5 h-3.5" /> Người tham gia (RACI)
+                  <Users className="w-3.5 h-3.5" /> {t('phase.participants')}
                 </span>
                 <RaciParticipants value={meta.participants} onChange={changeParticipants}
                   members={orgMembers} getUserById={getUserById} readOnly={!canEditPhase} />
@@ -495,7 +497,7 @@ export default function PhaseDetailModal() {
                 className="w-full flex items-center justify-between mb-2 group/sec">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                   <CheckSquare className="w-3.5 h-3.5" />
-                  Checklist ({completedChecks}/{checklist.length})
+                  {t('phase.checklistTitle', { done: completedChecks, total: checklist.length })}
                 </h3>
                 <span className="flex items-center gap-2">
                   <span className="text-[10px] text-gray-400">{progressPct}%</span>
@@ -515,7 +517,7 @@ export default function PhaseDetailModal() {
                     <div key={key}>
                       <div className="flex items-center gap-2 px-1 mb-0.5">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                          {group.role ? (getRoleName(group.role)) : 'Chung'}
+                          {group.role ? (getRoleName(group.role)) : t('phase.general')}
                         </span>
                         <span className="text-[10px] text-gray-400">{groupDone}/{group.items.length}</span>
                         <div className="flex-1 h-px bg-gray-100" />
@@ -554,13 +556,13 @@ export default function PhaseDetailModal() {
                                 <button
                                   onClick={() => startEditCheckItem(item.id, item.text)}
                                   className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-all"
-                                  title="Sửa">
+                                  title={t('common.edit')}>
                                   <Pencil className="w-3 h-3 text-gray-400" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteChecklistItem(item.id)}
                                   className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all"
-                                  title="Xóa">
+                                  title={t('common.delete')}>
                                   <Trash2 className="w-3 h-3 text-red-400" />
                                 </button>
                               </>
@@ -572,7 +574,7 @@ export default function PhaseDetailModal() {
                           <input type="text" value={checkDrafts[key] ?? ''}
                             onChange={e => setCheckDrafts(d => ({ ...d, [key]: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') addCheckItem(group.role); }}
-                            placeholder={group.role ? `Thêm cho ${getRoleName(group.role)}…` : 'Thêm mục chung…'}
+                            placeholder={group.role ? t('phase.addForRole', { role: getRoleName(group.role) }) : t('phase.addGeneralItem')}
                             className="flex-1 px-2.5 py-1 bg-gray-50/70 border border-dashed border-gray-200 rounded-md text-xs
                                        text-gray-700 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:bg-white" />
                           <button onClick={() => addCheckItem(group.role)} className="p-1 hover:bg-gray-100 rounded shrink-0">
@@ -594,7 +596,7 @@ export default function PhaseDetailModal() {
                 className="w-full flex items-center justify-between mb-2 group/sec">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                   <Target className="w-3.5 h-3.5" />
-                  Outcomes ({outcomes.filter(o => o.done).length}/{outcomes.length})
+                  {t('phase.outcomesTitle', { done: outcomes.filter(o => o.done).length, total: outcomes.length })}
                 </h3>
                 <ChevronDown className={`w-3.5 h-3.5 text-gray-400 group-hover/sec:text-gray-600 transition-transform ${expandOutcomes ? 'rotate-180' : ''}`} />
               </button>
@@ -606,7 +608,7 @@ export default function PhaseDetailModal() {
                   <div key={key}>
                     <div className="flex items-center gap-2 px-1 mb-0.5">
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                        {group.role ? (getRoleName(group.role)) : 'Chung'}
+                        {group.role ? (getRoleName(group.role)) : t('phase.general')}
                       </span>
                       <div className="flex-1 h-px bg-gray-100" />
                     </div>
@@ -620,7 +622,7 @@ export default function PhaseDetailModal() {
                             <button
                               onClick={() => toggleOutcomeItem(item.id)}
                               disabled={!canTick}
-                              title={!canTick ? 'Cần đính kèm ≥1 tài liệu/link trước khi đánh dấu hoàn thành' : undefined}
+                              title={!canTick ? t('phase.outcomeNeedsDocHint') : undefined}
                               className={`flex-1 flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors ${canTick ? 'hover:bg-gray-50' : 'cursor-not-allowed'}`}
                             >
                               {item.done
@@ -632,20 +634,20 @@ export default function PhaseDetailModal() {
                               </span>
                               {!item.done && atts.length === 0 && (
                                 <span className="text-[9px] font-medium text-amber-500 flex items-center gap-0.5 shrink-0">
-                                  <Paperclip className="w-2.5 h-2.5" /> cần tài liệu
+                                  <Paperclip className="w-2.5 h-2.5" /> {t('phase.needsDoc')}
                                 </span>
                               )}
                             </button>
                             <button
                               onClick={() => { setOutcomeAttachId(outcomeAttachId === item.id ? null : item.id); setOLinkName(''); setOLinkUrl(''); }}
                               className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-all"
-                              title="Đính kèm tài liệu / link">
+                              title={t('phase.attachDocOrLink')}>
                               <Paperclip className="w-3 h-3 text-gray-400" />
                             </button>
                             <button
                               onClick={() => handleDeleteOutcomeItem(item.id)}
                               className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all"
-                              title="Xóa">
+                              title={t('common.delete')}>
                               <Trash2 className="w-3 h-3 text-red-400" />
                             </button>
                           </div>
@@ -664,7 +666,7 @@ export default function PhaseDetailModal() {
                                     {att.kind === 'link' && <ExternalLink className="w-2.5 h-2.5 shrink-0" />}
                                   </a>
                                   <button onClick={() => handleDeleteAttachment(att.id)}
-                                    className="opacity-0 group-hover/att:opacity-100 hover:bg-red-50 rounded p-0.5 transition-all" title="Xóa">
+                                    className="opacity-0 group-hover/att:opacity-100 hover:bg-red-50 rounded p-0.5 transition-all" title={t('common.delete')}>
                                     <Trash2 className="w-3 h-3 text-red-400" />
                                   </button>
                                 </div>
@@ -676,7 +678,7 @@ export default function PhaseDetailModal() {
                           {outcomeAttachId === item.id && (
                             <div className="ml-9 mb-2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
                               <input type="text" value={oLinkName} onChange={e => setOLinkName(e.target.value)}
-                                placeholder="Tên tài liệu (tùy chọn)"
+                                placeholder={t('phase.docNamePlaceholder')}
                                 className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs
                                            text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
                               <input type="url" value={oLinkUrl} onChange={e => setOLinkUrl(e.target.value)}
@@ -688,14 +690,14 @@ export default function PhaseDetailModal() {
                                 <button onClick={() => handleOutcomeFilePick(item.id)}
                                   className="px-2.5 py-1 border border-dashed border-gray-300 rounded-lg text-xs text-gray-500
                                              hover:border-gray-400 flex items-center gap-1">
-                                  <Paperclip className="w-3 h-3" /> Upload tệp
+                                  <Paperclip className="w-3 h-3" /> {t('phase.uploadFile')}
                                 </button>
                                 <div className="flex gap-2">
                                   <button onClick={() => { setOutcomeAttachId(null); setOLinkName(''); setOLinkUrl(''); }}
-                                    className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700">Hủy</button>
+                                    className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700">{t('common.cancel')}</button>
                                   <button onClick={() => handleOutcomeLink(item.id)} disabled={!oLinkUrl.trim()}
                                     className="px-2.5 py-1 bg-slate-900 text-white text-xs rounded-lg hover:bg-slate-800 disabled:opacity-40 flex items-center gap-1">
-                                    <Link2 className="w-3 h-3" /> Đính kèm link
+                                    <Link2 className="w-3 h-3" /> {t('phase.attachLink')}
                                   </button>
                                 </div>
                               </div>
@@ -708,7 +710,7 @@ export default function PhaseDetailModal() {
                         <input type="text" value={outcomeDrafts[key] ?? ''}
                           onChange={e => setOutcomeDrafts(d => ({ ...d, [key]: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') addOutcomeItemFor(group.role); }}
-                          placeholder={group.role ? `Thêm cho ${getRoleName(group.role)}…` : 'Thêm outcome chung…'}
+                          placeholder={group.role ? t('phase.addForRole', { role: getRoleName(group.role) }) : t('phase.addGeneralOutcome')}
                           className="flex-1 px-2.5 py-1 bg-gray-50/70 border border-dashed border-gray-200 rounded-md text-xs
                                      text-gray-700 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:bg-white" />
                         <button onClick={() => addOutcomeItemFor(group.role)} className="p-1 hover:bg-gray-100 rounded shrink-0">
@@ -729,7 +731,7 @@ export default function PhaseDetailModal() {
                 className="w-full flex items-center justify-between mb-2 group/sec">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider
                                flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" /> Document ({attachments.filter(a => !a.outcomeItemId).length})
+                  <FileText className="w-3.5 h-3.5" /> {t('phase.documentsTitle', { count: attachments.filter(a => !a.outcomeItemId).length })}
                 </h3>
                 <ChevronDown className={`w-3.5 h-3.5 text-gray-400 group-hover/sec:text-gray-600 transition-transform ${expandDocs ? 'rotate-180' : ''}`} />
               </button>
@@ -755,17 +757,17 @@ export default function PhaseDetailModal() {
                         </a>
                       )}
                       <p className="text-[10px] text-gray-400">
-                        {att.kind === 'link' ? att.url : format(parseISO(att.uploadedAt), 'dd/MM/yyyy')}
+                        {att.kind === 'link' ? att.url : formatDate(att.uploadedAt)}
                       </p>
                     </div>
                     {att.kind === 'file' && (
-                      <a href={att.url} target="_blank" rel="noopener noreferrer" download title="Tải xuống"
+                      <a href={att.url} target="_blank" rel="noopener noreferrer" download title={t('phase.download')}
                         className="p-1 hover:bg-slate-100 rounded transition-all">
                         <Download className="w-3.5 h-3.5 text-slate-500" />
                       </a>
                     )}
                     <button onClick={() => handleDeleteAttachment(att.id)}
-                      className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all" title="Xóa">
+                      className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded transition-all" title={t('common.delete')}>
                       <Trash2 className="w-3 h-3 text-red-400" />
                     </button>
                   </div>
@@ -774,7 +776,7 @@ export default function PhaseDetailModal() {
               {showLinkForm && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
                   <input type="text" value={linkName} onChange={e => setLinkName(e.target.value)}
-                    placeholder="Tên tài liệu (tùy chọn)"
+                    placeholder={t('phase.docNamePlaceholder')}
                     className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs
                                text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
                   <input type="url" value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
@@ -785,10 +787,10 @@ export default function PhaseDetailModal() {
                                text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500" />
                   <div className="flex justify-end gap-2">
                     <button onClick={() => { setShowLinkForm(false); setLinkName(''); setLinkUrl(''); }}
-                      className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700">Hủy</button>
+                      className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700">{t('common.cancel')}</button>
                     <button onClick={handleAttachLink} disabled={!linkUrl.trim()}
                       className="px-3 py-1.5 bg-slate-900 text-white text-xs rounded-lg hover:bg-slate-800 disabled:opacity-40 flex items-center gap-1">
-                      <Link2 className="w-3 h-3" /> Đính kèm link
+                      <Link2 className="w-3 h-3" /> {t('phase.attachLink')}
                     </button>
                   </div>
                 </div>
@@ -797,12 +799,12 @@ export default function PhaseDetailModal() {
                 <button onClick={() => setShowUploadModal(true)}
                   className="py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-500
                              hover:border-gray-300 transition-colors flex items-center justify-center gap-1.5">
-                  <Paperclip className="w-3.5 h-3.5" /> Upload tệp
+                  <Paperclip className="w-3.5 h-3.5" /> {t('phase.uploadFile')}
                 </button>
                 <button onClick={() => setShowLinkForm(true)}
                   className="py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-500
                              hover:border-gray-300 transition-colors flex items-center justify-center gap-1.5">
-                  <Link2 className="w-3.5 h-3.5" /> Đính kèm link
+                  <Link2 className="w-3.5 h-3.5" /> {t('phase.attachLink')}
                 </button>
               </div>
               </>)}
@@ -812,7 +814,7 @@ export default function PhaseDetailModal() {
             <div className="px-6 pb-4">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3
                              flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5" /> Bình luận ({comments.length})
+                <MessageSquare className="w-3.5 h-3.5" /> {t('phase.commentsTitle', { count: comments.length })}
               </h3>
               <div className="space-y-3 mb-3 max-h-48 overflow-y-auto">
                 {comments.map(c => {
@@ -823,7 +825,7 @@ export default function PhaseDetailModal() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-slate-900">{author?.name}</span>
-                          <span className="text-[10px] text-gray-400">{format(parseISO(c.createdAt), 'dd/MM HH:mm')}</span>
+                          <span className="text-[10px] text-gray-400">{formatDate(c.createdAt, 'dateTimeShort')}</span>
                         </div>
                         <p className="text-xs text-gray-600 mt-0.5">{c.content}</p>
                       </div>
@@ -834,7 +836,7 @@ export default function PhaseDetailModal() {
               <div className="flex gap-2">
                 <textarea value={commentText} onChange={e => setCommentText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
-                  placeholder="Thêm bình luận..." rows={2}
+                  placeholder={t('phase.commentPlaceholder')} rows={2}
                   className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs
                              text-gray-700 focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none" />
                 <button onClick={handleAddComment} disabled={!commentText.trim()}
@@ -849,10 +851,10 @@ export default function PhaseDetailModal() {
             <div className="px-6 pb-6">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3
                              flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" /> Lịch sử hoạt động ({selectedPhaseBlock.activityLog.length})
+                <Clock className="w-3.5 h-3.5" /> {t('phase.activityTitle', { count: selectedPhaseBlock.activityLog.length })}
               </h3>
               {selectedPhaseBlock.activityLog.length === 0 ? (
-                <p className="text-xs text-gray-400 py-2">Chưa có hoạt động nào.</p>
+                <p className="text-xs text-gray-400 py-2">{t('phase.noActivity')}</p>
               ) : (
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {selectedPhaseBlock.activityLog.map(a => {
@@ -863,10 +865,10 @@ export default function PhaseDetailModal() {
                         <Avatar name={user?.name} src={user?.avatar} className="w-6 h-6 shrink-0" />
                         <div className="min-w-0">
                           <p className="text-xs text-gray-700">
-                            <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {verb}
+                            <span className="font-medium">{user?.name ?? t('common.someone')}</span> {verb}
                             {detail && <span className="text-gray-500"> — {detail}</span>}
                           </p>
-                          <p className="text-[10px] text-gray-400">{format(parseISO(a.timestamp), 'dd/MM/yyyy HH:mm')}</p>
+                          <p className="text-[10px] text-gray-400">{formatDate(a.timestamp, 'dateTime')}</p>
                         </div>
                       </div>
                     );
@@ -879,15 +881,15 @@ export default function PhaseDetailModal() {
           {/* #14: thanh Lưu metadata — chỉ áp khi bấm Lưu (không auto-apply) */}
           {metaDirty && (
             <div className="flex-shrink-0 flex items-center justify-between gap-3 px-6 py-3 border-t border-gray-200 bg-amber-50/60">
-              <span className="text-xs font-semibold text-amber-700">Có thay đổi chưa lưu</span>
+              <span className="text-xs font-semibold text-amber-700">{t('common.unsavedChanges')}</span>
               <div className="flex items-center gap-2">
                 <button onClick={resetMeta}
                   className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
-                  Hoàn tác
+                  {t('common.revert')}
                 </button>
                 <button onClick={saveMeta}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors">
-                  <Check className="w-3.5 h-3.5" /> Lưu
+                  <Check className="w-3.5 h-3.5" /> {t('common.save')}
                 </button>
               </div>
             </div>
@@ -898,8 +900,8 @@ export default function PhaseDetailModal() {
       {/* #14: xóa phase cần nhập lý do → log vào activity dự án */}
       {confirmDelete && (
         <DeleteReasonDialog
-          title="Xóa phase"
-          message={`Xóa phase "${selectedPhaseBlock.title}"? Hành động này không thể hoàn tác.`}
+          title={t('phase.deleteTitle')}
+          message={t('phase.deleteMessage', { title: selectedPhaseBlock.title })}
           onCancel={() => setConfirmDelete(false)}
           onConfirm={(reason) => {
             deletePhaseBlock(selectedPhaseBlock.id, reason);

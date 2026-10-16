@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useApp } from '../../context/AppContext';
 import { DEV_PHASES, PHASE_META } from '../../types';
 import { ApiError } from '../../api/client';
-import { HERO } from './landingContent';
+import { useLanding } from '../../i18n/useLanding';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 import {
   Layers, Eye, EyeOff, ArrowRight, Mail, Lock, User,
   ChevronRight, Sparkles
@@ -19,10 +22,10 @@ const fadeUp = {
 
 // #33: validate phía client để báo lỗi rõ từng ô, thay vì tooltip thô của trình duyệt / JSON thô từ API.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function emailError(v: string): string | undefined {
-  const t = v.trim();
-  if (!t) return 'Vui lòng nhập email.';
-  if (!EMAIL_RE.test(t)) return 'Email không đúng định dạng (ví dụ: ten@congty.com).';
+function emailError(v: string, t: TFunction): string | undefined {
+  const value = v.trim();
+  if (!value) return t('auth.validation.emailRequired');
+  if (!EMAIL_RE.test(value)) return t('auth.validation.emailInvalid');
   return undefined;
 }
 
@@ -32,15 +35,16 @@ function FieldError({ msg }: { msg?: string }) {
   return msg ? <p className="text-[11px] text-error mt-1" role="alert">{msg}</p> : null;
 }
 
-// Lỗi từ API/mạng → câu tiếng Việt dễ hiểu.
-function friendlyError(err: unknown, fallback: string): string {
-  if (err instanceof ApiError && err.status === 401) return 'Email hoặc mật khẩu không đúng.';
-  if (err instanceof TypeError) return 'Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.';
+// Lỗi từ API/mạng → câu dễ hiểu (lỗi API đã được dịch theo mã lỗi trong api/client.ts).
+function friendlyError(err: unknown, fallback: string, t: TFunction): string {
+  if (err instanceof ApiError && err.status === 401) return t('auth.invalidCredentials');
   return err instanceof Error ? err.message : fallback;
 }
 
 export default function LoginPage() {
   const { login, register, goToLanding } = useApp();
+  const { t } = useTranslation();
+  const { hero: HERO } = useLanding();
   const [mode, setMode] = useState<'login' | 'register'>(
     typeof window !== 'undefined' && window.location.pathname === '/register' ? 'register' : 'login'
   );
@@ -72,8 +76,8 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     const errs: FieldErrors = {
-      email: emailError(email),
-      password: password ? undefined : 'Vui lòng nhập mật khẩu.',
+      email: emailError(email, t),
+      password: password ? undefined : t('auth.validation.passwordRequired'),
     };
     setFieldErrors(errs);
     if (errs.email || errs.password) return;
@@ -81,7 +85,7 @@ export default function LoginPage() {
     try {
       await login(email.trim(), password);
     } catch (err) {
-      setError(friendlyError(err, 'Đăng nhập thất bại'));
+      setError(friendlyError(err, t('auth.login.failed'), t));
     } finally {
       setLoading(false);
     }
@@ -91,10 +95,10 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     const errs: FieldErrors = {
-      name: regName.trim() ? undefined : 'Vui lòng nhập họ tên.',
-      email: emailError(regEmail),
-      password: regPassword.length >= 6 ? undefined : 'Mật khẩu tối thiểu 6 ký tự.',
-      confirm: regPassword === regConfirm ? undefined : 'Mật khẩu không khớp.',
+      name: regName.trim() ? undefined : t('auth.validation.nameRequired'),
+      email: emailError(regEmail, t),
+      password: regPassword.length >= 6 ? undefined : t('auth.validation.passwordMin'),
+      confirm: regPassword === regConfirm ? undefined : t('auth.validation.passwordMismatch'),
     };
     setFieldErrors(errs);
     if (Object.values(errs).some(Boolean)) return;
@@ -110,11 +114,11 @@ export default function LoginPage() {
           return;
         } catch (loginErr) {
           setError(loginErr instanceof ApiError && loginErr.status === 401
-            ? 'Email này đã được đăng ký. Vui lòng đăng nhập.'
-            : friendlyError(loginErr, 'Email đã được đăng ký. Vui lòng đăng nhập.'));
+            ? t('auth.register.emailTaken')
+            : friendlyError(loginErr, t('auth.register.emailTaken'), t));
         }
       } else {
-        setError(friendlyError(err, 'Đăng ký thất bại'));
+        setError(friendlyError(err, t('auth.register.failed'), t));
       }
     } finally {
       setLoading(false);
@@ -164,8 +168,7 @@ export default function LoginPage() {
             </motion.h2>
             <motion.p custom={2} variants={fadeUp} initial="hidden" animate="visible"
               className="text-sm text-on-dark-soft leading-relaxed max-w-sm">
-              Checklist theo vai trò, người chịu trách nhiệm rõ ràng, và trạng thái tự cảnh báo
-              khi dự án bắt đầu chậm — từ đánh giá đến vận hành.
+              {HERO.loginLead}
             </motion.p>
 
             <motion.div custom={3} variants={fadeUp} initial="hidden" animate="visible"
@@ -183,13 +186,14 @@ export default function LoginPage() {
           </div>
 
           <div className="text-[11px] text-on-dark-soft">
-            &copy; 2026 ProjectHub
+            &copy; {new Date().getFullYear()} ProjectHub
           </div>
         </div>
       </div>
 
       {/* ── Right — Form ───────────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center bg-white p-6 sm:p-10">
+      <div className="flex-1 flex items-center justify-center bg-white p-6 sm:p-10 relative">
+        <LanguageSwitcher className="absolute top-4 right-4 sm:top-6 sm:right-6" />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -208,8 +212,8 @@ export default function LoginPage() {
             {mode === 'login' ? (
               <motion.div key="login" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                 <div className="mb-8">
-                  <h1 className="text-2xl font-semibold text-ink tracking-tight">Đăng nhập</h1>
-                  <p className="text-sm text-muted mt-1.5">Chào mừng trở lại! Nhập thông tin để tiếp tục.</p>
+                  <h1 className="text-2xl font-semibold text-ink tracking-tight">{t('auth.login.title')}</h1>
+                  <p className="text-sm text-muted mt-1.5">{t('auth.login.subtitle')}</p>
                 </div>
 
                 <form onSubmit={handleLogin} noValidate className="space-y-4">
@@ -226,7 +230,7 @@ export default function LoginPage() {
                     <FieldError msg={fieldErrors.email} />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-body mb-1.5 block">Mật khẩu</label>
+                    <label className="text-xs font-medium text-body mb-1.5 block">{t('auth.fields.password')}</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input type={showPassword ? 'text' : 'password'}
@@ -254,10 +258,10 @@ export default function LoginPage() {
                           </svg>
                         )}
                       </button>
-                      <span className="text-xs text-body">Ghi nhớ đăng nhập</span>
+                      <span className="text-xs text-body">{t('auth.login.remember')}</span>
                     </label>
                     <button type="button" className="text-xs text-ink hover:text-[#242424] font-medium transition-colors">
-                      Quên mật khẩu?
+                      {t('auth.login.forgot')}
                     </button>
                   </div>
 
@@ -269,14 +273,14 @@ export default function LoginPage() {
                     {loading ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      <>Đăng nhập <ArrowRight className="w-4 h-4" /></>
+                      <>{t('auth.login.submit')} <ArrowRight className="w-4 h-4" /></>
                     )}
                   </button>
                 </form>
 
                 <div className="flex items-center gap-3 my-6">
                   <div className="flex-1 h-px bg-hairline" />
-                  <span className="text-[11px] text-muted-soft">hoặc</span>
+                  <span className="text-[11px] text-muted-soft">{t('auth.or')}</span>
                   <div className="flex-1 h-px bg-hairline" />
                 </div>
 
@@ -284,24 +288,24 @@ export default function LoginPage() {
                   className="w-full py-3 bg-white text-body text-sm font-semibold rounded-lg
                              border border-hairline hover:bg-surface-soft hover:border-gray-300
                              transition-all flex items-center justify-center gap-2">
-                  Tạo tài khoản mới
+                  {t('auth.login.createAccount')}
                 </button>
               </motion.div>
             ) : (
               <motion.div key="register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                 <div className="mb-8">
-                  <h1 className="text-2xl font-semibold text-ink tracking-tight">Đăng ký</h1>
-                  <p className="text-sm text-muted mt-1.5">Tạo tài khoản để bắt đầu sử dụng ProjectHub.</p>
+                  <h1 className="text-2xl font-semibold text-ink tracking-tight">{t('auth.register.title')}</h1>
+                  <p className="text-sm text-muted mt-1.5">{t('auth.register.subtitle')}</p>
                 </div>
 
                 <form onSubmit={handleRegister} noValidate className="space-y-4">
                   <div>
-                    <label className="text-xs font-medium text-body mb-1.5 block">Họ tên</label>
+                    <label className="text-xs font-medium text-body mb-1.5 block">{t('auth.fields.name')}</label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input type="text" value={regName}
                         onChange={e => { setRegName(e.target.value); clearField('name'); }}
-                        placeholder="Nguyễn Văn A" autoComplete="name"
+                        placeholder={t('auth.fields.namePlaceholder')} autoComplete="name"
                         aria-invalid={!!fieldErrors.name}
                         className={`${inputClass} ${errCls('name')}`} />
                     </div>
@@ -320,30 +324,30 @@ export default function LoginPage() {
                     <FieldError msg={fieldErrors.email} />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-body mb-1.5 block">Mật khẩu</label>
+                    <label className="text-xs font-medium text-body mb-1.5 block">{t('auth.fields.password')}</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input type={showPassword ? 'text' : 'password'}
                         value={regPassword}
                         onChange={e => { setRegPassword(e.target.value); clearField('password'); }}
-                        placeholder="Tối thiểu 6 ký tự" autoComplete="new-password"
+                        placeholder={t('auth.fields.passwordHint')} autoComplete="new-password"
                         aria-invalid={!!fieldErrors.password}
                         className={`${inputClass} ${errCls('password')}`} />
                     </div>
                     <FieldError msg={fieldErrors.password} />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-body mb-1.5 block">Xác nhận mật khẩu</label>
+                    <label className="text-xs font-medium text-body mb-1.5 block">{t('auth.fields.confirmPassword')}</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input type={showPassword ? 'text' : 'password'}
                         value={regConfirm}
                         onChange={e => { setRegConfirm(e.target.value); clearField('confirm'); }}
-                        placeholder="Nhập lại mật khẩu" autoComplete="new-password"
+                        placeholder={t('auth.fields.confirmPlaceholder')} autoComplete="new-password"
                         aria-invalid={!!fieldErrors.confirm || (!!regConfirm && regConfirm !== regPassword)}
                         className={`${inputClass} ${regConfirm && regConfirm !== regPassword ? '!border-error focus:!ring-error/20' : errCls('confirm')}`} />
                     </div>
-                    <FieldError msg={regConfirm && regConfirm !== regPassword ? 'Mật khẩu không khớp.' : fieldErrors.confirm} />
+                    <FieldError msg={regConfirm && regConfirm !== regPassword ? t('auth.validation.passwordMismatch') : fieldErrors.confirm} />
                   </div>
 
                   <button type="submit" disabled={loading}
@@ -354,14 +358,14 @@ export default function LoginPage() {
                     {loading ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      <>Đăng ký <ArrowRight className="w-4 h-4" /></>
+                      <>{t('auth.register.submit')} <ArrowRight className="w-4 h-4" /></>
                     )}
                   </button>
                 </form>
 
                 <div className="flex items-center gap-3 my-6">
                   <div className="flex-1 h-px bg-hairline" />
-                  <span className="text-[11px] text-muted-soft">hoặc</span>
+                  <span className="text-[11px] text-muted-soft">{t('auth.or')}</span>
                   <div className="flex-1 h-px bg-hairline" />
                 </div>
 
@@ -369,7 +373,7 @@ export default function LoginPage() {
                   className="w-full py-3 bg-white text-body text-sm font-semibold rounded-lg
                              border border-hairline hover:bg-surface-soft hover:border-gray-300
                              transition-all flex items-center justify-center gap-2">
-                  Đã có tài khoản? Đăng nhập
+                  {t('auth.register.haveAccount')}
                 </button>
               </motion.div>
             )}
@@ -384,7 +388,7 @@ export default function LoginPage() {
           <button onClick={goToLanding}
             className="w-full mt-5 py-2 text-xs text-muted hover:text-ink transition-colors flex items-center justify-center gap-1">
             <ChevronRight className="w-3 h-3 rotate-180" />
-            Về trang chủ
+            {t('auth.backHome')}
           </button>
         </motion.div>
       </div>

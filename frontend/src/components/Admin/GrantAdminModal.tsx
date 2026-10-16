@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Trans, useTranslation } from 'react-i18next';
 import { ShieldPlus, ShieldMinus, X, AlertTriangle } from 'lucide-react';
 import type { AdminUserInfo } from '../../types';
 import { adminApi } from '../../api';
@@ -14,6 +15,7 @@ interface Props {
 export default function GrantAdminModal({ user, onClose, onDone }: Props) {
   // State reset tự nhiên nhờ remount theo key={user.id} ở nơi mount (AdminLayout) —
   // không cần effect đồng bộ (tránh react-hooks/set-state-in-effect).
+  const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +37,7 @@ export default function GrantAdminModal({ user, onClose, onDone }: Props) {
       onDone();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Cập nhật quyền thất bại');
+      setError(e instanceof Error ? e.message : t('admin.grant.failed'));
       setSubmitting(false);
     }
   };
@@ -64,9 +66,9 @@ export default function GrantAdminModal({ user, onClose, onDone }: Props) {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-ink">
-                    {granting ? 'Cấp quyền Admin' : 'Thu hồi quyền Admin'}
+                    {granting ? t('admin.users.grantAdmin') : t('admin.users.revokeAdmin')}
                   </h3>
-                  <p className="text-[11px] text-muted-soft">Thao tác này cần xác nhận</p>
+                  <p className="text-[11px] text-muted-soft">{t('admin.needsConfirm')}</p>
                 </div>
               </div>
               <button onClick={onClose}
@@ -88,13 +90,8 @@ export default function GrantAdminModal({ user, onClose, onDone }: Props) {
               <div className={`flex items-start gap-2.5 p-3 rounded-xl border ${s.box}`}>
                 <AlertTriangle className={`w-4 h-4 ${s.boxIcon} flex-shrink-0 mt-0.5`} />
                 <p className={`text-[12px] leading-relaxed ${s.boxText}`}>
-                  {granting ? (
-                    <>Sau khi cấp quyền, <strong>{user.name}</strong> trở thành <strong>superuser</strong> —
-                    toàn quyền quản trị hệ thống (xem mọi workspace/user, đặt lại mật khẩu, cấp quyền admin).</>
-                  ) : (
-                    <><strong>{user.name}</strong> sẽ mất toàn bộ quyền quản trị và không truy cập được
-                    khu vực admin nữa.</>
-                  )}
+                  <Trans i18nKey={granting ? 'admin.grant.grantWarning' : 'admin.grant.revokeWarning'}
+                    values={{ name: user.name }} components={{ strong: <strong /> }} />
                 </p>
               </div>
 
@@ -105,13 +102,13 @@ export default function GrantAdminModal({ user, onClose, onDone }: Props) {
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline-soft bg-surface-soft/40">
               <button onClick={onClose}
                 className="h-9 px-4 rounded-lg text-sm font-medium text-body hover:bg-surface-soft transition-colors">
-                Hủy
+                {t('common.cancel')}
               </button>
               <button onClick={handleConfirm} disabled={submitting}
                 className={`h-9 px-4 rounded-lg text-sm font-medium text-white flex items-center gap-2 transition-colors
                   disabled:opacity-40 disabled:cursor-not-allowed ${s.btn}`}>
                 {granting ? <ShieldPlus className="w-4 h-4" /> : <ShieldMinus className="w-4 h-4" />}
-                {submitting ? 'Đang lưu…' : granting ? 'Xác nhận cấp quyền' : 'Xác nhận thu hồi'}
+                {submitting ? t('common.saving') : granting ? t('admin.grant.confirmGrant') : t('admin.grant.confirmRevoke')}
               </button>
             </div>
           </motion.div>

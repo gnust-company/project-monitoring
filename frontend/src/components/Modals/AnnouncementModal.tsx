@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Megaphone, X, Calendar, Check } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { announcementsApi } from '../../api';
 import type { Announcement, DismissScope } from '../../types';
 import { Markdown } from '../../lib/markdown';
+import { formatDate } from '../../i18n/format';
 
 function fmt(iso: string | null | undefined): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return iso ? formatDate(iso, 'dateTimeShort') : '';
 }
 
 /**
@@ -18,6 +19,7 @@ function fmt(iso: string | null | undefined): string {
  */
 export default function AnnouncementModal() {
   const { currentUser } = useApp();
+  const { t } = useTranslation();
   const [items, setItems] = useState<Announcement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -60,10 +62,10 @@ export default function AnnouncementModal() {
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-hairline flex-shrink-0">
               <h2 className="text-base font-bold text-ink flex items-center gap-2">
-                <Megaphone className="w-4 h-4" /> Thông báo
+                <Megaphone className="w-4 h-4" /> {t('announcement.title')}
                 {items.length > 1 && <span className="text-[11px] font-medium text-muted">({items.length})</span>}
               </h2>
-              <button onClick={() => setOpen(false)} title="Đóng"
+              <button onClick={() => setOpen(false)} title={t('common.close')}
                 className="p-1 hover:bg-stone-100 rounded-lg"><X className="w-4 h-4 text-stone-500" /></button>
             </div>
 
@@ -96,11 +98,11 @@ export default function AnnouncementModal() {
                 <div className="flex items-center justify-end gap-2 px-6 py-3.5 border-t border-hairline flex-shrink-0">
                   <button onClick={() => dismiss(selected.id, 'day')}
                     className="flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink px-3 py-1.5 rounded-lg hover:bg-surface-soft transition-colors">
-                    <Check className="w-3.5 h-3.5" /> Không hiện lại hôm nay
+                    <Check className="w-3.5 h-3.5" /> {t('announcement.hideToday')}
                   </button>
                   <button onClick={() => dismiss(selected.id, 'week')}
                     className="flex items-center gap-1.5 text-xs font-semibold text-white bg-ink px-3 py-1.5 rounded-lg hover:bg-[#242424] transition-colors">
-                    <Check className="w-3.5 h-3.5" /> Không hiện lại tuần này
+                    <Check className="w-3.5 h-3.5" /> {t('announcement.hideWeek')}
                   </button>
                 </div>
               </div>

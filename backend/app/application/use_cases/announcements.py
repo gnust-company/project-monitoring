@@ -19,7 +19,14 @@ class AnnouncementNotFoundError(Exception):
 
 
 class InvalidAnnouncementError(Exception):
-    """time-range không hợp lệ (starts_at >= ends_at) hoặc thiếu trường."""
+    """time-range không hợp lệ (starts_at >= ends_at) hoặc thiếu trường.
+
+    `code` là hậu tố mã lỗi API (#29): window_required | window_order.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class InvalidDismissScopeError(Exception):
@@ -28,9 +35,9 @@ class InvalidDismissScopeError(Exception):
 
 def _validate_window(starts_at: datetime | None, ends_at: datetime | None) -> None:
     if starts_at is None or ends_at is None:
-        raise InvalidAnnouncementError("Cần cả thời điểm bắt đầu và kết thúc")
+        raise InvalidAnnouncementError("window_required", "Both start and end time are required")
     if starts_at >= ends_at:
-        raise InvalidAnnouncementError("Thời điểm bắt đầu phải trước kết thúc")
+        raise InvalidAnnouncementError("window_order", "Start time must be before end time")
 
 
 def _dismiss_until(scope: str, now: datetime) -> datetime:

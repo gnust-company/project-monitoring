@@ -64,5 +64,6 @@ Chi tiết kiến trúc Clean Architecture và trạng thái implement: [backend
 - **PIC & quyền** — chỉ PIC/admin sửa thông tin dự án & phase; ai cũng tick việc, bình luận
 - **Sức khỏe tự động** — Đúng tiến độ / Có rủi ro / Chậm tiến độ tự tính từ phase; Dashboard, trang Nhóm (khối lượng việc)
 - **Quản trị** — bảng admin (workspace, người dùng, quyền admin), thông báo in-app và thông báo hệ thống
+- **Song ngữ VI/EN** — mặc định theo ngôn ngữ trình duyệt, đổi bằng nút VI | EN (nhớ trong trình duyệt); ngày giờ, thông báo và thông báo lỗi đều theo ngôn ngữ đã chọn
 
 Mô tả đầy đủ: [docs/APP_DESCRIPTION.md](docs/APP_DESCRIPTION.md) · tiến độ issue: [docs/ROADMAP.md](docs/ROADMAP.md)

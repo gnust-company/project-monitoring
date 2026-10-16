@@ -140,7 +140,7 @@ class AssignMemberRole:
         membership = await self._orgs.get_membership(org_id, actor.id)
         is_owner = actor.is_superuser or (membership is not None and membership.role == WorkspaceRole.OWNER)
         if not (is_owner or actor.id == user_id):
-            raise RoleForbiddenError("Chỉ owner hoặc chính bạn mới đổi được role này")
+            raise RoleForbiddenError("Only the owner or the member themselves can change this role")
         if code is not None:
             valid = {r.code for r in await self._roles.list_by_org(org_id)}
             if code not in valid:

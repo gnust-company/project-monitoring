@@ -10,11 +10,45 @@ Schema database tương ứng: [SCHEMA.md](./SCHEMA.md).
 - **Auth**: `Authorization: Bearer <JWT>` cho mọi endpoint trừ `/auth/login`, `/auth/register`, `/health`
 - **ID**: UUID string
 - **Date**: `YYYY-MM-DD` (date) hoặc ISO-8601 (datetime)
-- **Lỗi** thống nhất:
+- **Lỗi** thống nhất (#29): `detail` là câu tiếng Anh cho dev; FE **dịch theo `code`** (+ `params`)
+  sang ngôn ngữ người dùng đang chọn. Lỗi 422 do FastAPI tự kiểm tra body vẫn là mảng `detail`
+  chuẩn (không có `code`).
 
 ```json
-{ "detail": "Project not found" }
+{ "detail": "Phase code 'PA' already exists", "code": "phase_def.code_conflict", "params": { "code": "PA" } }
 ```
+
+| `code` | Status | `params` |
+|---|---|---|
+| `auth.not_authenticated` · `auth.invalid_token` · `auth.user_not_found` | 401 | |
+| `auth.invalid_credentials` | 401 | |
+| `auth.superuser_required` | 403 | |
+| `auth.setup_done` · `auth.email_taken` | 409 | |
+| `auth.email_domain_not_allowed` | 422 | `domains` |
+| `auth.wrong_password` | 400 | |
+| `workspace.not_found` · `workspace.member_email_not_found` | 404 | |
+| `workspace.not_member` · `workspace.owner_required` | 403 | |
+| `project.not_found` | 404 | |
+| `project.forbidden_edit` · `project.forbidden_delete` · `project.forbidden_pic` | 403 | |
+| `phase.not_found` · `phase.item_not_found` · `phase.attachment_not_found` | 404 | |
+| `phase.forbidden_edit` · `phase.forbidden_delete` | 403 | |
+| `phase.outcome_needs_attachment` | 422 | |
+| `phase_def.not_found` | 404 | |
+| `phase_def.code_conflict` | 409 | `code` |
+| `phase_def.in_use` | 409 | `count` |
+| `role.not_found` | 404 | |
+| `role.code_conflict` | 409 | `code` |
+| `role.forbidden` | 403 | |
+| `user.not_found` | 404 | |
+| `user.cannot_change_own_admin` · `user.cannot_delete_self` | 400 | |
+| `announcement.not_found` | 404 | |
+| `announcement.window_required` · `announcement.window_order` · `announcement.invalid_scope` | 422 | |
+| `notification.not_found` | 404 | |
+| `change_request.not_found` · `change_request.resolved` | 404 · 409 | |
+
+Thêm mã mới: BE raise `ApiError(status, "<code>", "<English detail>", **params)`
+(`app/presentation/api/errors.py`) và thêm câu dịch `errors.<code>` vào
+`frontend/src/i18n/locales/{vi,en}/common.ts`.
 
 | Status | Ý nghĩa |
 |---|---|
@@ -293,10 +327,21 @@ FE poll định kỳ + badge chưa đọc. BE tự sinh khi có sự kiện.
 | POST | `/notifications/read-all` | Đánh dấu tất cả đã đọc → `{ count }` |
 
 ```json
-{ "id": "uuid", "type": "phase_assigned", "title": "...", "body": "",
+{ "id": "uuid", "type": "phase_assigned", "title": "You were assigned phase UI design", "body": "",
+  "params": { "phase": "UI design" },
   "orgId": "uuid", "projectId": "uuid", "phaseBlockId": "uuid", "changeRequestId": null,
   "read": false, "createdAt": "..." }
 ```
+
+#29: FE ghép câu theo `type` + `params` bằng ngôn ngữ người dùng (`notifications.types.<type>`);
+`title` chỉ là câu tiếng Anh dự phòng. Thông báo tạo trước #29 có `params: null` → FE hiện nguyên `title`.
+
+| `type` | `params` |
+|---|---|
+| `member_added` · `member_removed` | `workspace` |
+| `phase_assigned` · `comment_added` | `phase` |
+| `project_pic_changed` | `project` |
+| `change_request_approved` · `change_request_rejected` | `{}` |
 
 `type` ∈ `member_added | member_removed | phase_assigned | phase_created | phase_updated | phase_deleted | comment_added | change_request_created | change_request_approved | change_request_rejected`
 

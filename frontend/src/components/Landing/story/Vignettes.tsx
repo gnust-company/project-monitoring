@@ -4,6 +4,7 @@
 // prefers-reduced-motion: nhảy thẳng tới trạng thái cuối.
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   Check, Lock, Paperclip, Bell, Megaphone, UserRound, MessageSquare,
   Eye, Hand, SquarePen, FileText,
@@ -14,7 +15,7 @@ import {
 } from '../../../types';
 import { ROLE_LABELS } from '../../../data/mockData';
 import Avatar from '../../common/Avatar';
-import { STORY_PROJECT, TEAM } from '../landingContent';
+import { useLanding } from '../../../i18n/useLanding';
 
 // Màu mặc định của vai trò — khớp backend app/domain/roles.py (DEFAULT_ROLES).
 const ROLE_COLOR: Record<string, string> = {
@@ -89,17 +90,18 @@ const pop = {
 // ── PA: workspace + quy trình tuỳ biến + PIC ─────────────────────────
 function ProcessVignette({ play }: { play: boolean }) {
   const step = useSequence(play, 3, 750);
+  const { project: STORY_PROJECT, vignettes: { process: L } } = useLanding();
   const roles = ['PM', 'BA', 'SW_Architect', 'SW_Developer', 'SW_Tester'];
   return (
-    <Frame title="Tạo workspace · bước 3/3 — Phase">
+    <Frame title={L.frame}>
       <div className="flex items-center gap-1.5 mb-4 text-[10px] font-semibold">
-        {['Thông tin', 'Vai trò', 'Phase'].map((s, i) => (
+        {L.steps.map((s, i) => (
           <span key={s} className={`px-2 py-1 rounded-md ${i === 2 ? 'bg-ink text-white' : 'bg-stone-100 text-stone-500'}`}>
             {i + 1}. {s}
           </span>
         ))}
       </div>
-      <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Phase của workspace</div>
+      <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">{L.phases}</div>
       <div className="flex flex-wrap gap-1.5 mb-4">
         {DEV_PHASES.flatMap(code => {
           const m = PHASE_META[code];
@@ -113,7 +115,7 @@ function ProcessVignette({ play }: { play: boolean }) {
           return [chip, (
             <motion.span key="UAT" {...pop}
               className={`text-[11px] font-semibold px-2 py-1 rounded-md border border-dashed ${rose.bg} ${rose.color} ${rose.border}`}>
-              UAT <span className="font-normal opacity-70">· phase riêng</span>
+              UAT <span className="font-normal opacity-70">· {L.customPhase}</span>
             </motion.span>
           )];
         })}
@@ -121,7 +123,7 @@ function ProcessVignette({ play }: { play: boolean }) {
       <AnimatePresence>
         {step >= 1 && (
           <motion.div key="roles" {...pop} className="mb-4">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Vai trò công việc</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">{L.roles}</div>
             <div className="flex flex-wrap gap-1.5">
               {roles.map(r => <RoleBadge key={r} role={r} />)}
               <span className="text-[10px] text-muted px-1 py-0.5">+3</span>
@@ -131,7 +133,7 @@ function ProcessVignette({ play }: { play: boolean }) {
         {step >= 3 && (
           <motion.div key="pic" {...pop}
             className="flex items-center gap-2 rounded-lg border border-hairline px-3 py-2">
-            <span className="text-[11px] text-muted">PIC dự án</span>
+            <span className="text-[11px] text-muted">{L.projectPic}</span>
             <Avatar name={STORY_PROJECT.pic} className="w-5 h-5" />
             <span className="text-xs font-medium text-ink">{STORY_PROJECT.pic}</span>
             <span className="ml-auto text-[10px] text-muted">{STORY_PROJECT.name}</span>
@@ -148,6 +150,7 @@ function ChecklistVignette({ play }: { play: boolean }) {
   const outcomes = PHASE_ROLE_OUTCOMES.SA.reduce((n, g) => n + g.outcomes.length, 0);
   const flat = groups.flatMap(g => g.tasks.map(t => `${g.role}:${t}`));
   const step = useSequence(play, 4, 650);
+  const { project: STORY_PROJECT, vignettes: { checklist: L } } = useLanding();
   const done = new Set(flat.slice(0, step));
   const pct = Math.round((done.size / (flat.length + outcomes)) * 100);
   const m = PHASE_META.SA;
@@ -171,7 +174,7 @@ function ChecklistVignette({ play }: { play: boolean }) {
         ))}
       </div>
       <div className="mt-3 pt-3 border-t border-hairline text-[11px] text-muted">
-        + {outcomes} outcome mặc định: {PHASE_ROLE_OUTCOMES.SA.flatMap(g => g.outcomes).join(', ')}
+        {L.defaultOutcomes(outcomes, PHASE_ROLE_OUTCOMES.SA.flatMap(g => g.outcomes).join(', '))}
       </div>
     </Frame>
   );
@@ -179,39 +182,41 @@ function ChecklistVignette({ play }: { play: boolean }) {
 
 // ── SD: RACI, có người ngoài nền tảng ────────────────────────────────
 type RaciPerson = { raci: RaciRole; name: string; role?: string; external?: boolean };
-const RACI_PEOPLE: RaciPerson[] = [
-  { raci: 'R', name: TEAM.ui, role: 'UI_Designer' },
-  { raci: 'R', name: TEAM.architect, role: 'SW_Architect' },
-  { raci: 'A', name: TEAM.pm, role: 'PM' },
-  { raci: 'I', name: TEAM.ba, role: 'BA' },
-  { raci: 'C', name: TEAM.external, external: true },
-];
 
 function RaciVignette({ play }: { play: boolean }) {
-  const step = useSequence(play, RACI_PEOPLE.length, 550);
-  const shown = RACI_PEOPLE.slice(0, step);
+  const { t } = useTranslation();
+  const { team: TEAM, vignettes: { raci: L } } = useLanding();
+  const people: RaciPerson[] = [
+    { raci: 'R', name: TEAM.ui, role: 'UI_Designer' },
+    { raci: 'R', name: TEAM.architect, role: 'SW_Architect' },
+    { raci: 'A', name: TEAM.pm, role: 'PM' },
+    { raci: 'I', name: TEAM.ba, role: 'BA' },
+    { raci: 'C', name: TEAM.external, external: true },
+  ];
+  const step = useSequence(play, people.length, 550);
+  const shown = people.slice(0, step);
   return (
-    <Frame title={`[SD] ${PHASE_META.SD.label} · Người tham gia (RACI)`}>
+    <Frame title={`[SD] ${PHASE_META.SD.label} · ${L.frame}`}>
       <div className="space-y-2">
         {RACI_ROLES.map(r => {
-          const meta = RACI_META[r];
+          const meta = RACI_META[r].chip;
           return (
             <div key={r} className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 min-h-[28px]">
               <div className="sm:w-36 shrink-0 flex items-center gap-1.5">
-                <span className={`inline-flex w-5 h-5 items-center justify-center rounded text-[10px] font-bold border ${meta.chip}`}>{r}</span>
-                <span className="text-[11px] text-muted whitespace-nowrap">{meta.label}</span>
+                <span className={`inline-flex w-5 h-5 items-center justify-center rounded text-[10px] font-bold border ${meta}`}>{r}</span>
+                <span className="text-[11px] text-muted whitespace-nowrap">{t(`raci.${r}.label`)}</span>
               </div>
               <div className="flex flex-wrap gap-1.5 min-w-0">
                 <AnimatePresence>
                   {shown.filter(p => p.raci === r).map(p => (
                     <motion.span key={p.name} {...pop}
-                      className={`inline-flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full border text-[11px] max-w-full ${meta.chip}
+                      className={`inline-flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full border text-[11px] max-w-full ${meta}
                         ${p.external ? 'ring-2 ring-violet-300/60' : ''}`}>
                       {p.external
                         ? <UserRound className="w-3.5 h-3.5 opacity-60" />
                         : <Avatar name={p.name} className="w-4 h-4" />}
                       <span className="whitespace-nowrap truncate">{p.name}</span>
-                      {p.external && <span className="text-[9px] opacity-60">ngoài</span>}
+                      {p.external && <span className="text-[9px] opacity-60">{L.external}</span>}
                     </motion.span>
                   ))}
                 </AnimatePresence>
@@ -226,18 +231,20 @@ function RaciVignette({ play }: { play: boolean }) {
 
 // ── SI: Pipeline — Sắp xếp (kéo/giãn) → Lưu ──────────────────────────
 function TimelineVignette({ play }: { play: boolean }) {
+  const { t } = useTranslation();
+  const { vignettes: { timeline: L } } = useLanding();
   const step = useSequence(play, 4, 900);
   const mode = step >= 1 ? 'layout' : 'readonly';
   const si = PHASE_META.SI;
   const st = PHASE_META.ST;
   const moved = step >= 2;
   const modes = [
-    { key: 'readonly', label: 'Chỉ xem', Icon: Eye },
-    { key: 'layout', label: 'Sắp xếp', Icon: Hand },
-    { key: 'create', label: 'Tạo phase', Icon: SquarePen },
+    { key: 'readonly', label: t('pipeline.mode.readonly'), Icon: Eye },
+    { key: 'layout', label: t('pipeline.mode.layout'), Icon: Hand },
+    { key: 'create', label: t('pipeline.mode.create'), Icon: SquarePen },
   ];
   return (
-    <Frame title="Pipeline · Tuần">
+    <Frame title={L.frame}>
       <div className="flex items-center bg-stone-100 rounded-lg p-0.5 w-fit mb-3">
         {modes.map(({ key, label, Icon }) => (
           <span key={key}
@@ -278,15 +285,15 @@ function TimelineVignette({ play }: { play: boolean }) {
           {step === 3 && (
             <motion.div key="dirty" {...pop}
               className="flex items-center gap-2 rounded-lg bg-ink text-white px-3 py-2 text-[11px]">
-              <span>1 thay đổi chưa lưu</span>
-              <span className="ml-auto px-2 py-0.5 rounded bg-white/10">Hủy</span>
-              <span className="px-2 py-0.5 rounded bg-white text-ink font-semibold">Lưu</span>
+              <span>{L.unsaved}</span>
+              <span className="ml-auto px-2 py-0.5 rounded bg-white/10">{t('common.cancel')}</span>
+              <span className="px-2 py-0.5 rounded bg-white text-ink font-semibold">{t('common.save')}</span>
             </motion.div>
           )}
           {step >= 4 && (
             <motion.div key="saved" {...pop}
               className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium px-1 py-2">
-              <Check className="w-3.5 h-3.5" /> Đã lưu — phase trùng lịch tự xuống hàng, không lệch ngày
+              <Check className="w-3.5 h-3.5" /> {L.saved}
             </motion.div>
           )}
         </AnimatePresence>
@@ -298,6 +305,7 @@ function TimelineVignette({ play }: { play: boolean }) {
 // ── ST: outcome cần tài liệu mới được tick ───────────────────────────
 function OutcomeVignette({ play }: { play: boolean }) {
   const step = useSequence(play, 3, 1100);
+  const { team: TEAM, vignettes: { outcome: L } } = useLanding();
   const m = PHASE_META.ST;
   const reportDone = step >= 2;
   return (
@@ -315,13 +323,13 @@ function OutcomeVignette({ play }: { play: boolean }) {
         </li>
         <li className="flex items-start gap-2">
           {reportDone ? <Tick done /> : (
-            <span className="w-4 h-4 rounded border border-stone-300 bg-stone-50 flex items-center justify-center shrink-0" title="Cần đính kèm tài liệu">
+            <span className="w-4 h-4 rounded border border-stone-300 bg-stone-50 flex items-center justify-center shrink-0" title={L.needsDoc}>
               <Lock className="w-2.5 h-2.5 text-stone-400" />
             </span>
           )}
           <div className="min-w-0 flex-1">
             <div className="text-[12px] text-ink font-medium">Test Report</div>
-            {step < 1 && <div className="text-[10px] text-amber-600 mt-0.5">Cần đính kèm tài liệu trước khi đánh dấu xong</div>}
+            {step < 1 && <div className="text-[10px] text-amber-600 mt-0.5">{L.needsDocHint}</div>}
             {step >= 1 && (
               <motion.div {...pop} className="mt-1 max-w-[220px]">
                 <span className="inline-flex items-center gap-1 text-[10px] text-body bg-stone-100 rounded px-1.5 py-0.5">
@@ -340,7 +348,7 @@ function OutcomeVignette({ play }: { play: boolean }) {
             <div className="text-[11px] text-body">
               <span className="font-semibold text-ink">{TEAM.tester}</span>{' '}
               <MessageSquare className="inline w-3 h-3 text-muted -mt-0.5" />{' '}
-              Đã đính kèm báo cáo, nhờ anh {TEAM.architect.split(' ').pop()} xem giúp.
+              {L.comment(TEAM.architect.split(' ').pop() ?? TEAM.architect)}
             </div>
           </motion.div>
         )}
@@ -351,15 +359,17 @@ function OutcomeVignette({ play }: { play: boolean }) {
 
 // ── DEP: trạng thái tự chuyển "Có rủi ro" ────────────────────────────
 function HealthVignette({ play }: { play: boolean }) {
+  const { t } = useTranslation();
+  const { project: STORY_PROJECT, vignettes: { health: L } } = useLanding();
   const step = useSequence(play, 2, 1200);
   const atRisk = step >= 1;
   const schedule = step >= 1 ? 78 : 55;
   const actual = 64;
   const kpis = [
-    { label: 'Tổng dự án', value: 12, color: 'text-ink' },
-    { label: 'Đúng tiến độ', value: atRisk ? 8 : 9, color: 'text-emerald-600' },
-    { label: 'Có rủi ro', value: atRisk ? 3 : 2, color: 'text-amber-600' },
-    { label: 'Chậm tiến độ', value: 1, color: 'text-red-600' },
+    { label: L.total, value: 12, color: 'text-ink' },
+    { label: t('projectStatus.onTrack'), value: atRisk ? 8 : 9, color: 'text-emerald-600' },
+    { label: t('projectStatus.atRisk'), value: atRisk ? 3 : 2, color: 'text-amber-600' },
+    { label: t('projectStatus.delayed'), value: 1, color: 'text-red-600' },
   ];
   return (
     <Frame title="Dashboard">
@@ -379,22 +389,22 @@ function HealthVignette({ play }: { play: boolean }) {
             <motion.span key={atRisk ? 'risk' : 'ok'} {...pop}
               className={`ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap
                 ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
-              {atRisk ? 'Có rủi ro' : 'Đúng tiến độ'}
+              {atRisk ? t('projectStatus.atRisk') : t('projectStatus.onTrack')}
             </motion.span>
           </AnimatePresence>
         </div>
         <div className="space-y-2 text-[10px] text-muted">
           <div>
-            <div className="flex justify-between mb-1"><span>Tiến độ theo lịch</span><span>{schedule}%</span></div>
+            <div className="flex justify-between mb-1"><span>{L.schedule}</span><span>{schedule}%</span></div>
             <Bar pct={schedule} color="#a8a29e" />
           </div>
           <div>
-            <div className="flex justify-between mb-1"><span>Tiến độ thực (checklist + outcome)</span><span>{actual}%</span></div>
+            <div className="flex justify-between mb-1"><span>{L.actual}</span><span>{actual}%</span></div>
             <Bar pct={actual} color={atRisk ? '#f59e0b' : '#10b981'} />
           </div>
         </div>
         <div className="mt-3 h-4 text-[10px]">
-          {atRisk && <motion.span {...pop} className="text-amber-600">Tiến độ thực chậm hơn lịch → tự chuyển “Có rủi ro”</motion.span>}
+          {atRisk && <motion.span {...pop} className="text-amber-600">{L.explain}</motion.span>}
         </div>
       </div>
     </Frame>
@@ -402,17 +412,12 @@ function HealthVignette({ play }: { play: boolean }) {
 }
 
 // ── OM: lịch sử thay đổi + thông báo ─────────────────────────────────
-const LOG = [
-  { who: TEAM.dev, text: 'đã hoàn thành mục', detail: 'Develop source code', when: 'vừa xong' },
-  { who: TEAM.pm, text: 'đã đổi ngày kết thúc', detail: '12/10 → 19/10', when: '5 phút trước' },
-  { who: TEAM.architect, text: `đã thêm người tham gia ${TEAM.external.split(' (')[0]}`, detail: 'Tham vấn', when: '1 giờ trước' },
-  { who: TEAM.sysops, text: 'đã tải lên file', detail: 'incident-log-t10.xlsx', when: 'hôm qua' },
-];
-
 function ActivityVignette({ play }: { play: boolean }) {
+  const { project: STORY_PROJECT, vignettes: { activity: L } } = useLanding();
+  const LOG = L.log;
   const step = useSequence(play, LOG.length, 700);
   return (
-    <Frame title={`${STORY_PROJECT.name} · Lịch sử hoạt động`}
+    <Frame title={`${STORY_PROJECT.name} · ${L.frame}`}
       right={(
         <span className="relative inline-flex">
           <Bell className="w-3.5 h-3.5 text-muted" />
@@ -426,12 +431,12 @@ function ActivityVignette({ play }: { play: boolean }) {
       )}>
       <div className="flex items-center gap-2 rounded-lg bg-surface-dark text-white px-3 py-2 mb-3 text-[11px]">
         <Megaphone className="w-3.5 h-3.5 shrink-0 text-white/70" />
-        <span className="truncate">Thông báo hệ thống: bảo trì máy chủ 22:00 thứ Bảy</span>
+        <span className="truncate">{L.announcement}</span>
       </div>
       <ul className="space-y-2.5 min-h-[136px]">
         <AnimatePresence>
           {LOG.slice(0, step).map(l => (
-            <motion.li key={l.detail} {...pop} className="flex items-start gap-2">
+            <motion.li key={l.who} {...pop} className="flex items-start gap-2">
               <Avatar name={l.who} className="w-5 h-5" />
               <div className="text-[11px] text-body leading-snug min-w-0">
                 <span className="font-semibold text-ink">{l.who}</span> {l.text}

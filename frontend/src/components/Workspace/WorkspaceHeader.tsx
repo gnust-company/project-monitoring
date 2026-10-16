@@ -1,14 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import { Bell, ChevronRight } from 'lucide-react';
 import UserMenu from '../common/UserMenu';
+import { formatRelative } from '../../i18n/format';
+import { notificationText } from '../../lib/notificationText';
 
 export default function WorkspaceHeader() {
   const {
     selectedOrg, workspaceView, goToWorkspaceSelector,
     notifications, unreadCount, markNotificationRead, markAllNotificationsRead,
   } = useApp();
+  const { t } = useTranslation();
 
   const [showNotif, setShowNotif] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -23,18 +27,8 @@ export default function WorkspaceHeader() {
   }, []);
 
   const viewLabel: Record<string, string> = {
-    dashboard: 'Dashboard', pipeline: 'Pipeline', team: 'Nhóm',
-    profile: 'Hồ sơ', settings: 'Cài đặt Workspace',
-  };
-
-  const relTime = (iso: string): string => {
-    const diff = Date.now() - new Date(iso).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return 'vừa xong';
-    if (m < 60) return `${m} phút trước`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h} giờ trước`;
-    return `${Math.floor(h / 24)} ngày trước`;
+    dashboard: t('nav.dashboard'), pipeline: t('nav.pipeline'), team: t('nav.team'),
+    profile: t('nav.profile'), settings: t('nav.settings'),
   };
 
   return (
@@ -43,7 +37,7 @@ export default function WorkspaceHeader() {
       <div className="flex items-center gap-2 text-sm">
         <button onClick={goToWorkspaceSelector}
           className="text-muted hover:text-ink transition-colors font-medium">
-          Workspaces
+          {t('nav.workspaces')}
         </button>
         {selectedOrg && (
           <>
@@ -80,14 +74,14 @@ export default function WorkspaceHeader() {
                 className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-hairline
                            shadow-xl shadow-black/[0.06] overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-hairline-soft flex items-center justify-between">
-                  <span className="text-sm font-semibold text-ink">Thông báo</span>
+                  <span className="text-sm font-semibold text-ink">{t('notifications.title')}</span>
                   {unreadCount > 0 && (
-                    <span className="text-[10px] font-bold text-ink">{unreadCount} mới</span>
+                    <span className="text-[10px] font-bold text-ink">{t('notifications.newCount', { count: unreadCount })}</span>
                   )}
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="px-4 py-8 text-center text-xs text-muted-soft">Chưa có thông báo</div>
+                    <div className="px-4 py-8 text-center text-xs text-muted-soft">{t('notifications.empty')}</div>
                   ) : notifications.map(n => (
                     <button key={n.id}
                       onClick={() => { if (!n.read) markNotificationRead(n.id); }}
@@ -96,9 +90,9 @@ export default function WorkspaceHeader() {
                       <div className="flex items-start gap-2.5">
                         {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-ink flex-shrink-0 mt-1.5" />}
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-body leading-relaxed">{n.title}</p>
+                          <p className="text-xs text-body leading-relaxed">{notificationText(n)}</p>
                           {n.body && <p className="text-[11px] text-muted mt-0.5">{n.body}</p>}
-                          <p className="text-[10px] text-muted-soft mt-0.5">{relTime(n.createdAt)}</p>
+                          <p className="text-[10px] text-muted-soft mt-0.5">{formatRelative(n.createdAt)}</p>
                         </div>
                       </div>
                     </button>
@@ -108,7 +102,7 @@ export default function WorkspaceHeader() {
                   <div className="px-4 py-2.5 border-t border-hairline-soft">
                     <button onClick={() => markAllNotificationsRead()}
                       className="text-xs text-ink hover:text-[#242424] font-medium transition-colors w-full text-center">
-                      Đánh dấu tất cả đã đọc
+                      {t('notifications.markAllRead')}
                     </button>
                   </div>
                 )}

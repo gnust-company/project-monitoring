@@ -11,6 +11,13 @@ import type { Project, PhaseBlock, ProjectStatus } from '../types';
 //  - At Risk: không Delayed, nhưng phaseProgress < dateProgress (thực chậm hơn lịch).
 //  - On Track: còn lại.
 
+/** Khóa dịch của trạng thái dự án (#29): t(`projectStatus.${STATUS_KEY[status]}`). */
+export const STATUS_KEY = {
+  'On Track': 'onTrack',
+  'At Risk': 'atRisk',
+  Delayed: 'delayed',
+} as const satisfies Record<ProjectStatus, string>;
+
 /** Tất cả "item" của phase = checklist + outcomes (#8). */
 function phaseItems(pb: PhaseBlock): { done: boolean }[] {
   return [...pb.checklist, ...(pb.outcomes ?? [])];

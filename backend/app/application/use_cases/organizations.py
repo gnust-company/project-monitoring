@@ -115,8 +115,8 @@ class AddMember:
         await self._orgs.add_member(org_id, user.id, WorkspaceRole.MEMBER)
         await self._notifier.notify(
             user.id, "member_added",
-            f"Bạn được thêm vào workspace {org.name if org else ''}".strip(),
-            org_id=org_id,
+            f"You were added to workspace {org.name if org else ''}".strip(),
+            org_id=org_id, params={"workspace": org.name if org else ""},
         )
         return user
 
@@ -131,6 +131,6 @@ class RemoveMember:
         await self._orgs.remove_member(org_id, user_id)
         await self._notifier.notify(
             user_id, "member_removed",
-            f"Bạn đã bị xóa khỏi workspace {org.name if org else ''}".strip(),
-            org_id=org_id,
+            f"You were removed from workspace {org.name if org else ''}".strip(),
+            org_id=org_id, params={"workspace": org.name if org else ""},
         )

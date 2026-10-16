@@ -5,9 +5,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { PHASE_META } from '../../../types';
 import Avatar from '../../common/Avatar';
-import { CHAPTERS, STORY, STORY_PROJECT } from '../landingContent';
+import { useLanding } from '../../../i18n/useLanding';
 import PhaseVignette from './Vignettes';
 
 // Vị trí (% bề ngang) của từng phase trên mini Gantt — gối đầu nhẹ như dự án thật.
@@ -19,6 +20,8 @@ function scrollToChapter(i: number) {
 }
 
 function ProjectCard({ active }: { active: number }) {
+  const { t } = useTranslation();
+  const { chapters: CHAPTERS, story: STORY, project: STORY_PROJECT } = useLanding();
   const atRisk = CHAPTERS[active].phase === 'DEP';
   const pct = Math.round(((active + 0.5) / CHAPTERS.length) * 100);
   const [s, e] = SPANS[active];
@@ -27,7 +30,7 @@ function ProjectCard({ active }: { active: number }) {
     <div className="rounded-2xl border border-hairline bg-white shadow-xl shadow-black/[0.05] p-6">
       <div className="flex items-start gap-3 mb-5">
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Dự án</div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">{STORY.projectLabel}</div>
           <div className="text-lg font-semibold text-ink leading-tight">{STORY_PROJECT.name}</div>
           <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted">
             <Avatar name={STORY_PROJECT.pic} className="w-5 h-5" /> PIC · {STORY_PROJECT.pic}
@@ -38,7 +41,7 @@ function ProjectCard({ active }: { active: number }) {
             initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
             className={`ml-auto shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full
               ${atRisk ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
-            {atRisk ? 'Có rủi ro' : 'Đúng tiến độ'}
+            {atRisk ? t('projectStatus.atRisk') : t('projectStatus.onTrack')}
           </motion.span>
         </AnimatePresence>
       </div>
@@ -60,7 +63,7 @@ function ProjectCard({ active }: { active: number }) {
           return (
             <button key={c.phase} type="button" onClick={() => scrollToChapter(i)}
               className="absolute left-0 right-0 flex items-center group" style={{ top: i * ROW, height: ROW }}
-              aria-label={`${c.phase} — ${c.vi}`}>
+              aria-label={`${c.phase} — ${c.name || m.label}`}>
               <span className={`w-11 shrink-0 text-left text-[10px] font-bold transition-colors
                 ${current ? m.color : done ? 'text-ink/60' : 'text-ink/25 group-hover:text-ink/50'}`}>
                 {c.phase}
@@ -99,6 +102,7 @@ function ProjectCard({ active }: { active: number }) {
 }
 
 export default function StorySection() {
+  const { chapters: CHAPTERS, story: STORY } = useLanding();
   const [active, setActive] = useState(0);
   // Chương xa nhất đã cuộn tới (-1 = chưa tới chương nào) → vignette chỉ chạy khi người đọc tới nơi,
   // chạy xong giữ nguyên trạng thái cuối.
@@ -161,7 +165,7 @@ export default function StorySection() {
                   <motion.div animate={{ opacity: i === active ? 1 : 0.35 }} transition={{ duration: 0.35 }}>
                     <div className="flex items-center gap-2 mb-4">
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${m.bg} ${m.color} ${m.border}`}>{c.phase}</span>
-                      <span className="text-xs text-muted">{m.label} — {c.vi}</span>
+                      <span className="text-xs text-muted">{m.label}{c.name && ` — ${c.name}`}</span>
                       <span className="ml-auto text-xs text-muted-soft tabular-nums">{String(i + 1).padStart(2, '0')} / 07</span>
                     </div>
                     <h3 className="text-2xl lg:text-3xl font-semibold text-ink tracking-tight mb-3 text-balance">{c.title}</h3>

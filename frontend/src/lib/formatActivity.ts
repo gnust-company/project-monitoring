@@ -1,43 +1,47 @@
-// #24: rà soát changelog — biến (action, target) thô của BE thành câu tiếng Việt
-// dễ đọc: dịch hành động, đổi UUID → tên người, ISO date → dd/MM/yyyy, tag → nhãn.
-import { PHASE_TAG_META, RACI_META, type RaciRole, type User } from '../types';
+// #24: rà soát changelog — biến (action, target) thô của BE thành câu dễ đọc theo ngôn ngữ
+// đang chọn (#29): dịch hành động, đổi UUID → tên người, ISO date → ngày hiển thị, tag → nhãn.
+import { PHASE_TAG_META, type RaciRole, type User } from '../types';
+import i18n from '../i18n';
+import { formatDate } from '../i18n/format';
+import type vi from '../i18n/locales/vi';
 
 export interface FormattedActivity {
-  /** Cụm động từ tiếng Việt, vd "đã thêm người tham gia". */
+  /** Cụm động từ, vd "đã thêm người tham gia" / "added participant". */
   verb: string;
   /** Phần bổ nghĩa đã được làm sạch (tên/ngày/nhãn), hoặc null nếu không có. */
   detail: string | null;
 }
 
 type UserLookup = (id: string) => User | undefined;
+type VerbKey = keyof typeof vi.activity.verbs;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Dịch hành động BE → tiếng Việt. Khóa là chuỗi `action` thô.
-const VERB: Record<string, string> = {
-  'created phase': 'đã tạo phase',
-  'deleted phase': 'đã xóa phase',
-  'renamed phase': 'đã đổi tên phase',
-  'changed status': 'đã đổi trạng thái',
-  'changed start date': 'đã đổi ngày bắt đầu',
-  'changed end date': 'đã đổi ngày kết thúc',
-  'reassigned phase': 'đã giao phase cho',
-  'added participant': 'đã thêm người tham gia',
-  'removed participant': 'đã gỡ người tham gia',
-  'changed participant role': 'đã đổi vai trò RACI của',
-  'added checklist': 'đã thêm mục checklist',
-  'added outcome': 'đã thêm mục kết quả',
-  'completed item': 'đã hoàn thành mục',
-  'reopened item': 'đã mở lại mục',
-  'edited item': 'đã sửa mục',
-  'removed item': 'đã xóa mục',
-  commented: 'đã bình luận',
-  'removed document': 'đã gỡ tài liệu',
-  'attached link': 'đã đính kèm link',
-  'uploaded file': 'đã tải lên file',
-  'created project': 'đã tạo dự án',
-  'renamed project': 'đã đổi tên dự án',
-  'deleted project': 'đã xóa dự án',
+// `action` thô của BE → khóa dịch trong activity.verbs.
+const VERB: Record<string, VerbKey> = {
+  'created phase': 'createdPhase',
+  'deleted phase': 'deletedPhase',
+  'renamed phase': 'renamedPhase',
+  'changed status': 'changedStatus',
+  'changed start date': 'changedStartDate',
+  'changed end date': 'changedEndDate',
+  'reassigned phase': 'reassignedPhase',
+  'added participant': 'addedParticipant',
+  'removed participant': 'removedParticipant',
+  'changed participant role': 'changedParticipantRole',
+  'added checklist': 'addedChecklist',
+  'added outcome': 'addedOutcome',
+  'completed item': 'completedItem',
+  'reopened item': 'reopenedItem',
+  'edited item': 'editedItem',
+  'removed item': 'removedItem',
+  commented: 'commented',
+  'removed document': 'removedDocument',
+  'attached link': 'attachedLink',
+  'uploaded file': 'uploadedFile',
+  'created project': 'createdProject',
+  'renamed project': 'renamedProject',
+  'deleted project': 'deletedProject',
 };
 
 // Hành động mà `target` là 1 UUID người dùng cần đổi sang tên.
@@ -48,17 +52,19 @@ const USER_TARGET = new Set([
 const RACI_TARGET = new Set(['added participant', 'removed participant', 'changed participant role']);
 // Hành động mà `target` là "ISO → ISO".
 const DATE_TARGET = new Set(['changed start date', 'changed end date']);
+// BE ghi lý do xóa vào target dạng "<tên> — lý do: <lý do>" (dữ liệu cũ & hiện tại).
+const REASON_RE = /\s—\s(?:lý do|reason):\s/i;
 
 function resolveUser(id: string, getUserById: UserLookup): string {
-  return getUserById(id)?.name ?? 'người dùng không xác định';
+  return getUserById(id)?.name ?? i18n.t('activity.unknownUser');
 }
 
-function viDate(iso: string): string {
-  const m = iso.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+function isoDate(iso: string): string {
+  const v = iso.trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(v) ? formatDate(v.slice(0, 10)) : v;
 }
 
-function viTag(value: string): string {
+function tagLabel(value: string): string {
   const v = value.trim();
   return (PHASE_TAG_META as Record<string, { label: string }>)[v]?.label ?? v;
 }
@@ -74,7 +80,8 @@ export function formatActivity(
   target: string,
   getUserById: UserLookup,
 ): FormattedActivity {
-  const verb = VERB[action] ?? action;
+  const key = VERB[action];
+  const verb = key ? i18n.t(`activity.verbs.${key}`) : action;
   const raw = (target ?? '').trim();
   if (!raw) return { verb, detail: null };
 
@@ -86,7 +93,7 @@ export function formatActivity(
     const m = RACI_TARGET.has(action) ? raw.match(/^(.*?)\s+—\s+([RACI])$/) : null;
     if (m) {
       who = m[1].trim();
-      raci = ` (${RACI_META[m[2] as RaciRole].label})`;
+      raci = ` (${i18n.t(`raci.${m[2] as RaciRole}.label`)})`;
     }
     const id = who.split(/\s|—/)[0].trim();
     const name = UUID_RE.test(id) ? resolveUser(id, getUserById) : who;
@@ -94,18 +101,21 @@ export function formatActivity(
   }
 
   if (DATE_TARGET.has(action)) {
-    return { verb, detail: mapTransition(raw, viDate) };
+    return { verb, detail: mapTransition(raw, isoDate) };
   }
 
   if (action === 'changed status') {
-    return { verb, detail: mapTransition(raw, viTag) };
+    return { verb, detail: mapTransition(raw, tagLabel) };
   }
 
-  // Mặc định: giữ nguyên target, nhưng vẫn quét & thay UUID lẻ nếu lỡ lọt vào.
-  const cleaned = raw.replace(
-    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
-    (m) => resolveUser(m, getUserById),
-  );
+  // Mặc định: giữ nguyên target, nhưng vẫn quét & thay UUID lẻ nếu lỡ lọt vào,
+  // và dịch nhãn "lý do:" của các bản ghi xóa.
+  const cleaned = raw
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+      (m) => resolveUser(m, getUserById),
+    )
+    .replace(REASON_RE, ` — ${i18n.t('activity.reason')}: `);
   return { verb, detail: cleaned };
 }
 

@@ -1,5 +1,5 @@
 // Landing page — kể chuyện "một dự án đi qua 7 phase" (StorySection). Toàn bộ chữ nằm ở
-// landingContent.ts (chuẩn bị cho song ngữ #29); chỉ mô tả tính năng đang có thật.
+// src/i18n/locales/{vi,en}/landing.ts (#29); chỉ mô tả tính năng đang có thật.
 import { motion, MotionConfig } from 'framer-motion';
 import {
   Layers, ArrowRight, ArrowDown, FolderKanban, CalendarRange, Workflow, ClipboardCheck,
@@ -9,7 +9,8 @@ import { useApp } from '../../context/AppContext';
 import LivePipelinePreview from './LivePipelinePreview';
 import StorySection from './story/StorySection';
 import UserMenu from '../common/UserMenu';
-import { NAV, HERO, FEATURES, DEPLOY, CTA, FOOTER } from './landingContent';
+import LanguageSwitcher from '../common/LanguageSwitcher';
+import { useLanding } from '../../i18n/useLanding';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -56,6 +57,7 @@ const FEATURE_ICONS: Record<string, typeof Layers> = {
 
 export default function LandingPage() {
   const { goToLogin, goToWorkspaceSelector, currentUser } = useApp();
+  const { nav: NAV, hero: HERO, features: FEATURES, deploy: DEPLOY, cta: CTA, footer: FOOTER } = useLanding();
 
   // CTA: chưa đăng nhập → tới đăng nhập; đã đăng nhập → vào danh sách workspace
   const goStart = currentUser ? goToWorkspaceSelector : goToLogin;
@@ -80,7 +82,8 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <LanguageSwitcher />
               {currentUser ? (
                 <>
                   <button onClick={goToWorkspaceSelector}
@@ -92,8 +95,9 @@ export default function LandingPage() {
                 </>
               ) : (
                 <>
+                  {/* Màn hẹp: ẩn link Đăng nhập (nút Bắt đầu cũng dẫn tới đăng nhập) để đủ chỗ cho VI|EN. */}
                   <button onClick={goToLogin}
-                    className="text-sm text-muted hover:text-ink transition-colors font-medium px-3 py-2 whitespace-nowrap">
+                    className="hidden sm:inline-block text-sm text-muted hover:text-ink transition-colors font-medium px-3 py-2 whitespace-nowrap">
                     {NAV.login}
                   </button>
                   <button onClick={goStart}

@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Trans, useTranslation } from 'react-i18next';
 import { Megaphone, Plus, Pencil, Trash2, X, AlertCircle, Eye, Calendar } from 'lucide-react';
 import { announcementsApi, type AnnouncementBody } from '../../api';
-import { ApiError } from '../../api/client';
 import type { Announcement } from '../../types';
 import { Markdown } from '../../lib/markdown';
+import { formatDate } from '../../i18n/format';
 
 // ISO (UTC) → giá trị cho <input type="datetime-local"> (giờ địa phương).
 function isoToLocalInput(iso: string | null | undefined): string {
@@ -19,8 +20,7 @@ function localInputToIso(v: string): string {
 }
 
 function fmt(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return iso ? formatDate(iso, 'dateTime') : '—';
 }
 
 type Phase = 'active' | 'upcoming' | 'expired';
@@ -31,10 +31,10 @@ function phaseOf(a: Announcement, now: number): Phase {
   if (now > e) return 'expired';
   return 'active';
 }
-const phaseBadge: Record<Phase, { label: string; cls: string }> = {
-  active:   { label: 'Đang hiển thị', cls: 'bg-emerald-50 text-emerald-700' },
-  upcoming: { label: 'Sắp tới',       cls: 'bg-amber-50 text-amber-700' },
-  expired:  { label: 'Đã hết hạn',    cls: 'bg-stone-100 text-stone-500' },
+const phaseBadge: Record<Phase, string> = {
+  active: 'bg-emerald-50 text-emerald-700',
+  upcoming: 'bg-amber-50 text-amber-700',
+  expired: 'bg-stone-100 text-stone-500',
 };
 
 interface FormState { id: string | null; title: string; body: string; startsAt: string; endsAt: string; }
@@ -45,6 +45,7 @@ const emptyForm = (): FormState => {
 };
 
 export default function AdminAnnouncements() {
+  const { t } = useTranslation();
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,9 +57,9 @@ export default function AdminAnnouncements() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try { setItems(await announcementsApi.listAll()); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Không tải được thông báo'); }
+    catch (e) { setError(e instanceof Error ? e.message : t('adminAnnouncements.loadFailed')); }
     finally { setLoading(false); }
-  }, []);
+  }, [t]);
   useEffect(() => { load(); }, [load]);
 
   const openCreate = () => { setForm(emptyForm()); setPreview(false); };
@@ -69,9 +70,9 @@ export default function AdminAnnouncements() {
 
   const save = async () => {
     if (!form) return;
-    if (!form.title.trim()) { setError('Cần tiêu đề'); return; }
-    if (!form.startsAt || !form.endsAt) { setError('Cần khoảng thời gian hiển thị'); return; }
-    if (new Date(form.startsAt) >= new Date(form.endsAt)) { setError('Thời điểm bắt đầu phải trước kết thúc'); return; }
+    if (!form.title.trim()) { setError(t('adminAnnouncements.titleRequired')); return; }
+    if (!form.startsAt || !form.endsAt) { setError(t('errors.announcement.window_required')); return; }
+    if (new Date(form.startsAt) >= new Date(form.endsAt)) { setError(t('errors.announcement.window_order')); return; }
     setSaving(true); setError(null);
     const body: AnnouncementBody = {
       title: form.title.trim(), body: form.body,
@@ -83,7 +84,7 @@ export default function AdminAnnouncements() {
       setForm(null);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.detail : (e instanceof Error ? e.message : 'Lưu thất bại'));
+      setError(e instanceof Error ? e.message : t('errors.saveFailed'));
     } finally { setSaving(false); }
   };
 
@@ -91,7 +92,7 @@ export default function AdminAnnouncements() {
     if (!deleteTarget) return;
     setSaving(true);
     try { await announcementsApi.remove(deleteTarget.id); setDeleteTarget(null); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Xóa thất bại'); }
+    catch (e) { setError(e instanceof Error ? e.message : t('errors.deleteFailed')); }
     finally { setSaving(false); }
   };
 
@@ -102,13 +103,13 @@ export default function AdminAnnouncements() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-bold text-ink flex items-center gap-2">
-            <Megaphone className="w-5 h-5" /> Thông báo hệ thống
+            <Megaphone className="w-5 h-5" /> {t('adminAnnouncements.title')}
           </h1>
-          <p className="text-sm text-muted mt-0.5">Gửi thông báo tới mọi người dùng trong một khoảng thời gian.</p>
+          <p className="text-sm text-muted mt-0.5">{t('adminAnnouncements.subtitle')}</p>
         </div>
         <button onClick={openCreate}
           className="flex items-center gap-1.5 h-9 px-4 rounded-lg bg-ink text-white text-sm font-semibold hover:bg-[#242424] transition-colors">
-          <Plus className="w-4 h-4" /> Tạo thông báo
+          <Plus className="w-4 h-4" /> {t('adminAnnouncements.create')}
         </button>
       </div>
 
@@ -117,32 +118,32 @@ export default function AdminAnnouncements() {
       )}
 
       {loading ? (
-        <p className="text-sm text-muted py-12 text-center">Đang tải…</p>
+        <p className="text-sm text-muted py-12 text-center">{t('common.loading')}</p>
       ) : items.length === 0 ? (
         <div className="border border-dashed border-hairline rounded-xl py-16 flex flex-col items-center gap-2 text-muted">
           <Megaphone className="w-8 h-8 text-stone-300" />
-          <p className="text-sm">Chưa có thông báo nào.</p>
+          <p className="text-sm">{t('adminAnnouncements.empty')}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {items.map(a => {
-            const ph = phaseBadge[phaseOf(a, now)];
+            const phase = phaseOf(a, now);
             return (
               <div key={a.id} className="bg-white border border-hairline rounded-xl px-4 py-3 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-ink truncate">{a.title}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${ph.cls}`}>{ph.label}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${phaseBadge[phase]}`}>{t(`adminAnnouncements.phase.${phase}`)}</span>
                   </div>
                   <div className="flex items-center gap-1 text-[11px] text-muted mt-1">
                     <Calendar className="w-3 h-3" /> {fmt(a.startsAt)} → {fmt(a.endsAt)}
                   </div>
                 </div>
-                <button onClick={() => openEdit(a)} title="Sửa"
+                <button onClick={() => openEdit(a)} title={t('common.edit')}
                   className="p-2 rounded-lg text-muted hover:bg-surface-soft hover:text-ink transition-colors">
                   <Pencil className="w-4 h-4" />
                 </button>
-                <button onClick={() => setDeleteTarget(a)} title="Xóa"
+                <button onClick={() => setDeleteTarget(a)} title={t('common.delete')}
                   className="p-2 rounded-lg text-muted hover:bg-error/5 hover:text-error transition-colors">
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -163,7 +164,7 @@ export default function AdminAnnouncements() {
               onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-5 py-4 border-b border-hairline">
                 <h2 className="text-base font-bold text-ink flex items-center gap-2">
-                  <Megaphone className="w-4 h-4" /> {form.id ? 'Sửa thông báo' : 'Tạo thông báo'}
+                  <Megaphone className="w-4 h-4" /> {form.id ? t('adminAnnouncements.edit') : t('adminAnnouncements.create')}
                 </h2>
                 <button onClick={() => !saving && setForm(null)} className="p-1 hover:bg-stone-100 rounded-lg">
                   <X className="w-4 h-4 text-stone-500" />
@@ -172,19 +173,19 @@ export default function AdminAnnouncements() {
 
               <div className="p-5 space-y-4 overflow-y-auto">
                 <div>
-                  <label className="text-xs font-semibold text-stone-600 mb-1 block">Tiêu đề</label>
+                  <label className="text-xs font-semibold text-stone-600 mb-1 block">{t('createPhase.titleLabel')}</label>
                   <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
                     className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-stone-600 mb-1 block">Bắt đầu hiển thị</label>
+                    <label className="text-xs font-semibold text-stone-600 mb-1 block">{t('adminAnnouncements.startsAt')}</label>
                     <input type="datetime-local" value={form.startsAt} onChange={e => setForm({ ...form, startsAt: e.target.value })}
                       className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-stone-600 mb-1 block">Kết thúc hiển thị</label>
+                    <label className="text-xs font-semibold text-stone-600 mb-1 block">{t('adminAnnouncements.endsAt')}</label>
                     <input type="datetime-local" value={form.endsAt} onChange={e => setForm({ ...form, endsAt: e.target.value })}
                       className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
                   </div>
@@ -192,19 +193,19 @@ export default function AdminAnnouncements() {
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-stone-600">Nội dung (Markdown)</label>
+                    <label className="text-xs font-semibold text-stone-600">{t('adminAnnouncements.body')}</label>
                     <button onClick={() => setPreview(p => !p)}
                       className={`flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded ${preview ? 'bg-ink text-white' : 'text-muted hover:bg-surface-soft'}`}>
-                      <Eye className="w-3 h-3" /> {preview ? 'Soạn thảo' : 'Xem trước'}
+                      <Eye className="w-3 h-3" /> {preview ? t('adminAnnouncements.compose') : t('adminAnnouncements.preview')}
                     </button>
                   </div>
                   {preview ? (
                     <div className="min-h-[160px] px-3 py-2 border border-stone-200 rounded-lg bg-stone-50/40">
-                      <Markdown source={form.body || '_(trống)_'} />
+                      <Markdown source={form.body || t('adminAnnouncements.emptyBody')} />
                     </div>
                   ) : (
                     <textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })}
-                      rows={7} placeholder="# Tiêu đề&#10;**Đậm**, *nghiêng*, [link](https://…)&#10;- gạch đầu dòng"
+                      rows={7} placeholder={t('adminAnnouncements.bodyPlaceholder')}
                       className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink resize-y" />
                   )}
                 </div>
@@ -215,11 +216,11 @@ export default function AdminAnnouncements() {
               <div className="flex gap-2 px-5 py-4 border-t border-hairline">
                 <button onClick={() => setForm(null)} disabled={saving}
                   className="flex-1 py-2.5 border border-stone-200 text-sm font-semibold rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-60">
-                  Hủy
+                  {t('common.cancel')}
                 </button>
                 <button onClick={save} disabled={saving}
                   className="flex-1 py-2.5 bg-ink text-white text-sm font-semibold rounded-lg hover:bg-[#242424] transition-colors disabled:opacity-60">
-                  {saving ? 'Đang lưu…' : (form.id ? 'Lưu thay đổi' : 'Tạo thông báo')}
+                  {saving ? t('common.saving') : (form.id ? t('adminAnnouncements.saveChanges') : t('adminAnnouncements.create'))}
                 </button>
               </div>
             </motion.div>
@@ -236,14 +237,17 @@ export default function AdminAnnouncements() {
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="p-5 space-y-4">
-                <h2 className="text-base font-bold text-ink flex items-center gap-2"><Trash2 className="w-4 h-4 text-error" /> Xóa thông báo</h2>
-                <p className="text-sm text-stone-600">Xóa <strong className="text-ink">{deleteTarget.title}</strong>? Hành động không thể hoàn tác.</p>
+                <h2 className="text-base font-bold text-ink flex items-center gap-2"><Trash2 className="w-4 h-4 text-error" /> {t('adminAnnouncements.deleteTitle')}</h2>
+                <p className="text-sm text-stone-600">
+                  <Trans i18nKey="adminAnnouncements.deleteMessage" values={{ title: deleteTarget.title }}
+                    components={{ strong: <strong className="text-ink" /> }} />
+                </p>
                 <div className="flex gap-2">
                   <button onClick={() => setDeleteTarget(null)} disabled={saving}
-                    className="flex-1 py-2.5 border border-stone-200 text-sm font-semibold rounded-lg hover:bg-stone-50 disabled:opacity-60">Hủy</button>
+                    className="flex-1 py-2.5 border border-stone-200 text-sm font-semibold rounded-lg hover:bg-stone-50 disabled:opacity-60">{t('common.cancel')}</button>
                   <button onClick={confirmDelete} disabled={saving}
                     className="flex-1 py-2.5 bg-error text-white text-sm font-semibold rounded-lg hover:bg-error/90 disabled:opacity-60">
-                    {saving ? 'Đang xóa…' : 'Xóa'}
+                    {saving ? t('common.deleting') : t('common.delete')}
                   </button>
                 </div>
               </div>

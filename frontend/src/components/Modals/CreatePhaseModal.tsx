@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import type { PhaseBlock, PhaseDefinition, PhaseParticipant } from '../../types';
 import { X, Plus, Calendar, Users, Trash2, Target, CheckSquare } from 'lucide-react';
@@ -23,6 +24,7 @@ function DraftSection({ items, setItems, roles, icon, label }: {
   label: string;
 }) {
   const { getRoleName } = useApp();
+  const { t } = useTranslation();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const keyOf = (r: string | undefined) => r ?? '__general__';
 
@@ -74,7 +76,7 @@ function DraftSection({ items, setItems, roles, icon, label }: {
                   <input type="text" value={drafts[k] ?? ''}
                     onChange={e => setDrafts(d => ({ ...d, [k]: e.target.value }))}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(role); } }}
-                    placeholder={role ? `Thêm mục cho ${getRoleName(role)}...` : 'Thêm mục chung...'}
+                    placeholder={role ? t('phase.addForRole', { role: getRoleName(role) }) : t('phase.addGeneralItem')}
                     className="flex-1 px-2.5 py-1 bg-stone-50/60 border border-dashed border-stone-200 rounded-md text-xs
                                focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink focus:bg-white" />
                   <button type="button" onClick={() => addItem(role)}
@@ -96,6 +98,7 @@ export default function CreatePhaseModal() {
     createPhaseOpen, closeCreatePhase, createPhaseProjectId, createPhaseDates,
     orgProjects, addPhaseBlock, selectedOrg, currentUser, phaseDefs, getPhaseMeta, getUserById,
   } = useApp();
+  const { t } = useTranslation();
 
   const meId = currentUser?.id ?? '';
   const defaultCode = phaseDefs[0]?.code ?? '';
@@ -159,7 +162,7 @@ export default function CreatePhaseModal() {
       await addPhaseBlock(pb);
       closeCreatePhase();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Tạo phase thất bại');
+      setError(err instanceof Error ? err.message : t('createPhase.failed'));
     } finally {
       setSubmitting(false);
     }
@@ -188,7 +191,7 @@ export default function CreatePhaseModal() {
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-5 py-4 border-b border-hairline flex-shrink-0">
-            <h2 className="text-base font-bold text-ink">Tạo Phase Block</h2>
+            <h2 className="text-base font-bold text-ink">{t('createPhase.title')}</h2>
             <button onClick={closeCreatePhase} className="p-1 hover:bg-stone-100 rounded-lg">
               <X className="w-4 h-4 text-stone-500" />
             </button>
@@ -196,7 +199,7 @@ export default function CreatePhaseModal() {
 
           <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1 block">Dự án</label>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">{t('createPhase.project')}</label>
               {lockedProject ? (
                 <div className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-700 font-medium">
                   {lockedProject.name}
@@ -208,7 +211,7 @@ export default function CreatePhaseModal() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1 block">Loại Phase</label>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">{t('createPhase.phaseType')}</label>
               <Dropdown value={phaseType} onChange={v => changePhaseType(v)}
                 options={phaseDefs.map(def => {
                   const meta = getPhaseMeta(def.code);
@@ -221,17 +224,17 @@ export default function CreatePhaseModal() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1 block">Tiêu đề</label>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">{t('createPhase.titleLabel')}</label>
               <input type="text" value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="VD: Core Feature Development"
+                placeholder={t('createPhase.titlePlaceholder')}
                 className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
                            focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" required />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1 block">Mô tả</label>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">{t('createPhase.description')}</label>
               <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
-                placeholder="Mô tả phase block này..."
+                placeholder={t('createPhase.descriptionPlaceholder')}
                 className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
                            focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink resize-none" />
             </div>
@@ -239,7 +242,7 @@ export default function CreatePhaseModal() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Bắt đầu
+                  <Calendar className="w-3 h-3" /> {t('phase.start')}
                 </label>
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
@@ -247,7 +250,7 @@ export default function CreatePhaseModal() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Kết thúc
+                  <Calendar className="w-3 h-3" /> {t('phase.end')}
                 </label>
                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm
@@ -259,7 +262,7 @@ export default function CreatePhaseModal() {
               <button type="button" onClick={() => setShowParticipants(!showParticipants)}
                 className="w-full flex items-center justify-between text-xs font-semibold text-stone-700 mb-1">
                 <span className="flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5" /> Người tham gia ({participants.length})
+                  <Users className="w-3.5 h-3.5" /> {t('createPhase.participants', { count: participants.length })}
                 </span>
                 <span className="text-stone-400">{showParticipants ? '▲' : '▼'}</span>
               </button>
@@ -272,17 +275,17 @@ export default function CreatePhaseModal() {
             </div>
 
             <DraftSection items={checklistItems} setItems={setChecklistItems} roles={checklistRoles}
-              icon={<CheckSquare className="w-3.5 h-3.5" />} label="Checklist theo role" />
+              icon={<CheckSquare className="w-3.5 h-3.5" />} label={t('createPhase.checklistByRole')} />
 
             <DraftSection items={outcomeItems} setItems={setOutcomeItems} roles={outcomeRoles}
-              icon={<Target className="w-3.5 h-3.5" />} label="Outcomes theo role" />
+              icon={<Target className="w-3.5 h-3.5" />} label={t('createPhase.outcomesByRole')} />
 
             {error && <p className="text-[11px] text-error">{error}</p>}
 
             <button type="submit" disabled={submitting}
               className="w-full py-2.5 bg-ink text-white text-sm font-semibold rounded-lg
                          hover:bg-[#242424] transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
-              <Plus className="w-4 h-4" /> Tạo Phase Block
+              <Plus className="w-4 h-4" /> {t('createPhase.submit')}
             </button>
           </form>
         </motion.div>

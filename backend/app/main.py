@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.presentation.api.errors import ApiError, api_error_handler
 from app.presentation.api.routers import (
     admin,
     announcements,
@@ -23,6 +24,9 @@ app = FastAPI(
     version="0.1.0",
     description="Development Process Pipeline API — hợp đồng chi tiết: docs/API_CONTRACT.md",
 )
+
+# #29: lỗi có mã ổn định → FE dịch theo `code`.
+app.add_exception_handler(ApiError, api_error_handler)
 
 app.add_middleware(
     CORSMiddleware,

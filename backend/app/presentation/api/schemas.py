@@ -186,6 +186,7 @@ class NotificationOut(CamelModel):
     project_id: UUID | None = None
     phase_block_id: UUID | None = None
     change_request_id: UUID | None = None
+    params: dict[str, str] | None = None  # #29: FE ghép câu theo type + params
     read: bool = False
     created_at: datetime | None = None
 
@@ -413,7 +414,7 @@ class PhaseParticipantIn(CamelModel):
     @model_validator(mode="after")
     def _exactly_one_identity(self) -> "PhaseParticipantIn":
         if (self.user_id is None) == (self.name is None):
-            raise ValueError("Cần đúng một trong userId hoặc name")
+            raise ValueError("Exactly one of userId or name is required")
         return self
 
 

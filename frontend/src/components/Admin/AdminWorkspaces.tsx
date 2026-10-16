@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Search, Users, FolderKanban, Calendar, Crown, ChevronDown } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { formatDate } from '../../i18n/format';
 import type { AdminWorkspaceInfo } from '../../types';
 import Avatar from '../common/Avatar';
 
@@ -11,11 +12,11 @@ interface Props {
 }
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  try { return format(parseISO(iso), 'dd/MM/yyyy'); } catch { return '—'; }
+  return iso ? formatDate(iso) : '—';
 }
 
 export default function AdminWorkspaces({ workspaces, loading }: Props) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -32,14 +33,14 @@ export default function AdminWorkspaces({ workspaces, loading }: Props) {
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-5 gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-ink">Workspaces</h2>
-          <p className="text-xs text-muted mt-0.5">{workspaces.length} không gian làm việc</p>
+          <h2 className="text-lg font-semibold text-ink">{t('admin.tabs.workspaces')}</h2>
+          <p className="text-xs text-muted mt-0.5">{t('admin.workspaces.count', { count: workspaces.length })}</p>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-soft" />
           <input
             value={query} onChange={e => setQuery(e.target.value)}
-            placeholder="Tìm theo tên, chủ sở hữu…"
+            placeholder={t('admin.workspaces.search')}
             className="w-full h-10 pl-9 pr-3 rounded-lg border border-hairline bg-white text-sm text-ink
                        focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 transition-all" />
         </div>
@@ -52,7 +53,7 @@ export default function AdminWorkspaces({ workspaces, loading }: Props) {
       )}
 
       {!loading && filtered.length === 0 && (
-        <div className="py-12 text-center text-sm text-muted-soft">Không tìm thấy workspace nào</div>
+        <div className="py-12 text-center text-sm text-muted-soft">{t('admin.workspaces.empty')}</div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -74,7 +75,7 @@ export default function AdminWorkspaces({ workspaces, loading }: Props) {
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-ink truncate">{w.name}</p>
                       <p className="text-[11px] text-muted-soft flex items-center gap-1 mt-0.5">
-                        <Calendar className="w-3 h-3" /> Tạo {fmtDate(w.createdAt)}
+                        <Calendar className="w-3 h-3" /> {t('admin.workspaces.created', { date: fmtDate(w.createdAt) })}
                       </p>
                     </div>
                   </div>
@@ -83,9 +84,9 @@ export default function AdminWorkspaces({ workspaces, loading }: Props) {
 
                 {/* Quick metrics */}
                 <div className="flex items-center gap-4 mt-4">
-                  <Metric icon={Users} value={w.memberCount} label="thành viên" />
-                  <Metric icon={FolderKanban} value={w.projectCount} label="dự án" />
-                  <Metric icon={Crown} value={w.owners.length} label="chủ sở hữu" />
+                  <Metric icon={Users} value={w.memberCount} label={t('admin.workspaces.members', { count: w.memberCount })} />
+                  <Metric icon={FolderKanban} value={w.projectCount} label={t('admin.workspaces.projects', { count: w.projectCount })} />
+                  <Metric icon={Crown} value={w.owners.length} label={t('admin.workspaces.owners', { count: w.owners.length })} />
                 </div>
               </button>
 
@@ -94,9 +95,9 @@ export default function AdminWorkspaces({ workspaces, loading }: Props) {
                   initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
                   className="overflow-hidden border-t border-hairline-soft">
                   <div className="px-5 py-4">
-                    <p className="text-[10px] font-semibold text-muted-soft uppercase tracking-wide mb-2.5">Chủ sở hữu</p>
+                    <p className="text-[10px] font-semibold text-muted-soft uppercase tracking-wide mb-2.5">{t('admin.workspaces.ownersTitle')}</p>
                     {w.owners.length === 0 ? (
-                      <p className="text-xs text-muted-soft">Chưa có chủ sở hữu</p>
+                      <p className="text-xs text-muted-soft">{t('admin.workspaces.noOwners')}</p>
                     ) : (
                       <div className="space-y-2">
                         {w.owners.map(o => (

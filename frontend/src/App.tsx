@@ -16,7 +16,6 @@ function AppContent() {
 
   useEffect(() => {
     document.title = 'ProjectHub — Development Process Pipeline';
-    document.documentElement.lang = 'vi';
   }, []);
 
   if (!authReady) {

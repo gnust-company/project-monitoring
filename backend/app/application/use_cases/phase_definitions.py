@@ -20,7 +20,7 @@ class PhaseDefInUseError(Exception):
     """Phase đang được dùng bởi ≥1 block → cần force=True mới xóa."""
     def __init__(self, count: int) -> None:
         self.count = count
-        super().__init__(f"{count} block đang dùng phase này")
+        super().__init__(f"{count} phase blocks use this phase")
 
 
 class PhaseCodeConflictError(Exception):

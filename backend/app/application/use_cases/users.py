@@ -50,7 +50,7 @@ class ChangePassword:
     async def execute(self, user: User, current_password: str, new_password: str) -> None:
         hashed = await self._users.get_password_hash(user.id)
         if not hashed or not self._verify(current_password, hashed):
-            raise InvalidPasswordError("Mật khẩu hiện tại không đúng")
+            raise InvalidPasswordError("Current password is incorrect")
         await self._users.update_password(user.id, self._hash(new_password))
 
 
