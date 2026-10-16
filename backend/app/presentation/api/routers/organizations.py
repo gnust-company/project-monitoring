@@ -2,7 +2,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.application.use_cases.change_requests import ListPendingChangeRequests
 from app.application.use_cases.phase_blocks import ListActivity
@@ -82,6 +82,7 @@ from app.presentation.api.schemas import (
     UserOut,
     WorkspaceRoleOut,
 )
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1/organizations", tags=["organizations"])
 
@@ -129,7 +130,7 @@ async def get_organization(
     try:
         org = await uc.execute(org_id)
     except OrgNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Organization not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "workspace.not_found", "Workspace not found")
     return await _to_out(orgs, org.id, org.name, access.user, org.description)
 
 
@@ -144,7 +145,7 @@ async def rename_organization(
     try:
         org = await uc.execute(org_id, body.name, body.description)
     except OrgNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Organization not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "workspace.not_found", "Workspace not found")
     return await _to_out(orgs, org.id, org.name, access.user, org.description)
 
 
@@ -176,7 +177,7 @@ async def add_member(
     try:
         user = await uc.execute(org_id, body.email, access.user)
     except UserNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No user with that email")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "workspace.member_email_not_found", "No user with that email")
     return UserOut.from_entity(user)
 
 
@@ -253,9 +254,9 @@ async def update_phase(
     try:
         phase = await uc.execute(org_id, phase_id, body.model_dump(mode="json", exclude_unset=True))
     except PhaseDefNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "phase_def.not_found", "Phase not found")
     except PhaseCodeConflictError as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"Mã phase '{e}' đã tồn tại")
+        raise ApiError(status.HTTP_409_CONFLICT, "phase_def.code_conflict", f"Phase code '{e}' already exists", code=str(e))
     return PhaseDefinitionOut.from_entity(phase)
 
 
@@ -270,11 +271,10 @@ async def delete_phase(
     try:
         await uc.execute(org_id, phase_id, force=force)
     except PhaseDefNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "phase_def.not_found", "Phase not found")
     except PhaseDefInUseError as e:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            detail={"message": f"{e.count} block đang dùng phase này", "count": e.count},
+        raise ApiError(
+            status.HTTP_409_CONFLICT, "phase_def.in_use", f"{e.count} phase blocks use this phase", count=e.count,
         )
 
 
@@ -319,9 +319,9 @@ async def update_role(
     try:
         role = await uc.execute(org_id, role_id, body.model_dump(mode="json", exclude_unset=True))
     except RoleNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Role not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "role.not_found", "Role not found")
     except RoleCodeConflictError as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"Mã vai trò '{e}' đã tồn tại")
+        raise ApiError(status.HTTP_409_CONFLICT, "role.code_conflict", f"Role code '{e}' already exists", code=str(e))
     return WorkspaceRoleOut.model_validate(role)
 
 
@@ -335,7 +335,7 @@ async def delete_role(
     try:
         await uc.execute(org_id, role_id)
     except RoleNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Role not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "role.not_found", "Role not found")
 
 
 @router.patch("/{org_id}/members/{user_id}/role", status_code=status.HTTP_204_NO_CONTENT)
@@ -350,6 +350,6 @@ async def set_member_role(
     try:
         await uc.execute(org_id, user_id, body.role, access.user)
     except RoleForbiddenError:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Không có quyền đổi role này")
+        raise ApiError(status.HTTP_403_FORBIDDEN, "role.forbidden", "Not allowed to change this role")
     except RoleNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Role không tồn tại trong workspace")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "role.not_found", "Role not found in this workspace")

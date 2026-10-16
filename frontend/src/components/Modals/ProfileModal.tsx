@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import { X } from 'lucide-react';
 import ProfileContent from '../Workspace/ProfileContent';
@@ -7,6 +8,7 @@ import ProfileContent from '../Workspace/ProfileContent';
 // Nội dung dùng chung ProfileContent (giống hệt trang Hồ sơ trong workspace).
 export default function ProfileModal() {
   const { profileModalOpen, closeProfileModal, currentUser } = useApp();
+  const { t } = useTranslation();
 
   if (!profileModalOpen || !currentUser) return null;
 
@@ -24,7 +26,7 @@ export default function ProfileModal() {
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 py-4 border-b border-hairline bg-white flex-shrink-0">
-            <h2 className="text-base font-bold text-ink">Hồ sơ của tôi</h2>
+            <h2 className="text-base font-bold text-ink">{t('userMenu.profile')}</h2>
             <button onClick={closeProfileModal} className="p-1.5 hover:bg-stone-100 rounded-lg">
               <X className="w-4 h-4 text-stone-500" />
             </button>

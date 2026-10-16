@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import Avatar from '../common/Avatar';
 import { participantUserIds } from '../../types';
@@ -20,6 +21,7 @@ export default function ProfileView() {
     currentUser, selectedOrg, orgProjects, phaseBlocks, orgRoles,
     assignMemberRole, getPhaseMeta, setWorkspaceView, openPhaseDetail, openProfileModal,
   } = useApp();
+  const { t } = useTranslation();
 
   const meId = currentUser?.id ?? '';
   const myJobRole = selectedOrg?.members.find(m => m.id === meId)?.jobRole ?? '';
@@ -47,10 +49,10 @@ export default function ProfileView() {
   if (!currentUser || !selectedOrg) return null;
 
   const statCards = [
-    { label: 'Dự án tham gia', value: stats.projects, icon: FolderKanban },
-    { label: 'Phase được giao', value: stats.phases, icon: GitBranch },
-    { label: 'Đầu việc đang mở', value: stats.openTasks, icon: ListTodo },
-    { label: 'Hoàn thành', value: `${stats.completion}%`, icon: CheckSquare },
+    { label: t('profile.statProjects'), value: stats.projects, icon: FolderKanban },
+    { label: t('profile.statPhases'), value: stats.phases, icon: GitBranch },
+    { label: t('profile.statOpenTasks'), value: stats.openTasks, icon: ListTodo },
+    { label: t('profile.complete'), value: `${stats.completion}%`, icon: CheckSquare },
   ];
 
   const projectName = (id: string) => orgProjects.find(p => p.id === id)?.name ?? '';
@@ -68,19 +70,19 @@ export default function ProfileView() {
               <div className="text-xs text-stone-500 mb-3">{currentUser.email}</div>
               <div className="flex items-center gap-2 flex-wrap">
                 <ShieldCheck className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
-                <span className="text-xs text-stone-500">Vai trò trong {selectedOrg.name}:</span>
+                <span className="text-xs text-stone-500">{t('profile.roleIn', { name: selectedOrg.name })}</span>
                 <select value={myJobRole}
                   onChange={e => assignMemberRole(meId, e.target.value || null)}
                   className="text-xs text-stone-700 bg-white border border-stone-200 rounded-md px-2 py-1
                              focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink">
-                  <option value="">— chưa có vai trò —</option>
+                  <option value="">{t('settings.noRole')}</option>
                   {orgRoles.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
                 </select>
               </div>
             </div>
             <button onClick={openProfileModal}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-stone-600 border border-stone-200 rounded-lg hover:border-stone-300 hover:bg-white transition-colors">
-              <Settings2 className="w-3.5 h-3.5" /> Sửa tài khoản
+              <Settings2 className="w-3.5 h-3.5" /> {t('profile.editAccount')}
             </button>
           </div>
         </motion.div>
@@ -101,10 +103,10 @@ export default function ProfileView() {
         <motion.div custom={5} variants={fadeUp} initial="hidden" animate="visible"
           className="bg-surface-card rounded-2xl border border-hairline p-6">
           <h2 className="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
-            <GitBranch className="w-4 h-4" /> Phase được giao ({assignedBlocks.length})
+            <GitBranch className="w-4 h-4" /> {t('profile.assignedPhases', { count: assignedBlocks.length })}
           </h2>
           {assignedBlocks.length === 0 ? (
-            <p className="text-sm text-stone-400">Bạn chưa được giao phase nào trong workspace này.</p>
+            <p className="text-sm text-stone-400">{t('profile.noAssignedPhasesHere')}</p>
           ) : (
             <div className="space-y-1.5">
               {assignedBlocks.map(pb => {
@@ -121,7 +123,7 @@ export default function ProfileView() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-ink truncate">{pb.title}</div>
-                      <div className="text-[10px] text-muted-soft">{projectName(pb.projectId)} · {pct}% hoàn thành</div>
+                      <div className="text-[10px] text-muted-soft">{projectName(pb.projectId)} · {t('common.percentDone', { pct })}</div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-stone-300 group-hover:text-stone-500" />
                   </button>

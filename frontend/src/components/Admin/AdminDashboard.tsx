@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Trans, useTranslation } from 'react-i18next';
 import { Users, Building2, FolderKanban, Layers, ShieldCheck, Crown, ArrowRight } from 'lucide-react';
 import type { AdminStats, AdminUserInfo, AdminWorkspaceInfo } from '../../types';
 import Avatar from '../common/Avatar';
@@ -35,6 +36,7 @@ function StatCard({ icon: Icon, label, value, sub, i }: {
 }
 
 export default function AdminDashboard({ stats, users, workspaces, onSeeUsers, onSeeWorkspaces }: Props) {
+  const { t } = useTranslation();
   const topWorkspaces = [...workspaces].sort((a, b) => b.projectCount - a.projectCount).slice(0, 5);
   const recentUsers = [...users]
     .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
@@ -44,11 +46,11 @@ export default function AdminDashboard({ stats, users, workspaces, onSeeUsers, o
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard i={0} icon={Users} label="Người dùng" value={stats?.userCount ?? 0}
-          sub={stats ? `${stats.superuserCount} admin` : undefined} />
-        <StatCard i={1} icon={Building2} label="Workspace" value={stats?.workspaceCount ?? 0} />
-        <StatCard i={2} icon={FolderKanban} label="Dự án" value={stats?.projectCount ?? 0} />
-        <StatCard i={3} icon={Layers} label="Phase block" value={stats?.phaseBlockCount ?? 0} />
+        <StatCard i={0} icon={Users} label={t('admin.stats.users')} value={stats?.userCount ?? 0}
+          sub={stats ? t('admin.stats.admins', { count: stats.superuserCount }) : undefined} />
+        <StatCard i={1} icon={Building2} label={t('admin.stats.workspaces')} value={stats?.workspaceCount ?? 0} />
+        <StatCard i={2} icon={FolderKanban} label={t('admin.stats.projects')} value={stats?.projectCount ?? 0} />
+        <StatCard i={3} icon={Layers} label={t('admin.stats.phaseBlocks')} value={stats?.phaseBlockCount ?? 0} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -58,16 +60,16 @@ export default function AdminDashboard({ stats, users, workspaces, onSeeUsers, o
           <div className="flex items-center justify-between px-5 py-4 border-b border-hairline-soft">
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-muted" />
-              <h3 className="text-sm font-semibold text-ink">Workspace nổi bật</h3>
+              <h3 className="text-sm font-semibold text-ink">{t('admin.topWorkspaces')}</h3>
             </div>
             <button onClick={onSeeWorkspaces}
               className="text-xs text-muted hover:text-ink font-medium flex items-center gap-1 transition-colors">
-              Tất cả <ArrowRight className="w-3 h-3" />
+              {t('common.all')} <ArrowRight className="w-3 h-3" />
             </button>
           </div>
           <div className="divide-y divide-hairline-soft">
             {topWorkspaces.length === 0 && (
-              <div className="px-5 py-8 text-center text-xs text-muted-soft">Chưa có workspace</div>
+              <div className="px-5 py-8 text-center text-xs text-muted-soft">{t('admin.noWorkspaces')}</div>
             )}
             {topWorkspaces.map(w => (
               <div key={w.id} className="flex items-center justify-between px-5 py-3">
@@ -77,10 +79,10 @@ export default function AdminDashboard({ stats, users, workspaces, onSeeUsers, o
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink truncate">{w.name}</p>
-                    <p className="text-[11px] text-muted-soft">{w.memberCount} thành viên</p>
+                    <p className="text-[11px] text-muted-soft">{t('common.memberCount', { count: w.memberCount })}</p>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-body flex-shrink-0">{w.projectCount} dự án</span>
+                <span className="text-xs font-medium text-body flex-shrink-0">{t('common.projectCount', { count: w.projectCount })}</span>
               </div>
             ))}
           </div>
@@ -92,16 +94,16 @@ export default function AdminDashboard({ stats, users, workspaces, onSeeUsers, o
           <div className="flex items-center justify-between px-5 py-4 border-b border-hairline-soft">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-muted" />
-              <h3 className="text-sm font-semibold text-ink">Người dùng mới</h3>
+              <h3 className="text-sm font-semibold text-ink">{t('admin.newUsers')}</h3>
             </div>
             <button onClick={onSeeUsers}
               className="text-xs text-muted hover:text-ink font-medium flex items-center gap-1 transition-colors">
-              Tất cả <ArrowRight className="w-3 h-3" />
+              {t('common.all')} <ArrowRight className="w-3 h-3" />
             </button>
           </div>
           <div className="divide-y divide-hairline-soft">
             {recentUsers.length === 0 && (
-              <div className="px-5 py-8 text-center text-xs text-muted-soft">Chưa có người dùng</div>
+              <div className="px-5 py-8 text-center text-xs text-muted-soft">{t('admin.noUsers')}</div>
             )}
             {recentUsers.map(u => (
               <div key={u.id} className="flex items-center justify-between px-5 py-3">
@@ -127,8 +129,7 @@ export default function AdminDashboard({ stats, users, workspaces, onSeeUsers, o
         className="flex items-center gap-3 p-4 rounded-xl bg-surface-soft border border-hairline-soft">
         <ShieldCheck className="w-5 h-5 text-emerald-600 flex-shrink-0" />
         <p className="text-xs text-muted leading-relaxed">
-          Bạn đang ở khu vực quản trị toàn hệ thống. Mọi thao tác (xem thông tin, đặt lại mật khẩu)
-          chỉ dành cho tài khoản <strong className="text-body">superuser</strong>.
+          <Trans i18nKey="admin.superuserNote" components={{ strong: <strong className="text-body" /> }} />
         </p>
       </motion.div>
     </div>

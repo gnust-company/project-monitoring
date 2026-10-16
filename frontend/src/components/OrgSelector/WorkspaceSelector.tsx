@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import { Layers, Users, ArrowRight, ArrowLeft, Plus } from 'lucide-react';
 import CreateWorkspaceModal from '../Modals/CreateWorkspaceModal';
@@ -15,6 +16,7 @@ const fadeUp = {
 
 export default function WorkspaceSelector() {
   const { selectOrg, goToLanding, organizations, openCreateWorkspace, currentUser } = useApp();
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-white">
@@ -23,7 +25,7 @@ export default function WorkspaceSelector() {
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <button onClick={goToLanding}
             className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Trang chủ
+            <ArrowLeft className="w-4 h-4" /> {t('selector.home')}
           </button>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 bg-ink rounded-lg flex items-center justify-center">
@@ -39,8 +41,8 @@ export default function WorkspaceSelector() {
       <main className="max-w-4xl mx-auto px-6 py-16">
         <motion.div custom={0} variants={fadeUp} initial="hidden" animate="visible" className="text-center mb-12">
           <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-muted mb-3 block">Workspace</span>
-          <h1 className="text-4xl font-semibold text-ink mb-2 tracking-tight">Chọn Workspace</h1>
-          <p className="text-muted">Chọn tổ chức để quản lý dự án của bạn</p>
+          <h1 className="text-4xl font-semibold text-ink mb-2 tracking-tight">{t('selector.title')}</h1>
+          <p className="text-muted">{t('selector.subtitle')}</p>
         </motion.div>
 
         <div className="space-y-4">
@@ -65,7 +67,7 @@ export default function WorkspaceSelector() {
                     {org.name}
                   </h2>
                   <div className="flex items-center gap-3 mt-1 text-sm text-muted">
-                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{memberCount} thành viên</span>
+                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{t('common.memberCount', { count: memberCount })}</span>
                     <span className="text-gray-300">·</span>
                     <span>{pmCount} PM</span>
                     <span className="text-gray-300">·</span>
@@ -99,7 +101,7 @@ export default function WorkspaceSelector() {
                        border-dashed border-gray-300 p-5 text-muted hover:border-ink/30
                        hover:text-ink transition-all duration-300 group">
             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-            <span className="text-sm font-medium">Tạo Workspace mới</span>
+            <span className="text-sm font-medium">{t('selector.create')}</span>
           </motion.button>
         </div>
       </main>

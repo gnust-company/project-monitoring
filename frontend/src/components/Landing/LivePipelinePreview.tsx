@@ -1,4 +1,6 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatDate } from '../../i18n/format';
 import { PHASE_META } from '../../types';
 import { projects, phaseBlocks } from '../../data/mockData';
 import { computeProjectStatus, projectPhaseProgress } from '../../lib/projectStatus';
@@ -67,6 +69,7 @@ function resolveOverlaps(
 }
 
 export default function LivePipelinePreview() {
+  const { t } = useTranslation();
   const boardRef = useRef<HTMLDivElement>(null);
   const leftContentRef = useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState<'week' | 'month' | 'quarter'>('week');
@@ -461,14 +464,14 @@ export default function LivePipelinePreview() {
           <div className="flex items-center bg-white/[0.04] rounded-lg p-0.5">
             <button onClick={scrollToToday}
               className="px-2 py-1 text-[10px] font-bold rounded-md text-white/80 whitespace-nowrap hover:bg-white/[0.08] transition-colors">
-              Hôm nay
+              {t('pipeline.today')}
             </button>
             <div className="w-px h-3 bg-white/10 mx-0.5" />
             {(['week', 'month', 'quarter'] as const).map(z => (
               <button key={z} onClick={() => { setZoomLevel(z); hasScrolled.current = false; }}
                 className={`px-2 py-1 text-[10px] font-semibold rounded-md whitespace-nowrap transition-colors
                   ${zoomLevel === z ? 'bg-white/[0.08] text-white' : 'text-white/30 hover:text-white/50'}`}>
-                {z === 'week' ? 'Tuần' : z === 'month' ? 'Tháng' : 'Quý'}
+                {t(`pipeline.zoom.${z}`)}
               </button>
             ))}
           </div>
@@ -480,7 +483,7 @@ export default function LivePipelinePreview() {
         {/* Left panel */}
         <div className="w-36 shrink-0 bg-surface-soft border-r border-hairline overflow-hidden z-20 relative">
           <div className="bg-surface-soft border-b border-hairline px-3 flex items-center text-[9px] font-bold text-muted uppercase tracking-wider sticky top-0 z-10"
-            style={{ height: HEADER_HEIGHT }}>Dự án</div>
+            style={{ height: HEADER_HEIGHT }}>{t('pipeline.projectsHeader')}</div>
           <div ref={leftContentRef}>
             {filteredProjects.map(project => {
               const rd = projectRowData.get(project.id);
@@ -496,7 +499,7 @@ export default function LivePipelinePreview() {
                         (liveStatus.statusMap.get(project.id) ?? project.status) === 'At Risk' ? 'bg-amber-400' : 'bg-red-400'}`} />
                       <span className="text-[11px] font-semibold text-ink truncate">{project.name}</span>
                     </div>
-                    <div className="text-[9px] text-stone-400 font-light mt-0.5">{pbCount} phase · {liveStatus.progressMap.get(project.id) ?? project.progress}%</div>
+                    <div className="text-[9px] text-stone-400 font-light mt-0.5">{t('pipeline.phaseCount', { count: pbCount })} · {liveStatus.progressMap.get(project.id) ?? project.progress}%</div>
                   </div>
                 </div>
               );
@@ -527,10 +530,10 @@ export default function LivePipelinePreview() {
                     {zoomLevel === 'week' && (
                       <>
                         <span className="font-bold text-stone-700">W{format(col, 'ww')}</span>
-                        <span className="text-[8px] text-stone-400">{format(col, 'dd/MM')}</span>
+                        <span className="text-[8px] text-stone-400">{formatDate(col, 'dateShort')}</span>
                       </>
                     )}
-                    {zoomLevel === 'month' && <span>{format(col, 'MM/yyyy')}</span>}
+                    {zoomLevel === 'month' && <span>{formatDate(col, 'monthYear')}</span>}
                     {zoomLevel === 'quarter' && (
                       <>
                         <span className="font-bold text-stone-700">Q{getQuarter(col)}</span>
@@ -598,7 +601,7 @@ export default function LivePipelinePreview() {
                             <div className="font-bold">{pb.title}</div>
                             <div className="text-stone-400">{meta.label}</div>
                             <div className="text-stone-500 font-light">
-                              {format(parseISO(pos.startDate), 'dd/MM')} – {format(parseISO(pos.endDate), 'dd/MM')}
+                              {formatDate(pos.startDate, 'dateShort')} – {formatDate(pos.endDate, 'dateShort')}
                             </div>
                           </div>
                         )}

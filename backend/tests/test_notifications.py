@@ -51,3 +51,12 @@ async def test_cannot_read_others_notification(client: AsyncClient, make_user):
     # user khác không sở hữu thông báo này → 404
     resp = await client.post(f"{API}/notifications/{nid}/read", headers=auth(other_token))
     assert resp.status_code == 404
+
+
+async def test_notification_carries_params_for_translation(client: AsyncClient, make_user):
+    """#29: BE lưu type + params để FE tự ghép câu theo ngôn ngữ; title là bản tiếng Anh dự phòng."""
+    m_token = await _org_with_member(client, make_user)
+    notifs = (await client.get(f"{API}/notifications", headers=auth(m_token))).json()
+    assert notifs[0]["type"] == "member_added"
+    assert notifs[0]["params"] == {"workspace": "N"}
+    assert notifs[0]["title"] == "You were added to workspace N"

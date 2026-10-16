@@ -2,6 +2,7 @@
 // Mỗi dòng R/A/C/I liệt kê chip người tham gia; "+" mở popover chọn thành viên workspace
 // HOẶC gõ tên người ngoài nền tảng (text thuần, chỉ để ghi nhận). Một người chỉ ở 1 vai trò.
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, X, UserRound } from 'lucide-react';
 import {
   RACI_META, RACI_ROLES, participantKey,
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export default function RaciParticipants({ value, onChange, members, getUserById, readOnly }: Props) {
+  const { t } = useTranslation();
   const [openRole, setOpenRole] = useState<RaciRole | null>(null);
   const [freeName, setFreeName] = useState('');
 
@@ -41,31 +43,32 @@ export default function RaciParticipants({ value, onChange, members, getUserById
     <div className="space-y-1.5">
       {RACI_ROLES.map(role => {
         const meta = RACI_META[role];
+        const roleLabel = t(`raci.${role}.label`);
         const rows = value.filter(p => p.raci === role);
         return (
           <div key={role} className="flex items-start gap-2">
-            <div className="w-40 shrink-0 pt-1 whitespace-nowrap" title={`${meta.en} — ${meta.hint}`}>
+            <div className="w-40 shrink-0 pt-1 whitespace-nowrap" title={`${meta.en} — ${t(`raci.${role}.hint`)}`}>
               <span className={`inline-flex w-5 h-5 items-center justify-center rounded text-[10px] font-bold border ${meta.chip}`}>
                 {role}
               </span>
-              <span className="ml-1.5 text-[11px] text-gray-500">{meta.label}</span>
+              <span className="ml-1.5 text-[11px] text-gray-500">{roleLabel}</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5 min-h-[26px]">
               {rows.map(p => {
                 const u = p.userId ? getUserById(p.userId) : undefined;
-                const label = p.userId ? (u?.name ?? 'Người dùng') : (p.name ?? '');
+                const label = p.userId ? (u?.name ?? t('common.user')) : (p.name ?? '');
                 return (
                   <span key={participantKey(p)}
                     className={`inline-flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full border text-[11px] ${meta.chip}`}
-                    title={p.userId ? label : `${label} (ngoài nền tảng)`}>
+                    title={p.userId ? label : t('raci.externalTitle', { name: label })}>
                     {p.userId
                       ? <Avatar name={u?.name} src={u?.avatar} className="w-4 h-4" />
                       : <UserRound className="w-3.5 h-3.5 opacity-60" />}
                     <span className="max-w-[10rem] truncate">{label}</span>
-                    {!p.userId && <span className="text-[9px] opacity-60">ngoài</span>}
+                    {!p.userId && <span className="text-[9px] opacity-60">{t('raci.external')}</span>}
                     {!readOnly && (
-                      <button type="button" onClick={() => remove(p)} title={`Xóa ${label}`}
+                      <button type="button" onClick={() => remove(p)} title={t('raci.remove', { name: label })}
                         className="ml-0.5 opacity-50 hover:opacity-100 hover:text-red-600 transition-opacity">
                         <X className="w-3 h-3" />
                       </button>
@@ -78,7 +81,7 @@ export default function RaciParticipants({ value, onChange, members, getUserById
               {!readOnly && (
                 <div className="relative">
                   <button type="button" onClick={() => (openRole === role ? close() : setOpenRole(role))}
-                    title={`Thêm người (${meta.label})`}
+                    title={t('raci.add', { role: roleLabel })}
                     className="w-6 h-6 rounded-full border border-dashed border-gray-300 text-gray-400
                       hover:border-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors">
                     <Plus className="w-3 h-3" />
@@ -89,7 +92,7 @@ export default function RaciParticipants({ value, onChange, members, getUserById
                       <div className="absolute left-0 top-full mt-1 z-40 w-60 bg-white rounded-lg border border-gray-200 shadow-lg">
                         <div className="max-h-40 overflow-y-auto py-1">
                           {addable.length === 0 ? (
-                            <p className="px-3 py-2 text-[11px] text-gray-400">Đã thêm đủ thành viên workspace.</p>
+                            <p className="px-3 py-2 text-[11px] text-gray-400">{t('raci.allAdded')}</p>
                           ) : addable.map(m => (
                             <button key={m.id} type="button"
                               onClick={() => { add({ userId: m.id, name: null, raci: role }); close(); }}
@@ -101,7 +104,7 @@ export default function RaciParticipants({ value, onChange, members, getUserById
                         </div>
                         <div className="border-t border-gray-100 p-2">
                           <label className="block text-[10px] text-gray-400 mb-1">
-                            Người ngoài nền tảng — nhập tên
+                            {t('raci.externalLabel')}
                           </label>
                           <div className="flex gap-1.5">
                             <input value={freeName} maxLength={MAX_NAME} autoFocus
@@ -110,13 +113,13 @@ export default function RaciParticipants({ value, onChange, members, getUserById
                                 if (e.key === 'Enter') { e.preventDefault(); addFree(role); }
                                 if (e.key === 'Escape') { e.stopPropagation(); close(); }
                               }}
-                              placeholder="VD: Nguyễn Văn A (khách hàng)"
+                              placeholder={t('raci.externalPlaceholder')}
                               className="flex-1 min-w-0 px-2 py-1 text-xs border border-gray-200 rounded-md
                                 focus:outline-none focus:ring-1 focus:ring-slate-300" />
                             <button type="button" onClick={() => addFree(role)} disabled={!freeName.trim()}
                               className="px-2 py-1 text-xs font-medium bg-slate-800 text-white rounded-md
                                 disabled:opacity-40 hover:bg-slate-700 transition-colors">
-                              Thêm
+                              {t('common.add')}
                             </button>
                           </div>
                         </div>

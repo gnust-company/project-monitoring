@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import { getUserById } from '../../data/mockData';
 import { projectsApi } from '../../api';
@@ -9,11 +10,11 @@ import {
   X, Calendar, Trash2, Pencil, Check, FolderKanban,
   GitBranch, Clock, Crown, Lock,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { formatDate } from '../../i18n/format';
 import Avatar from '../common/Avatar';
 import Dropdown from '../common/Dropdown';
 import DeleteReasonDialog from '../ui/DeleteReasonDialog';
-import { computeProjectStatus, projectPhaseProgress, projectDateProgress, daysToNearestDeadline, isPhaseComplete } from '../../lib/projectStatus';
+import { computeProjectStatus, projectPhaseProgress, projectDateProgress, daysToNearestDeadline, isPhaseComplete, STATUS_KEY } from '../../lib/projectStatus';
 
 const STATUS_META: Record<ProjectStatus, { color: string; bg: string; border: string; bar: string }> = {
   'On Track': { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: '#10b981' },
@@ -27,6 +28,7 @@ export default function ProjectDetailModal() {
     updateProject, deleteProject, changeProjectPic, phaseBlocks,
     currentUser, selectedOrg, isOwner, getPhaseMeta, getRoleName,
   } = useApp();
+  const { t } = useTranslation();
 
   // Inline editing
   const [editingName, setEditingName] = useState(false);
@@ -147,18 +149,18 @@ export default function ProjectDetailModal() {
               <div className="w-8 h-8 bg-surface-card rounded-lg flex items-center justify-center">
                 <FolderKanban className="w-4 h-4 text-stone-500" />
               </div>
-              <h2 className="text-base font-bold text-ink">Chi tiết Dự án</h2>
+              <h2 className="text-base font-bold text-ink">{t('project.detailTitle')}</h2>
             </div>
             <div className="flex items-center gap-1">
               {canManage ? (
                 <button onClick={() => setConfirmDelete(true)}
                   className="p-1.5 rounded-lg transition-colors hover:bg-red-50 text-stone-400 hover:text-red-500"
-                  title="Xóa dự án">
+                  title={t('project.delete')}>
                   <Trash2 className="w-4 h-4" />
                 </button>
               ) : (
-                <span className="flex items-center gap-1 text-[10px] text-stone-400 pr-2" title="Chỉ PIC mới sửa/xóa dự án">
-                  <Lock className="w-3 h-3" /> Chỉ PIC
+                <span className="flex items-center gap-1 text-[10px] text-stone-400 pr-2" title={t('project.picOnlyHint')}>
+                  <Lock className="w-3 h-3" /> {t('project.picOnly')}
                 </span>
               )}
               <button onClick={closeProjectDetail} className="p-1.5 hover:bg-stone-100 rounded-lg">
@@ -199,17 +201,17 @@ export default function ProjectDetailModal() {
                 <div className="flex justify-end gap-2">
                   <button onClick={() => setEditingDesc(false)}
                     className="px-3 py-1.5 bg-ink text-white text-xs rounded-lg hover:bg-[#242424] flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Xong
+                    <Check className="w-3 h-3" /> {t('common.done')}
                   </button>
                 </div>
               </div>
             ) : (
               <div className={`group rounded-lg -mx-1 px-1 py-1 transition-colors ${canManage ? 'cursor-pointer hover:bg-stone-50' : ''}`}
                 onClick={() => canManage && setEditingDesc(true)}>
-                <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap break-words">{meta.description || (canManage ? 'Thêm mô tả...' : '—')}</p>
+                <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap break-words">{meta.description || (canManage ? t('phase.addDescription') : '—')}</p>
                 {canManage && (
                   <span className="text-[10px] text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
-                    <Pencil className="w-2.5 h-2.5" /> Click để chỉnh sửa
+                    <Pencil className="w-2.5 h-2.5" /> {t('phase.clickToEdit')}
                   </span>
                 )}
               </div>
@@ -217,18 +219,18 @@ export default function ProjectDetailModal() {
 
             {/* Status (auto) */}
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1.5 block">Trạng thái (tự động)</label>
+              <label className="text-xs font-semibold text-stone-700 mb-1.5 block">{t('project.statusAuto')}</label>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border
                 ${statusMeta.bg} ${statusMeta.color} ${statusMeta.border}`}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusMeta.bar }} />
-                {autoStatus}
+                {t(`projectStatus.${STATUS_KEY[autoStatus]}`)}
               </span>
             </div>
 
             {/* PIC (#11) */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
-                <Crown className="w-3 h-3" /> Người phụ trách (PIC)
+                <Crown className="w-3 h-3" /> {t('project.pic')}
               </label>
               {canChangePic ? (
                 <Dropdown className="w-60" value={meta.picUserId} onChange={uid => setMeta(m => ({ ...m, picUserId: uid }))}
@@ -249,7 +251,7 @@ export default function ProjectDetailModal() {
             {/* Dates — chỉ còn ngày bắt đầu (#20: dự án không có ngày kết thúc) */}
             <div>
               <label className="text-xs font-semibold text-stone-700 mb-1 block flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> Ngày bắt đầu
+                <Calendar className="w-3 h-3" /> {t('project.startDate')}
               </label>
               <input type="date" value={meta.startDate} disabled={!canManage}
                 onChange={e => setMeta(m => ({ ...m, startDate: e.target.value }))}
@@ -260,7 +262,7 @@ export default function ProjectDetailModal() {
             {/* Progress (auto — trung bình % các phase) */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-stone-700">Tiến độ (theo phase)</label>
+                <label className="text-xs font-semibold text-stone-700">{t('project.progressByPhase')}</label>
                 <span className="text-xs font-bold text-ink">{autoProgress}%</span>
               </div>
               <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
@@ -273,7 +275,7 @@ export default function ProjectDetailModal() {
             {projectPbs.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-stone-700">Tiến độ (theo ngày)</label>
+                  <label className="text-xs font-semibold text-stone-700">{t('project.progressByDate')}</label>
                   <span className="text-xs font-bold text-ink">{dateProgress}%</span>
                 </div>
                 <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
@@ -281,8 +283,8 @@ export default function ProjectDetailModal() {
                 </div>
                 <p className="text-[10px] text-stone-400 mt-1">
                   {dateProgress > autoProgress
-                    ? `Phase đang chậm hơn lịch ${dateProgress - autoProgress}%`
-                    : 'Phase đang bắt kịp hoặc vượt lịch'}
+                    ? t('project.behindSchedule', { pct: dateProgress - autoProgress })
+                    : t('project.onSchedule')}
                 </p>
               </div>
             )}
@@ -291,18 +293,18 @@ export default function ProjectDetailModal() {
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-surface-card rounded-lg p-3 border border-hairline">
                 <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-medium mb-0.5">
-                  <GitBranch className="w-3 h-3" /> Phase
+                  <GitBranch className="w-3 h-3" /> {t('project.statPhases')}
                 </div>
                 <div className="text-base font-bold text-ink">{projectPbs.length}</div>
               </div>
               <div className="bg-surface-card rounded-lg p-3 border border-hairline">
-                <div className="text-[10px] text-stone-400 font-medium mb-0.5">Hoàn thành</div>
+                <div className="text-[10px] text-stone-400 font-medium mb-0.5">{t('project.statComplete')}</div>
                 <div className="text-base font-bold text-emerald-600">{completePbs}</div>
               </div>
               <div className="bg-surface-card rounded-lg p-3 border border-hairline">
-                <div className="text-[10px] text-stone-400 font-medium mb-0.5">Hạn phase gần nhất</div>
+                <div className="text-[10px] text-stone-400 font-medium mb-0.5">{t('project.statNearestDeadline')}</div>
                 <div className={`text-base font-bold ${deadlineDays !== null && deadlineDays < 0 ? 'text-red-500' : deadlineDays !== null && deadlineDays < 7 ? 'text-amber-600' : 'text-ink'}`}>
-                  {deadlineDays === null ? '—' : deadlineDays >= 0 ? `${deadlineDays} ngày` : `Quá ${Math.abs(deadlineDays)}d`}
+                  {deadlineDays === null ? '—' : deadlineDays >= 0 ? t('project.daysLeft', { count: deadlineDays }) : t('project.daysOverdue', { count: Math.abs(deadlineDays) })}
                 </div>
               </div>
             </div>
@@ -310,7 +312,7 @@ export default function ProjectDetailModal() {
             {/* Phase distribution */}
             {projectPbs.length > 0 && (
               <div>
-                <label className="text-xs font-semibold text-stone-700 mb-1.5 block">Phân bố phase</label>
+                <label className="text-xs font-semibold text-stone-700 mb-1.5 block">{t('project.phaseDistribution')}</label>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(phaseCounts).map(([phase, count]) => {
                     const meta = getPhaseMeta(phase);
@@ -328,7 +330,7 @@ export default function ProjectDetailModal() {
             {/* Meta */}
             <div className="flex items-center justify-between pt-1 border-t border-hairline">
               <div className="flex items-center gap-2 pt-2">
-                <span className="text-xs text-stone-400">Người tạo:</span>
+                <span className="text-xs text-stone-400">{t('project.createdBy')}</span>
                 {creator && (
                   <div className="flex items-center gap-1.5">
                     <Avatar name={creator.name} src={creator.avatar} className="w-5 h-5" />
@@ -337,17 +339,17 @@ export default function ProjectDetailModal() {
                 )}
               </div>
               <span className="text-[10px] text-stone-400 pt-2">
-                Bắt đầu {format(parseISO(project.startDate), 'dd/MM/yyyy')}
+                {t('project.startedOn', { date: formatDate(project.startDate) })}
               </span>
             </div>
 
             {/* Changelog dự án — ai đã làm gì với phase */}
             <div className="pt-2 border-t border-hairline">
               <label className="text-xs font-semibold text-stone-700 mb-2 mt-2 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" /> Lịch sử thay đổi ({activity.length})
+                <Clock className="w-3.5 h-3.5" /> {t('project.changelog', { count: activity.length })}
               </label>
               {activity.length === 0 ? (
-                <p className="text-xs text-stone-400 py-2">Chưa có hoạt động nào.</p>
+                <p className="text-xs text-stone-400 py-2">{t('phase.noActivity')}</p>
               ) : (
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {activity.map(a => {
@@ -362,11 +364,11 @@ export default function ProjectDetailModal() {
                         <Avatar name={user?.name} src={user?.avatar} className="w-5 h-5 mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-stone-700">
-                            <span className="font-medium">{user?.name ?? 'Ai đó'}</span> {verb}
-                            {phaseName && <span className="text-stone-700"> · phase “{phaseName}”</span>}
+                            <span className="font-medium">{user?.name ?? t('common.someone')}</span> {verb}
+                            {phaseName && <span className="text-stone-700"> · {t('project.inPhase', { name: phaseName })}</span>}
                             {detail && <span className="text-stone-500"> — {detail}</span>}
                           </p>
-                          <p className="text-[10px] text-stone-400">{format(parseISO(a.timestamp), 'dd/MM/yyyy HH:mm')}</p>
+                          <p className="text-[10px] text-stone-400">{formatDate(a.timestamp, 'dateTime')}</p>
                         </div>
                       </div>
                     );
@@ -379,15 +381,15 @@ export default function ProjectDetailModal() {
           {/* #14: thanh Lưu metadata — chỉ áp khi bấm Lưu */}
           {metaDirty && (
             <div className="flex-shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-t border-hairline bg-amber-50/60">
-              <span className="text-xs font-semibold text-amber-700">Có thay đổi chưa lưu</span>
+              <span className="text-xs font-semibold text-amber-700">{t('common.unsavedChanges')}</span>
               <div className="flex items-center gap-2">
                 <button onClick={resetMeta}
                   className="px-3 py-1.5 text-xs font-semibold text-stone-500 hover:text-stone-700 rounded-lg hover:bg-stone-100 transition-colors">
-                  Hoàn tác
+                  {t('common.revert')}
                 </button>
                 <button onClick={saveMeta}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-ink text-white rounded-lg hover:bg-[#242424] transition-colors">
-                  <Check className="w-3.5 h-3.5" /> Lưu
+                  <Check className="w-3.5 h-3.5" /> {t('common.save')}
                 </button>
               </div>
             </div>
@@ -398,8 +400,8 @@ export default function ProjectDetailModal() {
       {/* #14: xóa dự án cần nhập lý do → log vào activity workspace */}
       {confirmDelete && (
         <DeleteReasonDialog
-          title="Xóa dự án"
-          message={`Xóa dự án "${project.name}" cùng toàn bộ phase? Hành động này không thể hoàn tác.`}
+          title={t('project.delete')}
+          message={t('project.deleteMessage', { name: project.name })}
           onCancel={() => setConfirmDelete(false)}
           onConfirm={async (reason) => {
             setConfirmDelete(false);

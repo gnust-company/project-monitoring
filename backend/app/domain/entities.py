@@ -245,6 +245,8 @@ class Notification:
     project_id: UUID | None = None
     phase_block_id: UUID | None = None
     change_request_id: UUID | None = None
+    # #29: tham số để FE ghép câu theo ngôn ngữ (title là bản tiếng Anh dự phòng).
+    params: dict[str, str] | None = None
     read: bool = False
     created_at: datetime | None = None
 

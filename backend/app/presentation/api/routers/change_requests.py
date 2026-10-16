@@ -2,7 +2,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.application.authz import can_manage_workspace
 from app.application.use_cases.change_requests import (
@@ -19,6 +19,7 @@ from app.presentation.api.deps import (
     reject_cr_uc,
 )
 from app.presentation.api.schemas import ChangeRequestOut
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1/change-requests", tags=["change-requests"])
 
@@ -26,10 +27,10 @@ router = APIRouter(prefix="/api/v1/change-requests", tags=["change-requests"])
 async def _guard_owner(cr_id: UUID, current: CurrentUser, crs: ChangeRequestRepoDep, orgs: OrgRepoDep):
     cr = await crs.get(cr_id)
     if cr is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Change request not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "change_request.not_found", "Change request not found")
     membership = await orgs.get_membership(cr.org_id, current.id)
     if not can_manage_workspace(current, membership):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Owner permission required")
+        raise ApiError(status.HTTP_403_FORBIDDEN, "workspace.owner_required", "Owner permission required")
     return cr
 
 
@@ -45,9 +46,9 @@ async def approve(
     try:
         cr = await uc.execute(cr_id, current.id)
     except ChangeRequestNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Change request not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "change_request.not_found", "Change request not found")
     except ChangeRequestNotPendingError:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Change request already resolved")
+        raise ApiError(status.HTTP_409_CONFLICT, "change_request.resolved", "Change request already resolved")
     return ChangeRequestOut.model_validate(cr)
 
 
@@ -63,7 +64,7 @@ async def reject(
     try:
         cr = await uc.execute(cr_id, current.id)
     except ChangeRequestNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Change request not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "change_request.not_found", "Change request not found")
     except ChangeRequestNotPendingError:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Change request already resolved")
+        raise ApiError(status.HTTP_409_CONFLICT, "change_request.resolved", "Change request already resolved")
     return ChangeRequestOut.model_validate(cr)

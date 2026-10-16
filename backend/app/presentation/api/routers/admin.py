@@ -4,7 +4,7 @@ reset mật khẩu user. Mọi endpoint yêu cầu `require_superuser`.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.application.use_cases.admin import (
     CannotModifySelfError,
@@ -33,6 +33,7 @@ from app.presentation.api.schemas import (
     SetSuperuserIn,
     UserOut,
 )
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -94,7 +95,7 @@ async def reset_password(
     try:
         await uc.execute(user_id, body.new_password)
     except UserNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "user.not_found", "User not found")
 
 
 @router.post("/users/{user_id}/superuser", status_code=status.HTTP_204_NO_CONTENT)
@@ -107,9 +108,9 @@ async def set_superuser(
     try:
         await uc.execute(current.id, user_id, body.is_superuser)
     except CannotModifySelfError:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Cannot change your own admin status")
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "user.cannot_change_own_admin", "Cannot change your own admin status")
     except UserNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "user.not_found", "User not found")
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -121,6 +122,6 @@ async def delete_user(
     try:
         await uc.execute(current.id, user_id)
     except CannotModifySelfError:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own account here")
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "user.cannot_delete_self", "Cannot delete your own account here")
     except UserNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "user.not_found", "User not found")

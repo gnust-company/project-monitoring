@@ -2,7 +2,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.application.use_cases.attachments import (
     AddFileAttachment,
@@ -62,6 +62,7 @@ from app.presentation.api.schemas import (
     PhaseItemOut,
     PhaseItemUpdate,
 )
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1", tags=["phase-blocks"])
 
@@ -108,7 +109,7 @@ async def get_block(
     try:
         block = await uc.execute(block_id)
     except PhaseBlockNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase block not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "phase.not_found", "Phase block not found")
     return PhaseBlockOut.from_entity(block, full=True)
 
 
@@ -121,9 +122,9 @@ async def update_block(
     try:
         block = await uc.execute(block_id, payload, access.user)
     except PhaseBlockNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase block not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "phase.not_found", "Phase block not found")
     except PhaseForbiddenError as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ApiError(status.HTTP_403_FORBIDDEN, "phase.forbidden_edit", str(e))
     return PhaseBlockOut.from_entity(block, full=True)
 
 
@@ -135,9 +136,9 @@ async def delete_block(
     try:
         await uc.execute(block_id, access.user, reason)
     except PhaseBlockNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase block not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "phase.not_found", "Phase block not found")
     except PhaseForbiddenError as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ApiError(status.HTTP_403_FORBIDDEN, "phase.forbidden_delete", str(e))
 
 
 # ─── Items ───────────────────────────────────────────────────────────
@@ -159,11 +160,11 @@ async def update_item(
     try:
         item = await uc.execute(block_id, item_id, body.model_dump(exclude_unset=True), access.user.id)
     except PhaseItemNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Item not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "phase.item_not_found", "Item not found")
     except OutcomeAttachmentRequiredError:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Outcome cần đính kèm ít nhất 1 tài liệu/link trước khi đánh dấu hoàn thành",
+        raise ApiError(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "phase.outcome_needs_attachment",
+            "Attach at least one document or link before marking this outcome done",
         )
     return PhaseItemOut.model_validate(item)
 
@@ -252,4 +253,4 @@ async def delete_attachment(
     try:
         await uc.execute(block_id, attachment_id, access.user.id)
     except AttachmentNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "phase.attachment_not_found", "Attachment not found")

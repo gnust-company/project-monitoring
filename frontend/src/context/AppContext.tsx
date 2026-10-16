@@ -10,6 +10,7 @@ import {
 } from '../api';
 import { getToken } from '../api/client';
 import { registerUsers } from '../data/mockData';
+import i18n from '../i18n';
 
 export type PhaseBlockUI = PhaseBlock;
 
@@ -579,7 +580,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const addPhaseDef = useCallback(async (body: PhaseDefBody): Promise<PhaseDefinition> => {
-    if (!state.selectedOrgId) throw new Error('Chưa chọn workspace');
+    if (!state.selectedOrgId) throw new Error(i18n.t('errors.noWorkspace'));
     const created = await phaseDefsApi.create(state.selectedOrgId, body);
     setPhaseDefs(prev => [...prev, created].sort((a, b) => a.position - b.position));
     return created;
@@ -611,7 +612,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const addRole = useCallback(async (body: RoleBody): Promise<WorkspaceRoleDef> => {
-    if (!state.selectedOrgId) throw new Error('Chưa chọn workspace');
+    if (!state.selectedOrgId) throw new Error(i18n.t('errors.noWorkspace'));
     const created = await rolesApi.create(state.selectedOrgId, body);
     setOrgRoles(prev => [...prev, created].sort((a, b) => a.position - b.position));
     return created;

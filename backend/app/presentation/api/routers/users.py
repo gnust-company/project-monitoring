@@ -2,7 +2,7 @@
 đổi mật khẩu, xóa tài khoản của chính mình."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from app.application.use_cases.users import (
     ChangePassword,
@@ -19,6 +19,7 @@ from app.presentation.api.deps import (
     update_profile_uc,
 )
 from app.presentation.api.schemas import PasswordChange, ProfileUpdate, UserOut
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -47,7 +48,7 @@ async def change_password(
     try:
         await uc.execute(current, body.current_password, body.new_password)
     except InvalidPasswordError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "auth.wrong_password", str(exc))
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

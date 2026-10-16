@@ -1,7 +1,7 @@
 """Auth router — register / login / me + first-run setup (super user)."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.application.use_cases.auth import (
     AuthenticateUser,
@@ -28,6 +28,7 @@ from app.presentation.api.schemas import (
     TokenOut,
     UserOut,
 )
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -45,7 +46,7 @@ async def setup(
     try:
         user = await uc.execute(body.email, body.password, body.name)
     except SetupAlreadyDoneError:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Setup already completed")
+        raise ApiError(status.HTTP_409_CONFLICT, "auth.setup_done", "Setup already completed")
     return TokenOut(access_token=create_access_token(str(user.id)), user=UserOut.from_entity(user))
 
 
@@ -57,10 +58,13 @@ async def register(
     try:
         user = await uc.execute(body.email, body.password, body.name)
     except EmailTakenError:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Email already registered")
+        raise ApiError(status.HTTP_409_CONFLICT, "auth.email_taken", "Email already registered")
     except EmailDomainNotAllowedError as e:
         # #5: 422 — message kèm allowlist để FE hiện hint.
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
+        raise ApiError(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "auth.email_domain_not_allowed", str(e),
+            domains=", ".join(e.allowed),
+        )
     return TokenOut(access_token=create_access_token(str(user.id)), user=UserOut.from_entity(user))
 
 
@@ -72,7 +76,7 @@ async def login(
     try:
         user = await uc.execute(body.email, body.password)
     except InvalidCredentialsError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, "auth.invalid_credentials", "Invalid email or password")
     return TokenOut(access_token=create_access_token(str(user.id)), user=UserOut.from_entity(user))
 
 

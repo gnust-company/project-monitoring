@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import { Mail, Shield, FolderKanban, Crown, ListTodo } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -25,6 +26,7 @@ interface PicProject { id: string; name: string; status: ProjectStatus; progress
 
 export default function TeamView() {
   const { selectedOrg, phaseBlocks, orgProjects, getRoleName, orgRoles } = useApp();
+  const { t } = useTranslation();
 
   // #10: dự án member làm PIC chính (Project.picUserId ?? createdBy).
   const picProjectsByMember = useMemo(() => {
@@ -82,9 +84,9 @@ export default function TeamView() {
       <div className="bg-white border-b border-hairline px-8 py-5">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-ink tracking-tight">Nhóm</h1>
+            <h1 className="text-xl font-semibold text-ink tracking-tight">{t('nav.team')}</h1>
             <p className="text-sm text-stone-500 mt-0.5 font-light">
-              {selectedOrg.name} · {members.length} thành viên
+              {selectedOrg.name} · {t('common.memberCount', { count: members.length })}
             </p>
           </div>
           <div className="flex -space-x-2">
@@ -115,7 +117,7 @@ export default function TeamView() {
                   <span className={`text-xs font-bold ${colors.text}`}>{getRoleName(role || undefined)}</span>
                 </div>
                 <div className="text-3xl font-semibold text-ink tracking-tight">{group.length}</div>
-                <div className="text-[10px] text-stone-500 font-light">thành viên</div>
+                <div className="text-[10px] text-stone-500 font-light">{t('team.membersUnit', { count: group.length })}</div>
               </motion.div>
             );
           })}
@@ -123,9 +125,9 @@ export default function TeamView() {
 
         {/* Member Cards */}
         <div className="flex items-baseline justify-between mb-4 flex-wrap gap-1">
-          <h2 className="text-sm font-semibold text-ink">Tất cả thành viên</h2>
+          <h2 className="text-sm font-semibold text-ink">{t('team.allMembers')}</h2>
           <span className="text-[10px] text-stone-400 font-light">
-            Tiến độ tính theo các dự án mà thành viên làm PIC chính
+            {t('team.progressHint')}
           </span>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -152,10 +154,10 @@ export default function TeamView() {
                 {/* PIC chính — dự án + tiến độ */}
                 <div className="mb-4">
                   <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <Crown className="w-3 h-3 text-amber-400" /> PIC chính ({picProjects.length})
+                    <Crown className="w-3 h-3 text-amber-400" /> {t('team.picOf', { count: picProjects.length })}
                   </div>
                   {picProjects.length === 0 ? (
-                    <p className="text-[11px] text-stone-400 font-light">Chưa phụ trách dự án nào.</p>
+                    <p className="text-[11px] text-stone-400 font-light">{t('team.noPicProjects')}</p>
                   ) : (
                     <div className="space-y-2">
                       {picProjects.slice(0, 4).map(p => {
@@ -174,7 +176,7 @@ export default function TeamView() {
                         );
                       })}
                       {picProjects.length > 4 && (
-                        <div className="text-[10px] text-stone-400">+{picProjects.length - 4} dự án khác</div>
+                        <div className="text-[10px] text-stone-400">{t('team.moreProjects', { count: picProjects.length - 4 })}</div>
                       )}
                     </div>
                   )}
@@ -183,7 +185,7 @@ export default function TeamView() {
                 {/* Dự án đang tham gia */}
                 {involvement.items.length > 0 && (
                   <div className="mb-4">
-                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">Dự án đang tham gia</div>
+                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">{t('team.involvedIn')}</div>
                     <div className="space-y-1.5">
                       {involvement.items.slice(0, 3).map(projectName => (
                         <div key={projectName} className="flex items-center gap-2">
@@ -192,7 +194,7 @@ export default function TeamView() {
                         </div>
                       ))}
                       {involvement.items.length > 3 && (
-                        <div className="text-[10px] text-stone-400 pl-5">+{involvement.items.length - 3} dự án khác</div>
+                        <div className="text-[10px] text-stone-400 pl-5">{t('team.moreProjects', { count: involvement.items.length - 3 })}</div>
                       )}
                     </div>
                   </div>
@@ -201,7 +203,7 @@ export default function TeamView() {
                 {/* Task stat — icon + nhãn bên trái, x/y (tổng mở/được giao) căn phải */}
                 <div className="mt-auto flex items-center gap-1.5 text-[11px] text-stone-500 pt-3 border-t border-stone-100">
                   <ListTodo className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
-                  <span className="text-stone-400 truncate">checklist mở/được giao</span>
+                  <span className="text-stone-400 truncate">{t('team.openAssigned')}</span>
                   <span className="font-bold text-ink tabular-nums ml-auto">{involvement.openTasks}/{involvement.assignedTasks}</span>
                 </div>
 

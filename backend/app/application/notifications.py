@@ -1,6 +1,7 @@
 """NotificationService — tiện ích sinh thông báo in-app từ các use case.
 
 Dùng NotificationRepository để ghi; các use case gọi service này khi có sự kiện.
+#29: `title` là câu tiếng Anh dự phòng; FE dịch theo `type` + `params`.
 """
 from uuid import UUID, uuid4
 
@@ -23,11 +24,12 @@ class NotificationService:
         project_id: UUID | None = None,
         phase_block_id: UUID | None = None,
         change_request_id: UUID | None = None,
+        params: dict[str, str] | None = None,
     ) -> None:
         await self._notifications.create(Notification(
             id=uuid4(), user_id=user_id, type=type, title=title, body=body,
             org_id=org_id, project_id=project_id, phase_block_id=phase_block_id,
-            change_request_id=change_request_id,
+            change_request_id=change_request_id, params=params,
         ))
 
     async def notify_many(self, user_ids: list[UUID], type: str, title: str, body: str = "", **refs) -> None:

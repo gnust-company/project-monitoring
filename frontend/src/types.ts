@@ -1,3 +1,5 @@
+import i18n from './i18n';
+
 // ─── User Roles ────────────────────────────────────────────────────
 // #26 mảng B: role công việc nay theo workspace (workspace_roles). UserRole chỉ còn
 // dùng cho landing/demo + bộ 8 mặc định; code role thực tế là string tùy biến.
@@ -71,6 +73,8 @@ export interface Notification {
   projectId?: string | null;
   phaseBlockId?: string | null;
   changeRequestId?: string | null;
+  // #29: tham số để FE tự ghép câu theo ngôn ngữ (vd { phase: 'Thiết kế UI' }); null với thông báo cũ.
+  params?: Record<string, string> | null;
   read: boolean;
   createdAt: string;
 }
@@ -185,17 +189,18 @@ export const PHASE_META: Record<DevPhase, { label: string; fullLabel: string; co
 
 // ─── #26 (mảng A): phase động per-workspace ────────────────────────
 // Bảng màu cố định (an toàn với Tailwind — class tĩnh). DB lưu khóa màu (vd "cyan").
-export const PHASE_PALETTE: Record<string, { label: string; color: string; bg: string; border: string; solid: string }> = {
-  gray:    { label: 'Xám',           color: 'text-gray-600',    bg: 'bg-gray-100',    border: 'border-gray-200',    solid: 'bg-gray-400' },
-  cyan:    { label: 'Lục lam',       color: 'text-cyan-700',    bg: 'bg-cyan-50',     border: 'border-cyan-200',    solid: 'bg-cyan-500' },
-  violet:  { label: 'Tím',           color: 'text-violet-600',  bg: 'bg-violet-50',   border: 'border-violet-200',  solid: 'bg-violet-500' },
-  blue:    { label: 'Xanh dương',    color: 'text-blue-600',    bg: 'bg-blue-50',     border: 'border-blue-200',    solid: 'bg-blue-500' },
-  orange:  { label: 'Cam',           color: 'text-orange-600',  bg: 'bg-orange-50',   border: 'border-orange-200',  solid: 'bg-orange-500' },
-  emerald: { label: 'Lục',           color: 'text-emerald-600', bg: 'bg-emerald-50',  border: 'border-emerald-200', solid: 'bg-emerald-500' },
-  slate:   { label: 'Đá',            color: 'text-slate-600',   bg: 'bg-slate-100',   border: 'border-slate-300',   solid: 'bg-slate-500' },
-  rose:    { label: 'Hồng',          color: 'text-rose-600',    bg: 'bg-rose-50',     border: 'border-rose-200',    solid: 'bg-rose-500' },
-  amber:   { label: 'Hổ phách',      color: 'text-amber-600',   bg: 'bg-amber-50',    border: 'border-amber-200',   solid: 'bg-amber-500' },
-  teal:    { label: 'Xanh mòng két', color: 'text-teal-600',    bg: 'bg-teal-50',     border: 'border-teal-200',    solid: 'bg-teal-500' },
+// Tên màu theo ngôn ngữ: t('colors.<key>').
+export const PHASE_PALETTE: Record<string, { color: string; bg: string; border: string; solid: string }> = {
+  gray:    { color: 'text-gray-600',    bg: 'bg-gray-100',    border: 'border-gray-200',    solid: 'bg-gray-400' },
+  cyan:    { color: 'text-cyan-700',    bg: 'bg-cyan-50',     border: 'border-cyan-200',    solid: 'bg-cyan-500' },
+  violet:  { color: 'text-violet-600',  bg: 'bg-violet-50',   border: 'border-violet-200',  solid: 'bg-violet-500' },
+  blue:    { color: 'text-blue-600',    bg: 'bg-blue-50',     border: 'border-blue-200',    solid: 'bg-blue-500' },
+  orange:  { color: 'text-orange-600',  bg: 'bg-orange-50',   border: 'border-orange-200',  solid: 'bg-orange-500' },
+  emerald: { color: 'text-emerald-600', bg: 'bg-emerald-50',  border: 'border-emerald-200', solid: 'bg-emerald-500' },
+  slate:   { color: 'text-slate-600',   bg: 'bg-slate-100',   border: 'border-slate-300',   solid: 'bg-slate-500' },
+  rose:    { color: 'text-rose-600',    bg: 'bg-rose-50',     border: 'border-rose-200',    solid: 'bg-rose-500' },
+  amber:   { color: 'text-amber-600',   bg: 'bg-amber-50',    border: 'border-amber-200',   solid: 'bg-amber-500' },
+  teal:    { color: 'text-teal-600',    bg: 'bg-teal-50',     border: 'border-teal-200',    solid: 'bg-teal-500' },
 };
 
 export const PHASE_COLOR_KEYS = Object.keys(PHASE_PALETTE);
@@ -350,7 +355,7 @@ export interface ChecklistItem {
 
 // Tên hiển thị của 1 role code, resolve từ danh sách role của workspace (fallback code).
 export function resolveRoleName(roles: WorkspaceRoleDef[], code: string | undefined): string {
-  if (!code) return 'Chung';
+  if (!code) return i18n.t('phase.general');
   return roles.find(r => r.code === code)?.name ?? code;
 }
 
@@ -364,13 +369,14 @@ export function resolveRoleColor(roles: WorkspaceRoleDef[], code: string | undef
 }
 
 // #34: ma trận RACI cho người tham gia phase — khớp backend RaciRole.
+// Nhãn/giải thích theo ngôn ngữ: t('raci.<R|A|C|I>.label' | '.hint').
 export type RaciRole = 'R' | 'A' | 'C' | 'I';
 export const RACI_ROLES: RaciRole[] = ['R', 'A', 'C', 'I'];
-export const RACI_META: Record<RaciRole, { label: string; en: string; hint: string; chip: string }> = {
-  R: { label: 'Thực hiện',        en: 'Responsible', hint: 'Trực tiếp làm',            chip: 'bg-blue-50 text-blue-700 border-blue-200' },
-  A: { label: 'Chịu trách nhiệm', en: 'Accountable', hint: 'Chịu trách nhiệm cuối/duyệt', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
-  C: { label: 'Tham vấn',         en: 'Consulted',   hint: 'Được hỏi ý kiến',          chip: 'bg-violet-50 text-violet-700 border-violet-200' },
-  I: { label: 'Được thông báo',   en: 'Informed',    hint: 'Chỉ cần nắm tình hình',    chip: 'bg-slate-50 text-slate-600 border-slate-200' },
+export const RACI_META: Record<RaciRole, { en: string; chip: string }> = {
+  R: { en: 'Responsible', chip: 'bg-blue-50 text-blue-700 border-blue-200' },
+  A: { en: 'Accountable', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
+  C: { en: 'Consulted',   chip: 'bg-violet-50 text-violet-700 border-violet-200' },
+  I: { en: 'Informed',    chip: 'bg-slate-50 text-slate-600 border-slate-200' },
 };
 
 /** Người tham gia phase: hoặc user hệ thống (`userId`) hoặc tên tự do (`name`, người ngoài nền tảng). */

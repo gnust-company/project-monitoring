@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -110,6 +110,7 @@ from app.infrastructure.repositories.workspace_roles import SqlAlchemyWorkspaceR
 from app.infrastructure.repositories.projects import SqlAlchemyProjectRepository
 from app.infrastructure.repositories.users import SqlAlchemyUserRepository
 from app.infrastructure.storage.minio_storage import MinioStorage
+from app.presentation.api.errors import ApiError
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -221,16 +222,16 @@ async def get_current_user(
     creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
     if creds is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, "auth.not_authenticated", "Not authenticated")
     user_id = decode_token(creds.credentials)
     if user_id is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, "auth.invalid_token", "Invalid token")
     try:
         user = await repo.get(UUID(user_id))
     except ValueError:
         user = None
     if user is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, "auth.user_not_found", "User not found")
     return user
 
 
@@ -240,7 +241,7 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 async def require_superuser(current: CurrentUser) -> User:
     """Chỉ admin toàn cục (is_superuser) — cho khu vực /admin."""
     if not current.is_superuser:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Superuser permission required")
+        raise ApiError(status.HTTP_403_FORBIDDEN, "auth.superuser_required", "Superuser permission required")
     return current
 
 
@@ -258,14 +259,14 @@ async def workspace_access(org_id: UUID, current: CurrentUser, orgs: OrgRepoDep)
     """User phải là member (hoặc superuser) của workspace."""
     membership = await orgs.get_membership(org_id, current.id)
     if not can_access_workspace(current, membership):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Not a member of this workspace")
+        raise ApiError(status.HTTP_403_FORBIDDEN, "workspace.not_member", "Not a member of this workspace")
     return Access(current, membership)
 
 
 async def workspace_manage(access: Annotated[Access, Depends(workspace_access)]) -> Access:
     """Chỉ owner/superuser (đổi tên/xóa workspace, quản lý thành viên)."""
     if not can_manage_workspace(access.user, access.membership):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Owner permission required")
+        raise ApiError(status.HTTP_403_FORBIDDEN, "workspace.owner_required", "Owner permission required")
     return access
 
 
@@ -361,10 +362,10 @@ async def project_access(
 ) -> ProjectAccess:
     project = await projects.get(project_id)
     if project is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "project.not_found", "Project not found")
     membership = await orgs.get_membership(project.org_id, current.id)
     if not can_access_workspace(current, membership):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Not a member of this workspace")
+        raise ApiError(status.HTTP_403_FORBIDDEN, "workspace.not_member", "Not a member of this workspace")
     return ProjectAccess(current, membership, project)
 
 
@@ -374,7 +375,7 @@ async def block_access(
 ) -> ProjectAccess:
     project_id = await blocks.get_project_id(block_id)
     if project_id is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Phase block not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "phase.not_found", "Phase block not found")
     return await project_access(project_id, current, orgs, projects)
 
 

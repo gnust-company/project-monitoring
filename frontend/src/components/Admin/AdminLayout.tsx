@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Trans, useTranslation } from 'react-i18next';
 import { ShieldCheck, LayoutDashboard, Building2, Users, Megaphone, ArrowLeft, LogOut, AlertCircle, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { adminApi } from '../../api';
 import type { AdminStats, AdminUserInfo, AdminWorkspaceInfo } from '../../types';
 import Avatar from '../common/Avatar';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 import AdminDashboard from './AdminDashboard';
 import AdminUsers from './AdminUsers';
 import AdminWorkspaces from './AdminWorkspaces';
@@ -14,11 +16,11 @@ import AdminAnnouncements from './AdminAnnouncements';
 
 type AdminTab = 'overview' | 'workspaces' | 'users' | 'announcements';
 
-const TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
-  { key: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
-  { key: 'workspaces', label: 'Workspaces', icon: Building2 },
-  { key: 'users', label: 'Người dùng', icon: Users },
-  { key: 'announcements', label: 'Thông báo', icon: Megaphone },
+const TABS: { key: AdminTab; icon: typeof Users }[] = [
+  { key: 'overview', icon: LayoutDashboard },
+  { key: 'workspaces', icon: Building2 },
+  { key: 'users', icon: Users },
+  { key: 'announcements', icon: Megaphone },
 ];
 
 const pageVariants = {
@@ -29,6 +31,7 @@ const pageVariants = {
 
 export default function AdminLayout() {
   const { currentUser, goToWorkspaceSelector, logout } = useApp();
+  const { t } = useTranslation();
 
   const [tab, setTab] = useState<AdminTab>('overview');
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -50,11 +53,11 @@ export default function AdminLayout() {
       ]);
       setStats(s); setUsers(u); setWorkspaces(w);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được dữ liệu quản trị');
+      setError(e instanceof Error ? e.message : t('admin.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -64,11 +67,11 @@ export default function AdminLayout() {
       setDeleteTarget(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không xóa được người dùng');
+      setError(e instanceof Error ? e.message : t('admin.deleteUserFailed'));
     } finally {
       setDeleteBusy(false);
     }
-  }, [deleteTarget, load]);
+  }, [deleteTarget, load, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -79,10 +82,10 @@ export default function AdminLayout() {
         <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
           <AlertCircle className="w-6 h-6 text-error" />
         </div>
-        <p className="text-sm text-muted">Bạn không có quyền truy cập khu vực quản trị.</p>
+        <p className="text-sm text-muted">{t('admin.noAccess')}</p>
         <button onClick={goToWorkspaceSelector}
           className="h-9 px-4 rounded-lg bg-ink text-white text-sm font-medium hover:bg-[#242424] transition-colors">
-          Về Workspaces
+          {t('admin.backToWorkspaces')}
         </button>
       </div>
     );
@@ -97,7 +100,7 @@ export default function AdminLayout() {
         <div className="flex items-center gap-3">
           <button onClick={goToWorkspaceSelector}
             className="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:bg-surface-soft hover:text-ink transition-colors"
-            title="Về Workspaces">
+            title={t('admin.backToWorkspaces')}>
             <ArrowLeft className="w-4.5 h-4.5" />
           </button>
           <div className="flex items-center gap-2">
@@ -105,20 +108,21 @@ export default function AdminLayout() {
               <ShieldCheck className="w-4 h-4 text-white" />
             </div>
             <div className="leading-tight">
-              <p className="text-sm font-semibold text-ink">Bảng quản trị</p>
-              <p className="text-[10px] text-muted-soft">Toàn hệ thống</p>
+              <p className="text-sm font-semibold text-ink">{t('userMenu.admin')}</p>
+              <p className="text-[10px] text-muted-soft">{t('admin.systemWide')}</p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          <LanguageSwitcher />
           <div className="flex items-center gap-2.5">
             <Avatar name={userName} src={currentUser.avatar} className="w-7 h-7" />
             <span className="text-sm font-medium text-ink max-w-[140px] truncate hidden sm:block">{userName}</span>
           </div>
           <button onClick={logout}
             className="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:bg-error/5 hover:text-error transition-colors"
-            title="Đăng xuất">
+            title={t('userMenu.logout')}>
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -127,13 +131,13 @@ export default function AdminLayout() {
       {/* Tab bar */}
       <div className="bg-white border-b border-hairline flex-shrink-0 sticky top-14 z-30">
         <div className="max-w-6xl mx-auto px-6 flex items-center gap-1">
-          {TABS.map(t => {
-            const active = tab === t.key;
+          {TABS.map(item => {
+            const active = tab === item.key;
             return (
-              <button key={t.key} onClick={() => setTab(t.key)}
+              <button key={item.key} onClick={() => setTab(item.key)}
                 className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors
                   ${active ? 'text-ink' : 'text-muted hover:text-body'}`}>
-                <t.icon className="w-4 h-4" /> {t.label}
+                <item.icon className="w-4 h-4" /> {t(`admin.tabs.${item.key}`)}
                 {active && (
                   <motion.div layoutId="adminTab"
                     className="absolute left-0 right-0 -bottom-px h-0.5 bg-ink rounded-full" />
@@ -152,7 +156,7 @@ export default function AdminLayout() {
             <p className="text-sm text-muted">{error}</p>
             <button onClick={load}
               className="h-9 px-4 rounded-lg border border-hairline text-sm font-medium text-body hover:bg-surface-soft transition-colors">
-              Thử lại
+              {t('common.retry')}
             </button>
           </div>
         ) : (
@@ -191,7 +195,7 @@ export default function AdminLayout() {
               onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-5 py-4 border-b border-hairline">
                 <h2 className="text-base font-bold text-ink flex items-center gap-2">
-                  <Trash2 className="w-4 h-4 text-error" /> Xóa người dùng
+                  <Trash2 className="w-4 h-4 text-error" /> {t('admin.deleteUser')}
                 </h2>
                 <button onClick={() => !deleteBusy && setDeleteTarget(null)} className="p-1 hover:bg-stone-100 rounded-lg">
                   <X className="w-4 h-4 text-stone-500" />
@@ -199,17 +203,17 @@ export default function AdminLayout() {
               </div>
               <div className="p-5 space-y-4">
                 <p className="text-sm text-stone-600">
-                  Xóa vĩnh viễn <strong className="text-ink">{deleteTarget.name}</strong> ({deleteTarget.email})
-                  khỏi toàn bộ hệ thống? Người dùng sẽ bị gỡ khỏi mọi workspace. Hành động không thể hoàn tác.
+                  <Trans i18nKey="admin.deleteUserMessage" values={{ name: deleteTarget.name, email: deleteTarget.email }}
+                    components={{ strong: <strong className="text-ink" /> }} />
                 </p>
                 <div className="flex gap-2">
                   <button onClick={() => setDeleteTarget(null)} disabled={deleteBusy}
                     className="flex-1 py-2.5 border border-stone-200 text-sm font-semibold rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-60">
-                    Hủy
+                    {t('common.cancel')}
                   </button>
                   <button onClick={confirmDelete} disabled={deleteBusy}
                     className="flex-1 py-2.5 bg-error text-white text-sm font-semibold rounded-lg hover:bg-error/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-                    <Trash2 className="w-4 h-4" /> {deleteBusy ? 'Đang xóa…' : 'Xóa vĩnh viễn'}
+                    <Trash2 className="w-4 h-4" /> {deleteBusy ? t('common.deleting') : t('admin.deleteForever')}
                   </button>
                 </div>
               </div>

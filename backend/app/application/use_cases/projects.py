@@ -124,9 +124,7 @@ class UpdateProject:
         if project is None:
             raise ProjectNotFoundError(str(project_id))
         if not can_edit_project(actor, project):
-            raise ProjectForbiddenError(
-                "Chỉ PIC (hoặc admin) mới được sửa dự án này"
-            )
+            raise ProjectForbiddenError("Only the project PIC (or an admin) can edit this project")
         old_name = project.name
         updated = await self._projects.update(_apply_updates(project, payload))
         # #26: đổi tên dự án là sự kiện cấp workspace → log vào nhật ký Overview
@@ -158,10 +156,8 @@ class DeleteProject:
         if project is None:
             raise ProjectNotFoundError(str(project_id))
         if not can_edit_project(actor, project):
-            raise ProjectForbiddenError(
-                "Chỉ PIC (hoặc admin) mới được xóa dự án này"
-            )
-        target = f"{project.name} — lý do: {reason.strip()}" if reason and reason.strip() else project.name
+            raise ProjectForbiddenError("Only the project PIC (or an admin) can delete this project")
+        target = f"{project.name} — reason: {reason.strip()}" if reason and reason.strip() else project.name
         await self._activity.add(ActivityEntry(
             id=uuid4(), org_id=project.org_id, project_id=None, user_id=actor.id,
             action="deleted project", target=target, created_at=None,
@@ -191,14 +187,14 @@ class ChangeProjectPic:
             or (membership is not None and membership.role == membership.role.OWNER)
         )
         if not (is_owner or effective_project_pic(project) == str(actor.id)):
-            raise ProjectForbiddenError("Bạn không có quyền đổi PIC dự án này")
+            raise ProjectForbiddenError("You are not allowed to change this project's PIC")
 
         project.pic_user_id = new_pic_id
         updated = await self._projects.update(project)
         if new_pic_id != actor.id:
             await self._notifier.notify(
                 new_pic_id, "project_pic_changed",
-                f"Bạn được chỉ định làm PIC dự án {project.name}",
-                org_id=project.org_id, project_id=project.id,
+                f"You are now the PIC of project {project.name}",
+                org_id=project.org_id, project_id=project.id, params={"project": project.name},
             )
         return updated

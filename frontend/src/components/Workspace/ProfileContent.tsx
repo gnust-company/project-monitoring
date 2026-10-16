@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { Trans, useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import { isPhaseComplete } from '../../lib/projectStatus';
 import { participantUserIds } from '../../types';
@@ -7,8 +8,7 @@ import {
   Mail, FolderKanban, GitBranch, CheckSquare, Layers,
   Pencil, Check, ChevronRight, Camera, Lock, Trash2, AlertTriangle,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-
+import { formatDate } from '../../i18n/format';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -26,6 +26,8 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
     organizations, phaseBlocks, orgProjects,
     changePassword, deleteAccount, getPhaseMeta,
   } = useApp();
+  const { t } = useTranslation();
+  const deleteWord = t('profile.deleteWord');
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const onPickAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,15 +88,15 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPwdError(null); setPwdOk(false);
-    if (newPwd.length < 6) { setPwdError('Mật khẩu mới phải có ít nhất 6 ký tự'); return; }
-    if (newPwd !== confirmPwd) { setPwdError('Xác nhận mật khẩu không khớp'); return; }
+    if (newPwd.length < 6) { setPwdError(t('profile.newPasswordMin')); return; }
+    if (newPwd !== confirmPwd) { setPwdError(t('auth.validation.passwordMismatch')); return; }
     setPwdBusy(true);
     try {
       await changePassword(curPwd, newPwd);
       setPwdOk(true);
       setCurPwd(''); setNewPwd(''); setConfirmPwd('');
     } catch (err) {
-      setPwdError(err instanceof Error ? err.message : 'Đổi mật khẩu thất bại');
+      setPwdError(err instanceof Error ? err.message : t('profile.changePasswordFailed'));
     } finally {
       setPwdBusy(false);
     }
@@ -106,16 +108,16 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
     try {
       await deleteAccount();
     } catch (err) {
-      setDelError(err instanceof Error ? err.message : 'Xóa tài khoản thất bại');
+      setDelError(err instanceof Error ? err.message : t('profile.deleteFailed'));
       setDelBusy(false);
     }
   };
 
   const statCards = [
-    { label: 'Workspace', value: stats.workspaces, icon: Layers },
-    { label: 'Dự án tham gia', value: stats.projects, icon: FolderKanban },
-    { label: 'Phase được giao', value: stats.assignedPhases, icon: GitBranch },
-    { label: 'Task đang mở', value: stats.openTasks, icon: CheckSquare },
+    { label: t('profile.statWorkspaces'), value: stats.workspaces, icon: Layers },
+    { label: t('profile.statProjects'), value: stats.projects, icon: FolderKanban },
+    { label: t('profile.statPhases'), value: stats.assignedPhases, icon: GitBranch },
+    { label: t('profile.statOpenTasks'), value: stats.openTasks, icon: CheckSquare },
   ];
 
   const inputCls = 'w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink';
@@ -127,7 +129,7 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
         className="bg-surface-card rounded-2xl border border-hairline p-6 mb-6">
         <div className="flex items-center gap-5 flex-wrap">
           <button type="button" onClick={() => avatarInputRef.current?.click()}
-            title="Đổi ảnh đại diện"
+            title={t('profile.changeAvatar')}
             className="relative w-20 h-20 rounded-2xl overflow-hidden group/avatar flex-shrink-0">
             {currentUser.avatar ? (
               <img src={currentUser.avatar} alt="" className="w-20 h-20 rounded-2xl bg-stone-200 object-cover" />
@@ -184,11 +186,11 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
       <motion.div custom={5} variants={fadeUp} initial="hidden" animate="visible"
         className="bg-surface-card rounded-2xl border border-hairline p-6 mb-6">
         <h2 className="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
-          <GitBranch className="w-4 h-4" /> Phase được giao ({assignedBlocks.length})
+          <GitBranch className="w-4 h-4" /> {t('profile.assignedPhases', { count: assignedBlocks.length })}
         </h2>
         {assignedBlocks.length === 0 ? (
           <div className="text-sm text-stone-400 text-center py-8">
-            Chưa có phase nào được giao cho bạn
+            {t('profile.noAssignedPhases')}
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -210,12 +212,12 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-ink truncate">{pb.title}</div>
                     <div className="text-[10px] text-stone-400">
-                      {project?.name} · {format(parseISO(pb.startDate), 'dd/MM')} – {format(parseISO(pb.endDate), 'dd/MM/yyyy')}
+                      {project?.name} · {formatDate(pb.startDate, 'dateShort')} – {formatDate(pb.endDate)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${pct >= 100 ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-500'}`}>
-                      {pct >= 100 ? 'Hoàn thành' : `${pct}%`}
+                      {pct >= 100 ? t('profile.complete') : `${pct}%`}
                     </span>
                     <div className="w-16 h-1.5 bg-stone-100 rounded-full overflow-hidden hidden sm:block">
                       <div className={`h-full ${meta.solid} rounded-full`} style={{ width: `${pct}%` }} />
@@ -235,30 +237,30 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
         className="bg-surface-card rounded-2xl border border-hairline p-6 mb-6">
         <button onClick={() => setShowPwd(v => !v)}
           className="w-full flex items-center justify-between text-sm font-semibold text-ink">
-          <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Đổi mật khẩu</span>
+          <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> {t('profile.changePassword')}</span>
           <span className="text-stone-400 text-xs">{showPwd ? '▲' : '▼'}</span>
         </button>
         {showPwd && (
           <form onSubmit={handleChangePassword} className="space-y-3 mt-4">
             <div>
-              <label className="text-xs font-semibold text-stone-700 mb-1 block">Mật khẩu hiện tại</label>
+              <label className="text-xs font-semibold text-stone-700 mb-1 block">{t('profile.currentPassword')}</label>
               <input type="password" value={curPwd} onChange={e => setCurPwd(e.target.value)} required className={inputCls} />
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-stone-700 mb-1 block">Mật khẩu mới</label>
+                <label className="text-xs font-semibold text-stone-700 mb-1 block">{t('profile.newPassword')}</label>
                 <input type="password" value={newPwd} onChange={e => setNewPwd(e.target.value)} required className={inputCls} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-stone-700 mb-1 block">Xác nhận mật khẩu mới</label>
+                <label className="text-xs font-semibold text-stone-700 mb-1 block">{t('profile.confirmNewPassword')}</label>
                 <input type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} required className={inputCls} />
               </div>
             </div>
             {pwdError && <p className="text-[11px] text-error">{pwdError}</p>}
-            {pwdOk && <p className="text-[11px] text-emerald-600 flex items-center gap-1"><Check className="w-3 h-3" /> Đã đổi mật khẩu thành công</p>}
+            {pwdOk && <p className="text-[11px] text-emerald-600 flex items-center gap-1"><Check className="w-3 h-3" /> {t('profile.passwordChanged')}</p>}
             <button type="submit" disabled={pwdBusy}
               className="py-2.5 px-4 bg-ink text-white text-sm font-semibold rounded-lg hover:bg-[#242424] transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-              <Lock className="w-4 h-4" /> Đổi mật khẩu
+              <Lock className="w-4 h-4" /> {t('profile.changePassword')}
             </button>
           </form>
         )}
@@ -268,17 +270,17 @@ export default function ProfileContent({ onOpenPhase }: { onOpenPhase?: (phaseId
       <motion.div custom={7} variants={fadeUp} initial="hidden" animate="visible"
         className="bg-red-50/40 rounded-2xl border border-red-200 p-6">
         <h2 className="text-sm font-semibold text-red-600 mb-1 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" /> Xóa tài khoản
+          <AlertTriangle className="w-4 h-4" /> {t('profile.deleteAccount')}
         </h2>
         <p className="text-xs text-stone-600 mb-3">
-          Hành động này không thể hoàn tác. Nhập <strong className="text-ink">XÓA</strong> để xác nhận.
+          <Trans i18nKey="profile.deleteHint" values={{ word: deleteWord }} components={{ strong: <strong className="text-ink" /> }} />
         </p>
         <div className="flex flex-wrap gap-2 items-center">
           <input type="text" value={confirmDelete} onChange={e => setConfirmDelete(e.target.value)}
-            placeholder="Nhập XÓA" className={inputCls + ' max-w-[200px]'} />
-          <button onClick={handleDeleteAccount} disabled={confirmDelete !== 'XÓA' || delBusy}
+            placeholder={t('profile.deletePlaceholder', { word: deleteWord })} className={inputCls + ' max-w-[200px]'} />
+          <button onClick={handleDeleteAccount} disabled={confirmDelete !== deleteWord || delBusy}
             className="py-2.5 px-4 bg-error text-white text-sm font-semibold rounded-lg hover:bg-error/90 transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
-            <Trash2 className="w-4 h-4" /> Xóa tài khoản vĩnh viễn
+            <Trash2 className="w-4 h-4" /> {t('profile.deleteForever')}
           </button>
         </div>
         {delError && <p className="text-[11px] text-error mt-2">{delError}</p>}
