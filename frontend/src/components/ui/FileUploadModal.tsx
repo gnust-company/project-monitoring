@@ -2,6 +2,7 @@
 // kèm thanh tiến độ từng tệp (dùng XHR progress qua uploadFn).
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { Trans, useTranslation } from 'react-i18next';
 import { UploadCloud, File as FileIcon, X, Check, AlertCircle, Loader2, Plus } from 'lucide-react';
 
 type Status = 'pending' | 'uploading' | 'done' | 'error';
@@ -28,6 +29,7 @@ export default function FileUploadModal({
   // tải 1 tệp, báo tiến độ 0-100 qua onProgress
   uploadFn: (file: File, onProgress: (pct: number) => void) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState<QueueItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -81,7 +83,7 @@ export default function FileUploadModal({
         await uploadFn(it.file, (pct) => patch(it.id, { progress: pct }));
         patch(it.id, { status: 'done', progress: 100 });
       } catch (err) {
-        patch(it.id, { status: 'error', error: err instanceof Error ? err.message : 'Tải thất bại' });
+        patch(it.id, { status: 'error', error: err instanceof Error ? err.message : t('upload.failed') });
       }
     }
     setBusy(false);
@@ -99,7 +101,7 @@ export default function FileUploadModal({
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <UploadCloud className="w-4.5 h-4.5 text-slate-500" /> Tải tệp lên
+                <UploadCloud className="w-4.5 h-4.5 text-slate-500" /> {t('upload.title')}
               </h3>
               <button onClick={() => { if (!busy) onClose(); }} disabled={busy}
                 className="p-1 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-40">
@@ -121,9 +123,9 @@ export default function FileUploadModal({
                   <UploadCloud className="w-5 h-5 text-slate-400" />
                 </div>
                 <p className="text-sm font-medium text-slate-700">
-                  Kéo-thả tệp vào đây, hoặc <span className="text-slate-900 underline">chọn từ máy</span>
+                  <Trans i18nKey="upload.dropzone" components={{ pick: <span className="text-slate-900 underline" /> }} />
                 </p>
-                <p className="text-xs text-gray-400">Có thể chọn nhiều tệp cùng lúc</p>
+                <p className="text-xs text-gray-400">{t('upload.multiple')}</p>
               </label>
 
               {/* Queue */}
@@ -147,7 +149,7 @@ export default function FileUploadModal({
                           </div>
                         ) : (
                           <p className={`text-[10px] ${it.status === 'error' ? 'text-red-500' : 'text-gray-400'}`}>
-                            {it.status === 'error' ? (it.error || 'Tải thất bại — bấm xác nhận để thử lại') : fmtSize(it.file.size)}
+                            {it.status === 'error' ? (it.error || t('upload.retryHint')) : fmtSize(it.file.size)}
                           </p>
                         )}
                       </div>
@@ -155,7 +157,7 @@ export default function FileUploadModal({
                         ? <span className="text-[10px] font-semibold text-slate-500 w-9 text-right shrink-0">{it.progress}%</span>
                         : (it.status !== 'done' && (
                           <button onClick={() => removeItem(it.id)} disabled={busy}
-                            className="p-1 rounded hover:bg-red-50 transition-colors disabled:opacity-30 shrink-0" title="Bỏ">
+                            className="p-1 rounded hover:bg-red-50 transition-colors disabled:opacity-30 shrink-0" title={t('upload.remove')}>
                             <X className="w-3.5 h-3.5 text-gray-400" />
                           </button>
                         ))}
@@ -168,24 +170,24 @@ export default function FileUploadModal({
             {/* Footer */}
             <div className="flex items-center justify-between gap-2 px-5 py-3 bg-gray-50 border-t border-gray-100">
               <span className="text-xs text-gray-400">
-                {items.length > 0 && `${items.length} tệp · ${items.filter(i => i.status === 'done').length} xong`}
+                {items.length > 0 && t('upload.summary', { count: items.length, done: items.filter(i => i.status === 'done').length })}
               </span>
               <div className="flex items-center gap-2">
                 {allDone ? (
                   <button onClick={onClose}
                     className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors">
-                    <Check className="w-3.5 h-3.5" /> Hoàn tất
+                    <Check className="w-3.5 h-3.5" /> {t('upload.finish')}
                   </button>
                 ) : (
                   <>
                     <button onClick={() => { if (!busy) onClose(); }} disabled={busy}
                       className="px-3.5 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40">
-                      Hủy
+                      {t('common.cancel')}
                     </button>
                     <button onClick={handleConfirm} disabled={busy || pendingCount === 0}
                       className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                       {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                      {busy ? 'Đang tải…' : `Xác nhận tải lên${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+                      {busy ? t('upload.uploading') : (pendingCount > 0 ? t('upload.confirmCount', { count: pendingCount }) : t('upload.confirm'))}
                     </button>
                   </>
                 )}

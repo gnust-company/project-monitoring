@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard, GitBranch, Users, Layers, Plus,
@@ -9,10 +10,10 @@ import Avatar from '../common/Avatar';
 import { computeProjectStatus } from '../../lib/projectStatus';
 import { useProjectFilter, isProjectVisible } from '../../lib/filterProjects';
 
-const navItems: { view: WorkspaceView; label: string; icon: typeof LayoutDashboard }[] = [
-  { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { view: 'pipeline', label: 'Pipeline', icon: GitBranch },
-  { view: 'team', label: 'Nhóm', icon: Users },
+const navItems: { view: Extract<WorkspaceView, 'dashboard' | 'pipeline' | 'team'>; icon: typeof LayoutDashboard }[] = [
+  { view: 'dashboard', icon: LayoutDashboard },
+  { view: 'pipeline', icon: GitBranch },
+  { view: 'team', icon: Users },
 ];
 
 const statusColors: Record<string, string> = {
@@ -34,6 +35,7 @@ export default function WorkspaceSidebar() {
     // #15: reset cả filter người + khoảng thời gian
     onlyMine, rangeStart, rangeEnd, setOnlyMine, clearRange,
   } = useApp();
+  const { t } = useTranslation();
 
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   // Droplist dự án dưới Pipeline — mặc định mở
@@ -90,7 +92,7 @@ export default function WorkspaceSidebar() {
         </div>
 
         <div className="px-2 pt-3 pb-1 flex justify-center">
-          <button onClick={openCreateProject} title="Tạo Dự án"
+          <button onClick={openCreateProject} title={t('sidebar.createProject')}
             className="w-9 h-9 flex items-center justify-center rounded-lg
                        bg-white/[0.04] hover:bg-white/[0.08] text-on-dark-soft hover:text-white transition-all">
             <Plus className="w-4 h-4" />
@@ -99,7 +101,7 @@ export default function WorkspaceSidebar() {
 
         <nav className="px-2 py-2 space-y-1 flex flex-col items-center">
           {navItems.map(item => (
-            <button key={item.view} title={item.label}
+            <button key={item.view} title={t(`nav.${item.view}`)}
               onClick={() => setWorkspaceView(item.view)}
               className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all
                          ${workspaceView === item.view
@@ -110,7 +112,7 @@ export default function WorkspaceSidebar() {
             </button>
           ))}
           {isOwner && (
-            <button title="Cài đặt Workspace"
+            <button title={t('nav.settings')}
               onClick={() => setWorkspaceView('settings')}
               className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all
                          ${workspaceView === 'settings'
@@ -126,11 +128,11 @@ export default function WorkspaceSidebar() {
 
         <div className="p-2 border-t border-white/[0.06] flex flex-col items-center gap-2">
           {currentUser && (
-            <button onClick={() => setWorkspaceView('profile')} title={`${currentUser.name} — Hồ sơ`}>
+            <button onClick={() => setWorkspaceView('profile')} title={`${currentUser.name} — ${t('nav.profile')}`}>
               <Avatar name={currentUser.name} src={currentUser.avatar} className="w-7 h-7 hover:ring-2 hover:ring-white/30 transition-all" />
             </button>
           )}
-          <button onClick={toggleSidebar} title="Mở rộng sidebar"
+          <button onClick={toggleSidebar} title={t('sidebar.expand')}
             className="w-9 h-9 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.06] transition-all">
             <PanelLeftOpen className="w-4 h-4" />
           </button>
@@ -177,7 +179,7 @@ export default function WorkspaceSidebar() {
                   <button
                     onClick={() => { setShowWorkspaceMenu(false); goToWorkspaceSelector(); }}
                     className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-white/40 hover:bg-white/[0.06] hover:text-white transition-colors">
-                    <LogOut className="w-3 h-3" /> Quản lý Workspace
+                    <LogOut className="w-3 h-3" /> {t('sidebar.manageWorkspaces')}
                   </button>
                 </div>
               </div>
@@ -191,7 +193,7 @@ export default function WorkspaceSidebar() {
         <button onClick={openCreateProject}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium
                      bg-white/[0.04] hover:bg-white/[0.08] text-on-dark-soft hover:text-white transition-all">
-          <Plus className="w-3.5 h-3.5" /> Tạo Dự án
+          <Plus className="w-3.5 h-3.5" /> {t('sidebar.createProject')}
         </button>
       </div>
 
@@ -207,7 +209,7 @@ export default function WorkspaceSidebar() {
                          }`}
               onClick={() => setWorkspaceView(item.view)}>
               <item.icon className={`w-4 h-4 ${workspaceView === item.view ? 'text-white' : 'text-white/30 group-hover:text-white/50'}`} />
-              <span className="flex-1 text-left">{item.label}</span>
+              <span className="flex-1 text-left">{t(`nav.${item.view}`)}</span>
               {item.view === 'pipeline' && (
                 <>
                   <span className="text-[10px] bg-white/[0.06] text-on-dark-soft px-1.5 py-0.5 rounded-full">
@@ -215,7 +217,7 @@ export default function WorkspaceSidebar() {
                   </span>
                   <button
                     onClick={e => { e.stopPropagation(); setProjectsOpen(!projectsOpen); }}
-                    title={projectsOpen ? 'Thu gọn danh sách dự án' : 'Mở danh sách dự án'}
+                    title={projectsOpen ? t('sidebar.collapseProjects') : t('sidebar.expandProjects')}
                     className="p-0.5 rounded hover:bg-white/[0.08] transition-colors">
                     <ChevronDown className={`w-3.5 h-3.5 text-white/40 transition-transform duration-200 ${projectsOpen ? '' : '-rotate-90'}`} />
                   </button>
@@ -228,14 +230,14 @@ export default function WorkspaceSidebar() {
               <div className="mt-0.5 mb-1 ml-4 pl-3 border-l border-white/[0.08] space-y-0.5">
                 <div className="flex items-center justify-between pr-2 py-1">
                   <span className="text-[10px] font-bold text-on-dark-soft uppercase tracking-wider">
-                    Dự án ({projectCount})
+                    {t('sidebar.projects', { count: projectCount })}
                   </span>
                   <button onClick={resetAllFilters}
                     className={`text-[9px] font-bold rounded-md px-2 py-0.5 transition-colors
                       ${allActive
                         ? 'bg-white/[0.08] text-white'
                         : 'text-white/30 hover:text-white'}`}>
-                    Tất cả
+                    {t('common.all')}
                   </button>
                 </div>
                 {orgProjects.map(project => {
@@ -275,12 +277,12 @@ export default function WorkspaceSidebar() {
               ${workspaceView === 'settings'
                 ? 'bg-white/[0.08] text-white'
                 : 'text-on-dark-soft hover:text-white hover:bg-white/[0.04]'}`}>
-            <Settings className="w-3.5 h-3.5" /> Cài đặt Workspace
+            <Settings className="w-3.5 h-3.5" /> {t('nav.settings')}
           </button>
         )}
         {currentUser && (
           <button onClick={() => setWorkspaceView('profile')}
-            title="Xem hồ sơ"
+            title={t('sidebar.viewProfile')}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-left
               ${workspaceView === 'profile' ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'}`}>
             <Avatar name={currentUser.name} src={currentUser.avatar} className="w-7 h-7" />
@@ -290,10 +292,10 @@ export default function WorkspaceSidebar() {
             </div>
           </button>
         )}
-        <button onClick={toggleSidebar} title="Thu gọn sidebar"
+        <button onClick={toggleSidebar} title={t('sidebar.collapse')}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium
                      text-white/30 hover:text-white hover:bg-white/[0.06] transition-all">
-          <PanelLeftClose className="w-3.5 h-3.5" /> Thu gọn
+          <PanelLeftClose className="w-3.5 h-3.5" /> {t('sidebar.collapseShort')}
         </button>
       </div>
     </aside>

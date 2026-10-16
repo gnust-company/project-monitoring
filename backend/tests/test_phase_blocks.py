@@ -146,6 +146,7 @@ async def test_non_creator_cannot_edit_phase_but_can_tick_items(client: AsyncCli
     bad = await client.patch(f"{API}/phase-blocks/{block['id']}",
                              json={"title": "Hacked"}, headers=auth(m_token))
     assert bad.status_code == 403
+    assert bad.json()["code"] == "phase.forbidden_edit"
 
     # member vẫn tick checklist được (không bị PIC khóa)
     item_id = block["checklist"][0]["id"]
@@ -157,6 +158,7 @@ async def test_non_creator_cannot_edit_phase_but_can_tick_items(client: AsyncCli
     # member xóa phase → 403
     dele = await client.delete(f"{API}/phase-blocks/{block['id']}", headers=auth(m_token))
     assert dele.status_code == 403
+    assert dele.json()["code"] == "phase.forbidden_delete"
 
     # owner (creator phase) sửa được
     ok = await client.patch(f"{API}/phase-blocks/{block['id']}",

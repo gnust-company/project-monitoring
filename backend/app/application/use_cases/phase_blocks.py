@@ -138,8 +138,8 @@ class CreatePhaseBlock:
         ))
         if assignee != data.created_by:
             await self._notifier.notify(
-                assignee, "phase_assigned", f"Bạn được giao phase {data.title}",
-                project_id=data.project_id, phase_block_id=created.id,
+                assignee, "phase_assigned", f"You were assigned phase {data.title}",
+                project_id=data.project_id, phase_block_id=created.id, params={"phase": data.title},
             )
         return created
 
@@ -235,7 +235,7 @@ class UpdatePhaseBlock:
             raise PhaseBlockNotFoundError(str(block_id))
         # #11: chỉ PIC phase (= người tạo)/superuser mới sửa metadata.
         if not can_edit_phase(actor, block):
-            raise PhaseForbiddenError("Chỉ PIC phase mới được sửa")
+            raise PhaseForbiddenError("Only the phase PIC can edit this phase")
 
         diffs = _diffs(block, payload)
         reassigned_to = (
@@ -251,8 +251,8 @@ class UpdatePhaseBlock:
             ))
         if reassigned_to and reassigned_to != actor.id:
             await self._notifier.notify(
-                reassigned_to, "phase_assigned", f"Bạn được giao phase {updated.title}",
-                project_id=updated.project_id, phase_block_id=block_id,
+                reassigned_to, "phase_assigned", f"You were assigned phase {updated.title}",
+                project_id=updated.project_id, phase_block_id=block_id, params={"phase": updated.title},
             )
         return updated
 
@@ -273,10 +273,10 @@ class DeletePhaseBlock:
             raise PhaseBlockNotFoundError(str(block_id))
         # #11: chỉ PIC phase (= người tạo)/superuser mới xóa.
         if not can_edit_phase(actor, block):
-            raise PhaseForbiddenError("Chỉ PIC phase mới được xóa")
+            raise PhaseForbiddenError("Only the phase PIC can delete this phase")
         # #14: ghi changelog cấp dự án TRƯỚC khi xóa (kèm lý do), phase_block_id=None
         # để bản ghi còn lại sau khi phase bị xóa.
-        target = f"{block.title} — lý do: {reason.strip()}" if reason and reason.strip() else block.title
+        target = f"{block.title} — reason: {reason.strip()}" if reason and reason.strip() else block.title
         await self._activity.add(ActivityEntry(
             id=uuid4(), project_id=block.project_id, user_id=actor.id,
             action="deleted phase", target=target, created_at=None, phase_block_id=None,
@@ -385,8 +385,8 @@ class AddComment:
         raw = {block.assignee, *block.participant_ids} - {author_id}
         recipients = [r for r in raw if r is not None]
         await self._notifier.notify_many(
-            list(recipients), "comment_added", f"Bình luận mới ở phase {block.title}",
-            project_id=block.project_id, phase_block_id=block_id,
+            list(recipients), "comment_added", f"New comment on phase {block.title}",
+            project_id=block.project_id, phase_block_id=block_id, params={"phase": block.title},
         )
         await _log(self._activity, block.project_id, block_id, author_id, "commented",
                    content[:80] + ("…" if len(content) > 80 else ""))

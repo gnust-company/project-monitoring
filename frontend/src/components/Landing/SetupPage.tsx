@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { Trans, useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 import { Layers, Mail, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function SetupPage() {
   const { setupSuperuser } = useApp();
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,13 +24,14 @@ export default function SetupPage() {
     try {
       await setupSuperuser(email, password, name);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
+      setError(err instanceof Error ? err.message : t('errors.generic'));
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-soft p-6">
+    <div className="min-h-screen flex items-center justify-center bg-surface-soft p-6 relative">
+      <LanguageSwitcher className="absolute top-4 right-4 sm:top-6 sm:right-6" />
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -41,19 +45,19 @@ export default function SetupPage() {
         </div>
 
         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-[11px] text-emerald-700 font-medium mb-4">
-          <ShieldCheck className="w-3.5 h-3.5" /> Thiết lập lần đầu
+          <ShieldCheck className="w-3.5 h-3.5" /> {t('auth.setup.badge')}
         </div>
 
-        <h1 className="text-2xl font-semibold text-ink tracking-tight">Tạo tài khoản quản trị</h1>
+        <h1 className="text-2xl font-semibold text-ink tracking-tight">{t('auth.setup.title')}</h1>
         <p className="text-sm text-muted mt-1.5 mb-6">
-          Hệ thống chưa có tài khoản nào. Tài khoản đầu tiên sẽ là <strong className="text-ink">admin toàn quyền</strong>.
+          <Trans i18nKey="auth.setup.lead" components={{ strong: <strong className="text-ink" /> }} />
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="Họ tên" required className={inputClass} />
+              placeholder={t('auth.fields.name')} required className={inputClass} />
           </div>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
@@ -63,7 +67,7 @@ export default function SetupPage() {
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="Mật khẩu (tối thiểu 6 ký tự)" required minLength={6} className={inputClass} />
+              placeholder={t('auth.setup.passwordPlaceholder')} required minLength={6} className={inputClass} />
           </div>
 
           {error && <p className="text-[11px] text-error">{error}</p>}
@@ -74,7 +78,7 @@ export default function SetupPage() {
                        transition-all flex items-center justify-center gap-2 mt-2">
             {loading
               ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              : <>Tạo & bắt đầu <ArrowRight className="w-4 h-4" /></>}
+              : <>{t('auth.setup.submit')} <ArrowRight className="w-4 h-4" /></>}
           </button>
         </form>
       </motion.div>

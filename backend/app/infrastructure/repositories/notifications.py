@@ -13,7 +13,7 @@ def _to_entity(m: NotificationModel) -> Notification:
     return Notification(
         id=m.id, user_id=m.user_id, type=m.type, title=m.title, body=m.body,
         org_id=m.org_id, project_id=m.project_id, phase_block_id=m.phase_block_id,
-        change_request_id=m.change_request_id, read=m.read, created_at=m.created_at,
+        change_request_id=m.change_request_id, params=m.params, read=m.read, created_at=m.created_at,
     )
 
 
@@ -25,7 +25,7 @@ class SqlAlchemyNotificationRepository(NotificationRepository):
         m = NotificationModel(
             id=n.id, user_id=n.user_id, type=n.type, title=n.title, body=n.body,
             org_id=n.org_id, project_id=n.project_id, phase_block_id=n.phase_block_id,
-            change_request_id=n.change_request_id, read=n.read,
+            change_request_id=n.change_request_id, params=n.params, read=n.read,
         )
         self._session.add(m)
         await self._session.flush()

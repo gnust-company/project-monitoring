@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Search, Crown, KeyRound, Mail, Building2, Calendar, ShieldPlus, ShieldMinus, Trash2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { formatDate } from '../../i18n/format';
 import type { AdminUserInfo } from '../../types';
 import Avatar from '../common/Avatar';
 
@@ -15,11 +16,11 @@ interface Props {
 }
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  try { return format(parseISO(iso), 'dd/MM/yyyy'); } catch { return '—'; }
+  return iso ? formatDate(iso) : '—';
 }
 
 export default function AdminUsers({ users, loading, currentUserId, onReset, onToggleAdmin, onDelete }: Props) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -36,14 +37,14 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-5 gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-ink">Người dùng</h2>
-          <p className="text-xs text-muted mt-0.5">{users.length} tài khoản trong hệ thống</p>
+          <h2 className="text-lg font-semibold text-ink">{t('admin.tabs.users')}</h2>
+          <p className="text-xs text-muted mt-0.5">{t('admin.users.count', { count: users.length })}</p>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-soft" />
           <input
             value={query} onChange={e => setQuery(e.target.value)}
-            placeholder="Tìm theo tên, email, vai trò…"
+            placeholder={t('admin.users.search')}
             className="w-full h-10 pl-9 pr-3 rounded-lg border border-hairline bg-white text-sm text-ink
                        focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 transition-all" />
         </div>
@@ -52,10 +53,10 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
       <div className="bg-white rounded-2xl border border-hairline overflow-hidden">
         {/* Header row */}
         <div className="hidden md:grid grid-cols-[1fr_120px_110px_180px] gap-3 px-5 py-3 border-b border-hairline-soft bg-surface-soft/50 text-[11px] font-semibold text-muted uppercase tracking-wide">
-          <span>Người dùng</span>
-          <span>Workspace</span>
-          <span>Ngày tạo</span>
-          <span className="text-right">Hành động</span>
+          <span>{t('admin.users.colUser')}</span>
+          <span>{t('admin.users.colWorkspaces')}</span>
+          <span>{t('admin.users.colCreated')}</span>
+          <span className="text-right">{t('admin.users.colActions')}</span>
         </div>
 
         {loading && (
@@ -65,7 +66,7 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
         )}
 
         {!loading && filtered.length === 0 && (
-          <div className="px-5 py-12 text-center text-sm text-muted-soft">Không tìm thấy người dùng nào</div>
+          <div className="px-5 py-12 text-center text-sm text-muted-soft">{t('admin.users.empty')}</div>
         )}
 
         <div className="divide-y divide-hairline-soft">
@@ -97,19 +98,19 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
                 {/* Action */}
                 <div className="flex justify-end items-center gap-1.5">
                   {u.id === currentUserId ? (
-                    <span className="text-[10px] font-medium text-muted-soft px-2 py-1 rounded-md bg-surface-soft">Bạn</span>
+                    <span className="text-[10px] font-medium text-muted-soft px-2 py-1 rounded-md bg-surface-soft">{t('admin.users.you')}</span>
                   ) : u.isSuperuser ? (
                     <button
                       onClick={e => { e.stopPropagation(); onToggleAdmin(u); }}
-                      title="Thu hồi quyền Admin"
+                      title={t('admin.users.revokeAdmin')}
                       className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-amber-700
                                  border border-amber-200 hover:bg-amber-50 transition-colors">
-                      <ShieldMinus className="w-3.5 h-3.5" /> Thu hồi
+                      <ShieldMinus className="w-3.5 h-3.5" /> {t('admin.users.revoke')}
                     </button>
                   ) : (
                     <button
                       onClick={e => { e.stopPropagation(); onToggleAdmin(u); }}
-                      title="Cấp quyền Admin"
+                      title={t('admin.users.grantAdmin')}
                       className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-emerald-700
                                  border border-emerald-200 hover:bg-emerald-50 transition-colors">
                       <ShieldPlus className="w-3.5 h-3.5" /> Admin
@@ -117,7 +118,7 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
                   )}
                   <button
                     onClick={e => { e.stopPropagation(); onReset(u); }}
-                    title="Đặt lại mật khẩu"
+                    title={t('admin.resetPassword.title')}
                     className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-body
                                border border-hairline hover:border-ink/30 hover:bg-surface-soft transition-colors">
                     <KeyRound className="w-3.5 h-3.5" />
@@ -125,7 +126,7 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
                   {u.id !== currentUserId && (
                     <button
                       onClick={e => { e.stopPropagation(); onDelete(u); }}
-                      title="Xóa người dùng khỏi hệ thống"
+                      title={t('admin.users.deleteHint')}
                       className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-500
                                  border border-hairline hover:border-red-300 hover:bg-red-50 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -141,8 +142,8 @@ export default function AdminUsers({ users, loading, currentUserId, onReset, onT
                   className="overflow-hidden bg-surface-soft/40 border-t border-hairline-soft">
                   <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <Detail icon={Mail} label="Email" value={u.email} />
-                    <Detail icon={Building2} label="Workspace" value={String(u.workspaceCount)} />
-                    <Detail icon={Calendar} label="Tham gia" value={fmtDate(u.createdAt)} />
+                    <Detail icon={Building2} label={t('admin.users.colWorkspaces')} value={String(u.workspaceCount)} />
+                    <Detail icon={Calendar} label={t('admin.users.joined')} value={fmtDate(u.createdAt)} />
                   </div>
                 </motion.div>
               )}

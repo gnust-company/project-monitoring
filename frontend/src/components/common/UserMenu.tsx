@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import { ChevronDown, User, Settings, CheckCircle2, ShieldCheck, LogOut } from 'lucide-react';
 import Avatar from './Avatar';
+import LanguageSwitcher from './LanguageSwitcher';
 
 // Menu tài khoản dùng chung cho mọi view (landing / selector / workspace).
 // Cùng một bộ option để trải nghiệm nhất quán; các mục phụ thuộc ngữ cảnh
@@ -12,6 +14,7 @@ export default function UserMenu({ align = 'right' }: { align?: 'left' | 'right'
     currentUser, currentUserEmail, currentView, selectedOrgId,
     openProfileModal, setWorkspaceView, goToWorkspaceSelector, goToAdmin, logout,
   } = useApp();
+  const { t } = useTranslation();
 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -52,26 +55,30 @@ export default function UserMenu({ align = 'right' }: { align?: 'left' | 'right'
             </div>
             <div className="p-1.5">
               <button onClick={() => { setOpen(false); openProfileModal(); }} className={item}>
-                <User className="w-4 h-4" /> Hồ sơ của tôi
+                <User className="w-4 h-4" /> {t('userMenu.profile')}
               </button>
               {inWorkspace && (
                 <button onClick={() => { setOpen(false); setWorkspaceView('settings'); }} className={item}>
-                  <Settings className="w-4 h-4" /> Cài đặt Workspace
+                  <Settings className="w-4 h-4" /> {t('nav.settings')}
                 </button>
               )}
               <button onClick={() => { setOpen(false); goToWorkspaceSelector(); }} className={item}>
-                <CheckCircle2 className="w-4 h-4" /> {inWorkspace ? 'Chuyển Workspace' : 'Workspaces của tôi'}
+                <CheckCircle2 className="w-4 h-4" /> {inWorkspace ? t('userMenu.switchWorkspace') : t('userMenu.myWorkspaces')}
               </button>
               {currentUser.isSuperuser && (
                 <button onClick={() => { setOpen(false); goToAdmin(); }} className={item}>
-                  <ShieldCheck className="w-4 h-4" /> Bảng quản trị
+                  <ShieldCheck className="w-4 h-4" /> {t('userMenu.admin')}
                 </button>
               )}
+            </div>
+            <div className="px-3 py-2 border-t border-hairline-soft flex items-center justify-between gap-2">
+              <span className="text-xs text-muted">{t('common.language')}</span>
+              <LanguageSwitcher />
             </div>
             <div className="p-1.5 border-t border-hairline-soft">
               <button onClick={() => { setOpen(false); logout(); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/5 transition-colors">
-                <LogOut className="w-4 h-4" /> Đăng xuất
+                <LogOut className="w-4 h-4" /> {t('userMenu.logout')}
               </button>
             </div>
           </motion.div>

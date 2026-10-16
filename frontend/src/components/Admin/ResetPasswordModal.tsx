@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Trans, useTranslation } from 'react-i18next';
 import { KeyRound, X, AlertTriangle, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import type { AdminUserInfo } from '../../types';
 import { adminApi } from '../../api';
@@ -19,6 +20,7 @@ function randomPassword(len = 12): string {
 }
 
 export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState(false); // bước xác nhận thứ 2
   const [show, setShow] = useState(false);
@@ -39,7 +41,7 @@ export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
       onDone();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Đặt lại mật khẩu thất bại');
+      setError(e instanceof Error ? e.message : t('admin.resetPassword.failed'));
       setSubmitting(false);
     }
   };
@@ -65,8 +67,8 @@ export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
                   <KeyRound className="w-4.5 h-4.5 text-amber-600" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-ink">Đặt lại mật khẩu</h3>
-                  <p className="text-[11px] text-muted-soft">Thao tác này cần xác nhận</p>
+                  <h3 className="text-sm font-semibold text-ink">{t('admin.resetPassword.title')}</h3>
+                  <p className="text-[11px] text-muted-soft">{t('admin.needsConfirm')}</p>
                 </div>
               </div>
               <button onClick={onClose}
@@ -87,14 +89,14 @@ export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-body mb-1.5">Mật khẩu mới</label>
+                <label className="block text-xs font-medium text-body mb-1.5">{t('profile.newPassword')}</label>
                 <div className="relative">
                   <input
                     type={show ? 'text' : 'password'}
                     value={password}
                     autoFocus
                     onChange={e => { setPassword(e.target.value); setConfirm(false); }}
-                    placeholder="Tối thiểu 6 ký tự"
+                    placeholder={t('auth.fields.passwordHint')}
                     className="no-native-reveal w-full h-10 pl-3 pr-20 rounded-lg border border-hairline bg-white text-sm text-ink
                                focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 transition-all" />
                   <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -106,12 +108,12 @@ export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
                 </div>
                 <div className="flex items-center justify-between mt-1.5">
                   {tooShort
-                    ? <span className="text-[11px] text-error">Cần ít nhất 6 ký tự</span>
-                    : <span className="text-[11px] text-muted-soft">Gửi mật khẩu mới cho người dùng qua kênh an toàn</span>}
+                    ? <span className="text-[11px] text-error">{t('admin.resetPassword.tooShort')}</span>
+                    : <span className="text-[11px] text-muted-soft">{t('admin.resetPassword.hint')}</span>}
                   <button type="button"
                     onClick={() => { setPassword(randomPassword()); setShow(true); setConfirm(false); }}
                     className="text-[11px] font-medium text-ink hover:underline">
-                    Tạo ngẫu nhiên
+                    {t('admin.resetPassword.generate')}
                   </button>
                 </div>
               </div>
@@ -125,8 +127,8 @@ export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
                     <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200">
                       <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                       <p className="text-[12px] text-amber-800 leading-relaxed">
-                        Mật khẩu hiện tại của <strong>{user.name}</strong> sẽ bị thay thế ngay lập tức.
-                        Bấm <strong>Xác nhận đặt lại</strong> để tiếp tục.
+                        <Trans i18nKey="admin.resetPassword.warning" values={{ name: user.name }}
+                          components={{ strong: <strong /> }} />
                       </p>
                     </div>
                   </motion.div>
@@ -140,14 +142,14 @@ export default function ResetPasswordModal({ user, onClose, onDone }: Props) {
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-hairline-soft bg-surface-soft/40">
               <button onClick={onClose}
                 className="h-9 px-4 rounded-lg text-sm font-medium text-body hover:bg-surface-soft transition-colors">
-                Hủy
+                {t('common.cancel')}
               </button>
               <button onClick={handleSubmit} disabled={!canProceed}
                 className={`h-9 px-4 rounded-lg text-sm font-medium text-white flex items-center gap-2 transition-colors
                   ${confirm ? 'bg-amber-600 hover:bg-amber-700' : 'bg-ink hover:bg-[#242424]'}
                   disabled:opacity-40 disabled:cursor-not-allowed`}>
                 {confirm ? <ShieldCheck className="w-4 h-4" /> : <KeyRound className="w-4 h-4" />}
-                {submitting ? 'Đang đặt lại…' : confirm ? 'Xác nhận đặt lại' : 'Đặt lại mật khẩu'}
+                {submitting ? t('admin.resetPassword.submitting') : confirm ? t('admin.resetPassword.confirm') : t('admin.resetPassword.title')}
               </button>
             </div>
           </motion.div>

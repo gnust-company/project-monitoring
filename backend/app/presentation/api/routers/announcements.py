@@ -6,7 +6,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.application.use_cases.announcements import (
     AnnouncementNotFoundError,
@@ -35,6 +35,7 @@ from app.presentation.api.schemas import (
     AnnouncementOut,
     AnnouncementUpdate,
 )
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1/announcements", tags=["announcements"])
 
@@ -58,9 +59,9 @@ async def dismiss(
     try:
         await uc.execute(announcement_id, current.id, body.scope)
     except InvalidDismissScopeError:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="scope phải là 'day' hoặc 'week'")
+        raise ApiError(status.HTTP_422_UNPROCESSABLE_ENTITY, "announcement.invalid_scope", "scope must be 'day' or 'week'")
     except AnnouncementNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Announcement not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "announcement.not_found", "Announcement not found")
 
 
 @router.get("", response_model=list[AnnouncementOut])
@@ -81,7 +82,7 @@ async def create(
     try:
         a = await uc.execute(body.model_dump(), current.id)
     except InvalidAnnouncementError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise ApiError(status.HTTP_422_UNPROCESSABLE_ENTITY, f"announcement.{e.code}", str(e))
     return AnnouncementOut.model_validate(a)
 
 
@@ -95,9 +96,9 @@ async def update(
     try:
         a = await uc.execute(announcement_id, body.model_dump(exclude_unset=True))
     except AnnouncementNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Announcement not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "announcement.not_found", "Announcement not found")
     except InvalidAnnouncementError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise ApiError(status.HTTP_422_UNPROCESSABLE_ENTITY, f"announcement.{e.code}", str(e))
     return AnnouncementOut.model_validate(a)
 
 
@@ -110,4 +111,4 @@ async def delete(
     try:
         await uc.execute(announcement_id)
     except AnnouncementNotFoundError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Announcement not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "announcement.not_found", "Announcement not found")

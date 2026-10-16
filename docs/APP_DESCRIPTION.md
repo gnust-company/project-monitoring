@@ -107,7 +107,7 @@ PA → SA → SD → SI → ST → DEP → OM
 - Tổng quan số liệu, danh sách workspace, người dùng (đặt lại mật khẩu, cấp/thu hồi admin, xoá người dùng), thông báo hệ thống.
 
 ### 4.10. Changelog 2 cấp
-- **Phase**: đổi ngày, đổi trạng thái, thêm/gỡ người tham gia, đổi vai trò RACI, hoàn thành việc, tài liệu… — hiển thị thành câu tiếng Việt dễ đọc.
+- **Phase**: đổi ngày, đổi trạng thái, thêm/gỡ người tham gia, đổi vai trò RACI, hoàn thành việc, tài liệu… — hiển thị thành câu dễ đọc theo ngôn ngữ người dùng chọn.
 - **Dự án**: tạo / sửa / xoá phase (dòng "đã xoá phase X" vẫn giữ sau khi phase bị xoá), tạo/đổi tên dự án.
 
 ### 4.11. Đăng ký & bảo mật
@@ -159,7 +159,7 @@ Landing ──→ Đăng nhập / Đăng ký ──→ Chọn workspace (hoặc 
 2. **Progressive disclosure** — mở dần theo tương tác
 3. **Status at a glance** — một giây biết cái gì ổn, cái gì cần chú ý
 4. **Context-aware actions** — nút hành động xuất hiện khi cần
-5. **Vietnamese-first UI** — giữ thuật ngữ kỹ thuật (Phase, Pipeline, Dashboard), nhãn tiếng Việt (song ngữ EN/VI: #29)
+5. **Song ngữ VI/EN** (#29) — mặc định theo ngôn ngữ trình duyệt, đổi bằng nút VI | EN (nhớ trong trình duyệt); giữ thuật ngữ kỹ thuật (Phase, Pipeline, PIC, RACI) ở cả hai ngôn ngữ; dữ liệu người dùng (tên phase, vai trò, checklist) không dịch
 
 ---
 

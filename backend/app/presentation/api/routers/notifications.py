@@ -1,10 +1,11 @@
 """Notifications router — in-app, đọc theo user hiện tại (polling từ FE)."""
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 
 from app.presentation.api.deps import CurrentUser, NotificationRepoDep
 from app.presentation.api.schemas import NotificationOut, UnreadCountOut
+from app.presentation.api.errors import ApiError
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 
@@ -28,7 +29,7 @@ async def unread_count(current: CurrentUser, repo: NotificationRepoDep) -> Unrea
 async def mark_read(notification_id: UUID, current: CurrentUser, repo: NotificationRepoDep) -> None:
     ok = await repo.mark_read(notification_id, current.id)
     if not ok:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        raise ApiError(status.HTTP_404_NOT_FOUND, "notification.not_found", "Notification not found")
 
 
 @router.post("/read-all", response_model=UnreadCountOut)

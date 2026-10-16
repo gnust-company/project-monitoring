@@ -52,7 +52,7 @@ class ApproveChangeRequest:
 
         await self._notifier.notify(
             cr.requested_by, "change_request_approved",
-            "Yêu cầu của bạn đã được duyệt",
+            "Your request was approved", params={},
             org_id=cr.org_id, project_id=cr.project_id, change_request_id=cr.id,
         )
         return cr
@@ -87,7 +87,7 @@ class RejectChangeRequest:
 
         await self._notifier.notify(
             cr.requested_by, "change_request_rejected",
-            "Yêu cầu của bạn đã bị từ chối",
+            "Your request was rejected", params={},
             org_id=cr.org_id, project_id=cr.project_id, change_request_id=cr.id,
         )
         return cr

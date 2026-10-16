@@ -76,6 +76,8 @@ async def test_login_wrong_password_401(client: AsyncClient):
         "email": "bob@hub.io", "password": "wrongpw",
     })
     assert bad.status_code == 401
+    # #29: lỗi có mã ổn định để FE dịch
+    assert bad.json()["code"] == "auth.invalid_credentials"
 
 
 async def test_register_duplicate_email_409(client: AsyncClient):
@@ -89,6 +91,7 @@ async def test_register_duplicate_email_409(client: AsyncClient):
 async def test_me_without_token_401(client: AsyncClient):
     resp = await client.get(f"{API}/auth/me")
     assert resp.status_code == 401
+    assert resp.json()["code"] == "auth.not_authenticated"
 
 
 # ─── #5: Allowlist domain email ──────────────────────────────────────
@@ -98,6 +101,8 @@ async def test_register_blocked_when_domain_not_allowed(client: AsyncClient, ema
     })
     assert resp.status_code == 422, resp.text
     assert "not allowed" in resp.text.lower()
+    assert resp.json()["code"] == "auth.email_domain_not_allowed"
+    assert resp.json()["params"]["domains"]
 
 
 async def test_register_allowed_when_domain_in_list(client: AsyncClient, email_allowlist):

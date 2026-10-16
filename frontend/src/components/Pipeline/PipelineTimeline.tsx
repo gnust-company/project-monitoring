@@ -1,5 +1,7 @@
 import { useRef, useMemo, useState, useCallback, useEffect, useLayoutEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
+import { formatDate } from '../../i18n/format';
 import type { PhaseBlock } from '../../types';
 import { getUserById } from '../../data/mockData';
 import { Search, X, MousePointer2, Hand, SquarePen, Eye, Save, RotateCcw, GripVertical } from 'lucide-react';
@@ -72,6 +74,7 @@ function assignRows(pbs: PhaseBlock[]): Map<string, number> {
 
 // ─── Component ──────────────────────────────────────────────────────
 export default function PipelineTimeline() {
+  const { t } = useTranslation();
   const {
     orgProjects, phaseBlocks, searchQuery, zoomLevel, selectedOrgId,
     setSearchQuery, setZoomLevel,
@@ -773,14 +776,16 @@ export default function PipelineTimeline() {
       <div className="flex-shrink-0 bg-white border-b border-hairline px-5 py-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
-            <h1 className="text-base font-bold text-ink">Development Pipeline</h1>
-            <span className="text-xs text-stone-400 font-light">{filteredProjects.length} dự án · {phaseBlocks.length} phase</span>
+            <h1 className="text-base font-bold text-ink">{t('pipeline.title')}</h1>
+            <span className="text-xs text-stone-400 font-light">
+              {t('common.projectCount', { count: filteredProjects.length })} · {t('pipeline.phaseCount', { count: phaseBlocks.length })}
+            </span>
           </div>
           {(() => {
-            const hint = boardMode === 'create' ? 'Kéo ngang trên hàng dự án để tạo phase (lịch được giữ cố định)'
+            const hint = boardMode === 'create' ? t('pipeline.hint.create')
               : boardMode === 'layout'
-                ? (isOwner ? 'Kéo/giãn phase · kéo tên dự án để đổi thứ tự — bấm Lưu' : 'Kéo/giãn phase — bấm Lưu để áp dụng')
-              : 'Kéo chuột để di chuyển lịch';
+                ? (isOwner ? t('pipeline.hint.layoutOwner') : t('pipeline.hint.layout'))
+              : t('pipeline.hint.readonly');
             return (
               <span title={hint}
                 className="hidden md:flex flex-1 basis-0 min-w-[10rem] items-center gap-1.5 text-[11px] text-stone-400 font-light">
@@ -792,7 +797,7 @@ export default function PipelineTimeline() {
           <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
-              <input type="text" placeholder="Tìm dự án hoặc PIC..."
+              <input type="text" placeholder={t('pipeline.searchPlaceholder')}
                 value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                 className={`pl-8 pr-8 py-1.5 bg-white border border-stone-200 rounded-lg text-sm
                            focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink
@@ -810,22 +815,22 @@ export default function PipelineTimeline() {
             {/* Chế độ tương tác: Chỉ xem (pan) / Sắp xếp (kéo-giãn) / Tạo phase (#18) */}
             <div className="flex items-center shrink-0 bg-stone-100 rounded-lg p-0.5">
               <button onClick={() => setBoardMode('readonly')}
-                title="Chỉ xem — chỉ di chuyển lịch, không kéo/giãn/tạo phase"
+                title={t('pipeline.modeHint.readonly')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md whitespace-nowrap transition-colors
                   ${boardMode === 'readonly' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
-                <Eye className="w-3.5 h-3.5" /> Chỉ xem
+                <Eye className="w-3.5 h-3.5" /> {t('pipeline.mode.readonly')}
               </button>
               <button onClick={() => setBoardMode('layout')}
-                title="Sắp xếp — kéo/giãn phase rồi bấm Lưu để áp dụng"
+                title={t('pipeline.modeHint.layout')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md whitespace-nowrap transition-colors
                   ${boardMode === 'layout' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
-                <Hand className="w-3.5 h-3.5" /> Sắp xếp
+                <Hand className="w-3.5 h-3.5" /> {t('pipeline.mode.layout')}
               </button>
               <button onClick={() => setBoardMode('create')}
-                title="Tạo phase — kéo ngang trên hàng dự án để tạo phase"
+                title={t('pipeline.modeHint.create')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md whitespace-nowrap transition-colors
                   ${boardMode === 'create' ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
-                <SquarePen className="w-3.5 h-3.5" /> Tạo phase
+                <SquarePen className="w-3.5 h-3.5" /> {t('pipeline.mode.create')}
               </button>
             </div>
             <div className="flex items-center shrink-0 bg-stone-100 rounded-lg p-0.5">
@@ -837,14 +842,14 @@ export default function PipelineTimeline() {
                 smoothScrollTo(target);
               }}
                 className="px-2.5 py-1 text-xs font-bold rounded-md text-ink whitespace-nowrap hover:bg-ink/[0.06] transition-colors">
-                Hôm nay
+                {t('pipeline.today')}
               </button>
               <div className="w-px h-4 bg-stone-300 mx-0.5" />
               {(['3day', 'week', 'month', 'quarter'] as const).map(z => (
                 <button key={z} onClick={() => { setZoomLevel(z); hasScrolled.current = false; }}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize whitespace-nowrap transition-colors
                     ${zoomLevel === z ? 'bg-white text-ink shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
-                  {z === '3day' ? '3 ngày' : z === 'week' ? 'Tuần' : z === 'month' ? 'Tháng' : 'Quý'}
+                  {t(`pipeline.zoom.${z}`)}
                 </button>
               ))}
             </div>
@@ -858,7 +863,7 @@ export default function PipelineTimeline() {
         <div ref={leftPanelRef}
           className="w-56 flex-shrink-0 bg-surface-soft border-r border-hairline overflow-hidden z-20 relative">
           <div className="bg-stone-50 border-b border-hairline px-4 flex items-center text-[10px] font-bold text-stone-500 uppercase tracking-wider relative z-10"
-            style={{ height: HEADER_HEIGHT }}>Dự án</div>
+            style={{ height: HEADER_HEIGHT }}>{t('pipeline.projectsHeader')}</div>
           <div ref={leftContentRef}>
             {filteredProjects.map(project => {
               const rd = projectRowData.get(project.id);
@@ -890,7 +895,7 @@ export default function PipelineTimeline() {
                   }) : undefined}
                   onDragEnd={() => { setDragProjectId(null); setDropTarget(null); }}
                   onClick={() => { if (!canReorderProjects) openProjectDetail(project.id); }}
-                  title={canReorderProjects ? 'Kéo để đổi thứ tự dự án' : 'Xem chi tiết dự án'}
+                  title={canReorderProjects ? t('pipeline.dragToReorder') : t('pipeline.openProject')}
                   className={`relative px-4 border-b border-hairline bg-surface-soft transition-colors flex items-center
                     ${canReorderProjects ? 'cursor-grab active:cursor-grabbing hover:bg-ink/[0.03]' : 'cursor-pointer hover:bg-white'}
                     ${isDragged ? 'opacity-40' : ''}`}
@@ -911,7 +916,7 @@ export default function PipelineTimeline() {
                       <span className="text-sm font-semibold text-ink truncate">{project.name}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-stone-400 font-light">{pbCount} phase</span>
+                      <span className="text-[10px] text-stone-400 font-light">{t('pipeline.phaseCount', { count: pbCount })}</span>
                       <span className="text-[10px] text-stone-300">·</span>
                       <span className="text-[10px] text-stone-400 font-light">{progressOf.get(project.id) ?? project.progress}%</span>
                     </div>
@@ -937,16 +942,16 @@ export default function PipelineTimeline() {
                     {zoomLevel === '3day' && (
                       <>
                         <span className="font-bold text-stone-700">{format(col, 'dd')}</span>
-                        <span className="text-[10px] text-stone-400 font-light">{format(col, 'dd/MM')} – {format(addDays(col, 2), 'dd/MM')}</span>
+                        <span className="text-[10px] text-stone-400 font-light">{formatDate(col, 'dateShort')} – {formatDate(addDays(col, 2), 'dateShort')}</span>
                       </>
                     )}
                     {zoomLevel === 'week' && (
                       <>
                         <span className="font-bold text-stone-700">W{format(col, 'ww')}</span>
-                        <span className="text-[10px] text-stone-400 font-light">{format(col, 'dd/MM')} – {format(addDays(col, 6), 'dd/MM')}</span>
+                        <span className="text-[10px] text-stone-400 font-light">{formatDate(col, 'dateShort')} – {formatDate(addDays(col, 6), 'dateShort')}</span>
                       </>
                     )}
-                    {zoomLevel === 'month' && format(col, 'MM/yyyy')}
+                    {zoomLevel === 'month' && formatDate(col, 'monthYear')}
                     {zoomLevel === 'quarter' && (
                       <>
                         <span className="font-bold text-stone-700">Q{getQuarter(col)}</span>
@@ -983,7 +988,7 @@ export default function PipelineTimeline() {
                 }}>
                 {createPreview.x2 - createPreview.x1 > 90 && (
                   <span className="text-[10px] font-semibold text-ink/60 whitespace-nowrap px-2">
-                    {format(getPosDate(createPreview.x1), 'dd/MM')} – {format(getPosDate(createPreview.x2), 'dd/MM')}
+                    {formatDate(getPosDate(createPreview.x1), 'dateShort')} – {formatDate(getPosDate(createPreview.x2), 'dateShort')}
                   </span>
                 )}
               </div>
@@ -1097,21 +1102,23 @@ export default function PipelineTimeline() {
                           bg-surface-dark text-white rounded-xl shadow-xl shadow-black/20 pl-4 pr-2 py-2
                           animate-in fade-in slide-in-from-bottom-2 duration-200">
             <span className="text-xs font-semibold whitespace-nowrap">
-              {[
-                pendingLayout.size > 0 ? `${pendingLayout.size} thay đổi phase` : null,
-                pendingOrder ? 'thứ tự dự án' : null,
-              ].filter(Boolean).join(' + ')} chưa lưu
+              {t('pipeline.pending.unsaved', {
+                items: [
+                  pendingLayout.size > 0 ? t('pipeline.pending.phases', { count: pendingLayout.size }) : null,
+                  pendingOrder ? t('pipeline.pending.order') : null,
+                ].filter(Boolean).join(' + '),
+              })}
             </span>
             <div className="flex items-center gap-1.5">
               <button onClick={discardLayout} disabled={savingLayout}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg
                            text-white/80 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-40">
-                <RotateCcw className="w-3.5 h-3.5" /> Hủy
+                <RotateCcw className="w-3.5 h-3.5" /> {t('common.cancel')}
               </button>
               <button onClick={saveLayout} disabled={savingLayout}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg
                            bg-white text-ink hover:bg-stone-100 transition-colors disabled:opacity-60">
-                <Save className="w-3.5 h-3.5" /> {savingLayout ? 'Đang lưu…' : 'Lưu'}
+                <Save className="w-3.5 h-3.5" /> {savingLayout ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </div>
@@ -1131,9 +1138,9 @@ export default function PipelineTimeline() {
         return (
           <CursorTooltip x={hoverInfo.x} y={hoverInfo.y} boundary={boardTop + HEADER_HEIGHT}>
             <div className="font-bold">{pb.title}</div>
-            <div className="text-stone-400">{meta.fullLabel} · {pct}% hoàn thành</div>
+            <div className="text-stone-400">{meta.fullLabel} · {t('common.percentDone', { pct })}</div>
             {assignee && <div className="text-stone-400">PIC: {assignee.name}</div>}
-            <div className="text-stone-500 font-light">{format(parseISO(pos.startDate), 'dd/MM/yyyy')} – {format(parseISO(pos.endDate), 'dd/MM/yyyy')}</div>
+            <div className="text-stone-500 font-light">{formatDate(pos.startDate)} – {formatDate(pos.endDate)}</div>
           </CursorTooltip>
         );
       })()}

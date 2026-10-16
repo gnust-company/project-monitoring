@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import { PHASE_PALETTE, PHASE_COLOR_KEYS, resolvePhaseMeta } from '../../types';
 import type { PhaseDefinition, WorkspaceRoleDef } from '../../types';
@@ -30,6 +31,7 @@ function ItemEditor({ items, setItems, icon, label, roleOptions }: {
   label: string;
   roleOptions: WorkspaceRoleDef[];
 }) {
+  const { t } = useTranslation();
   return (
     <div>
       <label className="text-xs font-semibold text-stone-700 mb-1.5 block flex items-center gap-1.5">
@@ -42,7 +44,7 @@ function ItemEditor({ items, setItems, icon, label, roleOptions }: {
               onChange={e => { const v = e.target.value; const next = [...items]; next[idx] = { ...next[idx], role: v || undefined }; setItems(next); }}
               className="px-1.5 py-1 bg-white border border-stone-200 rounded-md text-[11px] text-stone-600 w-28 flex-shrink-0
                          focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink">
-              <option value="">Chung</option>
+              <option value="">{t('phase.general')}</option>
               {roleOptions.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
               {it.role && !roleOptions.some(r => r.code === it.role) && <option value={it.role}>{it.role}</option>}
             </select>
@@ -58,7 +60,7 @@ function ItemEditor({ items, setItems, icon, label, roleOptions }: {
         ))}
         <button type="button" onClick={() => setItems([...items, { text: '', role: undefined }])}
           className="flex items-center gap-1 text-[11px] text-stone-500 hover:text-ink px-1 py-0.5">
-          <Plus className="w-3 h-3" /> Thêm mục
+          <Plus className="w-3 h-3" /> {t('phaseManager.addItem')}
         </button>
       </div>
     </div>
@@ -69,6 +71,7 @@ function ItemEditor({ items, setItems, icon, label, roleOptions }: {
 // workspace ĐÓ qua API (local state); nếu bỏ trống, dùng workspace đang chọn qua context.
 export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
   const ctx = useApp();
+  const { t } = useTranslation();
   const standalone = !!orgId;
   const [localDefs, setLocalDefs] = useState<PhaseDefinition[]>([]);
   const [localRoles, setLocalRoles] = useState<WorkspaceRoleDef[]>([]);
@@ -121,10 +124,10 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
   const handleAdd = async () => {
     setBusy(true); setError(null);
     try {
-      const created = await addPhaseDef({ name: 'Phase mới', color: 'gray' });
+      const created = await addPhaseDef({ name: t('phaseManager.newPhaseName'), color: 'gray' });
       setSelectedId(created.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thêm được phase');
+      setError(e instanceof Error ? e.message : t('phaseManager.addFailed'));
     } finally { setBusy(false); }
   };
 
@@ -142,7 +145,7 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
         outcomes: draft.outcomes.filter(i => i.text.trim()),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Lưu thất bại');
+      setError(e instanceof Error ? e.message : t('errors.saveFailed'));
     } finally { setBusy(false); }
   };
 
@@ -155,11 +158,9 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
       setSelectedId(phaseDefs.find(p => p.id !== selected.id)?.id ?? null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
-        let count = 0;
-        try { count = JSON.parse(e.detail).count ?? 0; } catch { /* detail không phải JSON */ }
-        setDeleteWarn({ count });
+        setDeleteWarn({ count: Number(e.params?.count ?? 0) });
       } else {
-        setError(e instanceof Error ? e.message : 'Xóa thất bại');
+        setError(e instanceof Error ? e.message : t('errors.deleteFailed'));
       }
     } finally { setBusy(false); }
   };
@@ -176,15 +177,15 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
-          <Layers className="w-4 h-4" /> Quản lý phase ({phaseDefs.length})
+          <Layers className="w-4 h-4" /> {t('phaseManager.title', { count: phaseDefs.length })}
         </h2>
         <button onClick={handleAdd} disabled={busy}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-[#242424] transition-colors disabled:opacity-50">
-          <Plus className="w-3.5 h-3.5" /> Thêm phase
+          <Plus className="w-3.5 h-3.5" /> {t('phaseManager.add')}
         </button>
       </div>
       <p className="text-[11px] text-stone-500 mb-3">
-        Tùy biến các giai đoạn (phase) của workspace: tên, màu, thứ tự và checklist/outcome mặc định khi tạo phase block.
+        {t('phaseManager.intro')}
       </p>
 
       <div className="grid grid-cols-[200px_1fr] gap-4">
@@ -216,24 +217,24 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
           <div className="bg-white border border-hairline rounded-xl p-4 space-y-3">
             <div className="grid grid-cols-[110px_1fr] gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-stone-700 mb-1 block">Mã viết tắt</label>
+                <label className="text-[11px] font-semibold text-stone-700 mb-1 block">{t('phaseManager.code')}</label>
                 <input type="text" value={draft.code} onChange={e => setDraft({ ...draft, code: e.target.value })}
-                  title="Mã phase (vd PA). Đổi mã sẽ cập nhật mọi block đang dùng."
+                  title={t('phaseManager.codeHint')}
                   className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-stone-700 mb-1 block">Tên đầy đủ</label>
+                <label className="text-[11px] font-semibold text-stone-700 mb-1 block">{t('phaseManager.fullName')}</label>
                 <input type="text" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })}
-                  placeholder="VD: Project Assessment"
+                  placeholder={t('phaseManager.fullNamePlaceholder')}
                   className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
               </div>
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-stone-700 mb-1 block">Màu</label>
+              <label className="text-[11px] font-semibold text-stone-700 mb-1 block">{t('phaseManager.color')}</label>
               <div className="flex flex-wrap gap-1.5">
                 {PHASE_COLOR_KEYS.map(key => (
-                  <button key={key} type="button" title={PHASE_PALETTE[key].label}
+                  <button key={key} type="button" title={t(`colors.${key}` as 'colors.gray')}
                     onClick={() => setDraft({ ...draft, color: key })}
                     className={`w-6 h-6 rounded-md ${PHASE_PALETTE[key].solid} transition-transform
                       ${draft.color === key ? 'ring-2 ring-offset-1 ring-ink scale-110' : 'hover:scale-105'}`} />
@@ -242,47 +243,47 @@ export default function PhaseManager({ orgId }: { orgId?: string } = {}) {
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-stone-700 mb-1 block">Mô tả</label>
+              <label className="text-[11px] font-semibold text-stone-700 mb-1 block">{t('createPhase.description')}</label>
               <textarea value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} rows={2}
                 className="w-full px-2.5 py-1.5 bg-white border border-stone-200 rounded-lg text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink" />
             </div>
 
             <ItemEditor items={draft.checklist} setItems={next => setDraft({ ...draft, checklist: next })}
-              icon={<CheckSquare className="w-3.5 h-3.5" />} label="Checklist mặc định" roleOptions={roleOptions} />
+              icon={<CheckSquare className="w-3.5 h-3.5" />} label={t('phaseManager.defaultChecklist')} roleOptions={roleOptions} />
             <ItemEditor items={draft.outcomes} setItems={next => setDraft({ ...draft, outcomes: next })}
-              icon={<Target className="w-3.5 h-3.5" />} label="Outcome mặc định" roleOptions={roleOptions} />
+              icon={<Target className="w-3.5 h-3.5" />} label={t('phaseManager.defaultOutcomes')} roleOptions={roleOptions} />
 
             {error && <p className="text-[11px] text-error">{error}</p>}
 
             {deleteWarn && (
               <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-[11px] text-red-600">
                 <p className="flex items-center gap-1.5 font-semibold mb-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" /> {deleteWarn.count} phase block đang dùng phase này.
+                  <AlertTriangle className="w-3.5 h-3.5" /> {t('phaseManager.inUse', { count: deleteWarn.count })}
                 </p>
-                <p className="mb-2 text-stone-600">Xóa vẫn giữ các block đó (sẽ hiển thị màu trung tính). Tiếp tục?</p>
+                <p className="mb-2 text-stone-600">{t('phaseManager.inUseHint')}</p>
                 <div className="flex gap-2">
                   <button onClick={() => handleDelete(true)} disabled={busy}
-                    className="px-2.5 py-1 bg-red-500 text-white rounded-md font-semibold hover:bg-red-600 disabled:opacity-50">Xóa vẫn tiếp tục</button>
-                  <button onClick={() => setDeleteWarn(null)} className="px-2.5 py-1 text-stone-500 hover:text-stone-700">Hủy</button>
+                    className="px-2.5 py-1 bg-red-500 text-white rounded-md font-semibold hover:bg-red-600 disabled:opacity-50">{t('phaseManager.deleteAnyway')}</button>
+                  <button onClick={() => setDeleteWarn(null)} className="px-2.5 py-1 text-stone-500 hover:text-stone-700">{t('common.cancel')}</button>
                 </div>
               </div>
             )}
 
             <div className="flex items-center justify-between pt-1 border-t border-hairline">
               <button onClick={() => handleDelete(false)} disabled={busy || phaseDefs.length <= 1}
-                title={phaseDefs.length <= 1 ? 'Workspace cần ít nhất 1 phase' : 'Xóa phase'}
+                title={phaseDefs.length <= 1 ? t('phaseManager.needOne') : t('phaseManager.delete')}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-500 border border-red-200 rounded-lg hover:border-red-400 disabled:opacity-40">
-                <Trash2 className="w-3.5 h-3.5" /> Xóa phase
+                <Trash2 className="w-3.5 h-3.5" /> {t('phaseManager.delete')}
               </button>
               <button onClick={handleSave} disabled={busy || !dirty}
                 className="flex items-center gap-1.5 px-4 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-[#242424] disabled:opacity-40">
-                <Check className="w-3.5 h-3.5" /> Lưu
+                <Check className="w-3.5 h-3.5" /> {t('common.save')}
               </button>
             </div>
           </div>
         ) : (
           <div className="flex items-center justify-center text-xs text-stone-400 border border-dashed border-stone-200 rounded-xl">
-            Chọn hoặc thêm một phase để chỉnh sửa
+            {t('phaseManager.empty')}
           </div>
         )}
       </div>

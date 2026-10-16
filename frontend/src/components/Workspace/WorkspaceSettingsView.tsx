@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
 import {
   Settings, Users, Trash2, Check, AlertTriangle, UserPlus, X, Mail,
@@ -22,6 +23,7 @@ export default function WorkspaceSettingsView() {
     updateOrganization, deleteOrganization, addOrgMember, removeOrgMember,
     goToWorkspaceSelector, orgRoles, assignMemberRole,
   } = useApp();
+  const { t } = useTranslation();
 
   const [tab, setTab] = useState<'general' | 'roles' | 'phases'>('general');
   const [nameDraft, setNameDraft] = useState(selectedOrg?.name ?? '');
@@ -44,7 +46,7 @@ export default function WorkspaceSettingsView() {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <Settings className="w-8 h-8 text-stone-300 mx-auto mb-3" />
-          <p className="text-sm text-stone-500">Chỉ chủ workspace mới truy cập được Cài đặt.</p>
+          <p className="text-sm text-stone-500">{t('settings.ownerOnly')}</p>
         </div>
       </div>
     );
@@ -67,7 +69,7 @@ export default function WorkspaceSettingsView() {
       setInviteEmail('');
       setShowAddMember(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không mời được thành viên');
+      setError(err instanceof Error ? err.message : t('settings.inviteFailed'));
     }
   };
 
@@ -76,17 +78,16 @@ export default function WorkspaceSettingsView() {
       <div className="px-8 py-6 max-w-3xl mx-auto">
         <motion.div custom={0} variants={fadeUp} initial="hidden" animate="visible" className="mb-6">
           <h1 className="text-xl font-semibold text-ink tracking-tight flex items-center gap-2">
-            <Settings className="w-5 h-5" /> Cài đặt Workspace
+            <Settings className="w-5 h-5" /> {t('nav.settings')}
           </h1>
           <p className="text-sm text-stone-500 mt-0.5 font-light">
-            {selectedOrg.name} · {orgProjects.length} dự án · {phaseBlocks.length} phase · {selectedOrg.members.length} thành viên
-            {!isOwner && <span className="ml-2 text-amber-600">· chỉ owner mới chỉnh sửa được</span>}
+            {selectedOrg.name} · {t('common.projectCount', { count: orgProjects.length })} · {t('pipeline.phaseCount', { count: phaseBlocks.length })} · {t('common.memberCount', { count: selectedOrg.members.length })}
           </p>
         </motion.div>
 
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-6 border-b border-hairline">
-          {([['general', 'Chung & Thành viên'], ['roles', 'Vai trò'], ['phases', 'Phase']] as const).map(([key, label]) => (
+          {([['general', t('settings.tabGeneral')], ['roles', t('settings.tabRoles')], ['phases', t('settings.tabPhases')]] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors
                 ${tab === key ? 'border-ink text-ink' : 'border-transparent text-stone-400 hover:text-stone-600'}`}>
@@ -99,8 +100,8 @@ export default function WorkspaceSettingsView() {
         {/* General */}
         <motion.div custom={1} variants={fadeUp} initial="hidden" animate="visible"
           className="bg-surface-card rounded-2xl border border-hairline p-6 mb-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Thông tin chung</h2>
-          <label className="text-xs font-semibold text-stone-700 mb-1 block">Tên workspace</label>
+          <h2 className="text-sm font-semibold text-ink mb-4">{t('settings.generalInfo')}</h2>
+          <label className="text-xs font-semibold text-stone-700 mb-1 block">{t('settings.name')}</label>
           <div className="flex gap-2">
             <input type="text" value={nameDraft} onChange={e => setNameDraft(e.target.value)}
               disabled={!isOwner}
@@ -112,15 +113,15 @@ export default function WorkspaceSettingsView() {
               disabled={!nameDirty || !isOwner}
               className="px-4 py-2 bg-ink text-white text-sm font-semibold rounded-lg hover:bg-[#242424]
                          disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5" /> Lưu
+              <Check className="w-3.5 h-3.5" /> {t('common.save')}
             </button>
           </div>
 
           {/* #26: mô tả workspace */}
-          <label className="text-xs font-semibold text-stone-700 mb-1 mt-4 block">Mô tả</label>
+          <label className="text-xs font-semibold text-stone-700 mb-1 mt-4 block">{t('createPhase.description')}</label>
           <textarea value={descDraft} onChange={e => setDescDraft(e.target.value)} rows={3}
             disabled={!isOwner}
-            placeholder="Mô tả ngắn về workspace (hiển thị ở trang Tổng quan)…"
+            placeholder={t('settings.descriptionPlaceholder')}
             className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm resize-none disabled:bg-stone-50 disabled:text-stone-400
                        focus:outline-none focus:ring-2 focus:ring-ink/15 focus:border-ink" />
           <div className="flex justify-end mt-2">
@@ -129,7 +130,7 @@ export default function WorkspaceSettingsView() {
               disabled={!descDirty || !isOwner}
               className="px-4 py-2 bg-ink text-white text-sm font-semibold rounded-lg hover:bg-[#242424]
                          disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5" /> Lưu mô tả
+              <Check className="w-3.5 h-3.5" /> {t('settings.saveDescription')}
             </button>
           </div>
         </motion.div>
@@ -139,12 +140,12 @@ export default function WorkspaceSettingsView() {
           className="bg-surface-card rounded-2xl border border-hairline p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
-              <Users className="w-4 h-4" /> Thành viên ({selectedOrg.members.length})
+              <Users className="w-4 h-4" /> {t('settings.members', { count: selectedOrg.members.length })}
             </h2>
             {isOwner && (
               <button onClick={() => setShowAddMember(!showAddMember)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-[#242424] transition-colors">
-                <UserPlus className="w-3.5 h-3.5" /> Mời thành viên
+                <UserPlus className="w-3.5 h-3.5" /> {t('settings.invite')}
               </button>
             )}
           </div>
@@ -152,7 +153,7 @@ export default function WorkspaceSettingsView() {
           {showAddMember && isOwner && (
             <div className="mb-4 p-3 bg-white border border-stone-200 rounded-xl">
               <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">
-                Mời qua email (người dùng phải đã có tài khoản)
+                {t('settings.inviteHint')}
               </div>
               <div className="flex gap-2">
                 <div className="relative flex-1">
@@ -165,7 +166,7 @@ export default function WorkspaceSettingsView() {
                 </div>
                 <button onClick={handleInvite}
                   className="px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-[#242424]">
-                  Mời
+                  {t('settings.inviteSubmit')}
                 </button>
               </div>
               {error && <p className="text-[11px] text-error mt-2">{error}</p>}
@@ -181,7 +182,7 @@ export default function WorkspaceSettingsView() {
                   <Avatar name={m.name} src={m.avatar} className="w-7 h-7" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-ink truncate">
-                      {m.name} {isSelf && <span className="text-[10px] text-stone-400 font-normal">(bạn)</span>}
+                      {m.name} {isSelf && <span className="text-[10px] text-stone-400 font-normal">{t('settings.you')}</span>}
                     </div>
                   </div>
                   {/* #26 mảng B: gán vai trò công việc trong workspace (owner đổi của ai cũng được) */}
@@ -189,12 +190,12 @@ export default function WorkspaceSettingsView() {
                     onChange={e => assignMemberRole(m.id, e.target.value || null)}
                     className="text-[11px] text-stone-600 bg-stone-50 border border-stone-200 rounded-md px-1.5 py-1
                                focus:outline-none focus:ring-1 focus:ring-ink/15 focus:border-ink">
-                    <option value="">— chưa có vai trò —</option>
+                    <option value="">{t('settings.noRole')}</option>
                     {orgRoles.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
                   </select>
                   {!isSelf && isOwner && (
                     <button onClick={() => removeOrgMember(selectedOrg.id, m.id)}
-                      title="Xóa khỏi workspace"
+                      title={t('settings.removeMember')}
                       className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 transition-all">
                       <X className="w-3.5 h-3.5 text-stone-400 hover:text-red-500" />
                     </button>
@@ -210,21 +211,21 @@ export default function WorkspaceSettingsView() {
           <motion.div custom={4} variants={fadeUp} initial="hidden" animate="visible"
             className="bg-red-50/40 rounded-2xl border border-red-200 p-6">
             <h2 className="text-sm font-semibold text-red-600 mb-1 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" /> Vùng nguy hiểm
+              <AlertTriangle className="w-4 h-4" /> {t('settings.dangerZone')}
             </h2>
             <p className="text-xs text-stone-500 mb-4">
-              Xóa workspace sẽ xóa vĩnh viễn {orgProjects.length} dự án và toàn bộ phase blocks bên trong. Không thể hoàn tác.
+              {t('settings.deleteWarning', { count: orgProjects.length })}
             </p>
             <button onClick={handleDelete}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all
                 ${confirmDelete ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white text-red-500 border border-red-200 hover:border-red-400'}`}>
               {confirmDelete
-                ? (<><AlertTriangle className="w-4 h-4" /> Click lần nữa để xóa vĩnh viễn</>)
-                : (<><Trash2 className="w-4 h-4" /> Xóa workspace này</>)}
+                ? (<><AlertTriangle className="w-4 h-4" /> {t('settings.deleteConfirm')}</>)
+                : (<><Trash2 className="w-4 h-4" /> {t('settings.deleteWorkspace')}</>)}
             </button>
             {confirmDelete && (
               <button onClick={() => setConfirmDelete(false)}
-                className="ml-3 text-xs text-stone-500 hover:text-stone-700">Hủy</button>
+                className="ml-3 text-xs text-stone-500 hover:text-stone-700">{t('common.cancel')}</button>
             )}
           </motion.div>
         )}

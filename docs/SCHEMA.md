@@ -335,6 +335,7 @@ CREATE INDEX idx_cr_status ON change_requests(status);
 
 Sinh tự động khi có sự kiện (thêm thành viên, được giao phase, bình luận, change-request
 tạo/duyệt/từ chối...). FE poll `GET /notifications` + badge chưa đọc.
+#29 (migration 0015): `title` là câu tiếng Anh dự phòng; FE dịch theo `type` + `params`.
 
 ```sql
 CREATE TABLE notifications (
@@ -347,6 +348,7 @@ CREATE TABLE notifications (
   project_id        UUID REFERENCES projects(id) ON DELETE CASCADE,
   phase_block_id    UUID REFERENCES phase_blocks(id) ON DELETE CASCADE,
   change_request_id UUID REFERENCES change_requests(id) ON DELETE CASCADE,
+  params            JSONB,                       -- #29: tham số để FE ghép câu theo ngôn ngữ (NULL = thông báo cũ)
   read              BOOLEAN NOT NULL DEFAULT false,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

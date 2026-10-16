@@ -1,15 +1,17 @@
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/AppContext';
+import { formatDate } from '../../i18n/format';
 import { orgsApi } from '../../api';
 import type { ProjectStatus, ActivityItem } from '../../types';
 import {
   FolderKanban, CheckCircle2, AlertTriangle, Clock,
   Users, ArrowUpRight, GitBranch, Activity, ChevronRight, Gauge,
 } from 'lucide-react';
-import { parseISO, differenceInDays, format } from 'date-fns';
+import { parseISO, differenceInDays } from 'date-fns';
 import { motion } from 'framer-motion';
 import { useMemo, useState, useEffect } from 'react';
 import Avatar from '../common/Avatar';
-import { computeProjectStatus, projectPhaseProgress, daysToNearestDeadline, isPhaseComplete } from '../../lib/projectStatus';
+import { computeProjectStatus, projectPhaseProgress, daysToNearestDeadline, isPhaseComplete, STATUS_KEY } from '../../lib/projectStatus';
 import { formatActivity } from '../../lib/formatActivity';
 
 const fadeUp = {
@@ -74,6 +76,7 @@ export default function DashboardView() {
     selectedOrg, orgProjects, phaseBlocks, getUserById,
     setWorkspaceView, openProjectDetail, setStatusFilter, phaseDefs, getPhaseMeta,
   } = useApp();
+  const { t } = useTranslation();
 
   // Trạng thái & tiến độ auto (derived) cho từng dự án
   const statusOf = useMemo(() => {
@@ -166,10 +169,10 @@ export default function DashboardView() {
     label: string; value: number; sub: string; icon: typeof FolderKanban;
     accent?: string; barColor?: string; share?: number; status: ProjectStatus | 'All';
   }> = [
-    { label: 'Tổng dự án', value: stats.total, sub: `${phaseBlocks.length} phase blocks`, icon: FolderKanban, status: 'All' },
-    { label: 'Đúng tiến độ', value: stats.onTrack, sub: 'On Track', icon: CheckCircle2, accent: 'text-emerald-600', barColor: '#10b981', share: stats.total ? (stats.onTrack / stats.total) * 100 : 0, status: 'On Track' },
-    { label: 'Có rủi ro', value: stats.atRisk, sub: 'At Risk — cần chú ý', icon: AlertTriangle, accent: 'text-amber-600', barColor: '#f59e0b', share: stats.total ? (stats.atRisk / stats.total) * 100 : 0, status: 'At Risk' },
-    { label: 'Chậm tiến độ', value: stats.delayed, sub: 'Delayed — cần xử lý', icon: Clock, accent: 'text-red-600', barColor: '#ef4444', share: stats.total ? (stats.delayed / stats.total) * 100 : 0, status: 'Delayed' },
+    { label: t('dashboard.kpi.total'), value: stats.total, sub: t('dashboard.kpi.totalSub', { count: phaseBlocks.length }), icon: FolderKanban, status: 'All' },
+    { label: t('projectStatus.onTrack'), value: stats.onTrack, sub: t('dashboard.kpi.onTrackSub'), icon: CheckCircle2, accent: 'text-emerald-600', barColor: '#10b981', share: stats.total ? (stats.onTrack / stats.total) * 100 : 0, status: 'On Track' },
+    { label: t('projectStatus.atRisk'), value: stats.atRisk, sub: t('dashboard.kpi.atRiskSub'), icon: AlertTriangle, accent: 'text-amber-600', barColor: '#f59e0b', share: stats.total ? (stats.atRisk / stats.total) * 100 : 0, status: 'At Risk' },
+    { label: t('projectStatus.delayed'), value: stats.delayed, sub: t('dashboard.kpi.delayedSub'), icon: Clock, accent: 'text-red-600', barColor: '#ef4444', share: stats.total ? (stats.delayed / stats.total) * 100 : 0, status: 'Delayed' },
   ];
 
   return (
@@ -179,11 +182,11 @@ export default function DashboardView() {
         <motion.div custom={0} variants={fadeUp} initial="hidden" animate="visible"
           className="flex items-end justify-between flex-wrap gap-2 mb-6">
           <div>
-            <h1 className="text-xl font-semibold text-ink tracking-tight">Dashboard — {selectedOrg.name}</h1>
+            <h1 className="text-xl font-semibold text-ink tracking-tight">{t('nav.dashboard')} — {selectedOrg.name}</h1>
             <p className="text-sm text-stone-500 mt-0.5 font-light">
-              {format(new Date(), 'EEEE, dd/MM/yyyy')} · {stats.dueIn7 > 0
-                ? <span className="text-amber-600 font-medium">{stats.dueIn7} dự án đến hạn trong 7 ngày tới</span>
-                : 'Không có dự án nào đến hạn trong 7 ngày tới'}
+              {formatDate(new Date(), 'fullDate')} · {stats.dueIn7 > 0
+                ? <span className="text-amber-600 font-medium">{t('dashboard.dueIn7', { count: stats.dueIn7 })}</span>
+                : t('dashboard.noneDueIn7')}
             </p>
           </div>
         </motion.div>
@@ -225,7 +228,7 @@ export default function DashboardView() {
           <motion.div custom={4} variants={fadeUp} initial="hidden" animate="visible"
             className="xl:col-span-2 bg-surface-card rounded-xl border border-hairline p-6 flex flex-col">
             <h2 className="text-sm font-semibold text-ink flex items-center gap-2 mb-2">
-              <Gauge className="w-4 h-4" /> Sức khỏe workspace
+              <Gauge className="w-4 h-4" /> {t('dashboard.health')}
             </h2>
             <div className="flex-1 flex items-center gap-6">
               <div className="relative flex-shrink-0">
@@ -234,7 +237,7 @@ export default function DashboardView() {
                   <span className="text-3xl font-semibold text-ink tracking-tight">
                     <CountUp value={stats.avgProgress} suffix="%" />
                   </span>
-                  <span className="text-[10px] text-stone-400">tiến độ TB</span>
+                  <span className="text-[10px] text-stone-400">{t('dashboard.avgProgress')}</span>
                 </div>
               </div>
               <div className="flex-1 min-w-0 space-y-3">
@@ -247,7 +250,7 @@ export default function DashboardView() {
                       className="w-full group text-left">
                       <div className="flex items-center gap-2 mb-1">
                         <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-                        <span className="text-xs text-body flex-1 whitespace-nowrap group-hover:text-ink transition-colors">{status}</span>
+                        <span className="text-xs text-body flex-1 whitespace-nowrap group-hover:text-ink transition-colors">{t(`projectStatus.${STATUS_KEY[status]}`)}</span>
                         <span className="text-xs font-semibold text-ink whitespace-nowrap">{count} · {pct}%</span>
                       </div>
                       <div className="h-1 bg-stone-100 rounded-full overflow-hidden">
@@ -268,16 +271,16 @@ export default function DashboardView() {
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
                 <Clock className="w-4 h-4 text-ink" />
-                Deadline sắp tới
+                {t('dashboard.upcomingDeadlines')}
               </h2>
               <button onClick={() => setWorkspaceView('pipeline')}
                 className="text-xs text-ink hover:text-[#242424] font-medium transition-colors flex items-center gap-1">
-                Xem Pipeline <ChevronRight className="w-3 h-3" />
+                {t('dashboard.viewPipeline')} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
             {deadlines.length === 0 ? (
               <div className="text-sm text-muted text-center py-8">
-                Không có deadline sắp tới
+                {t('dashboard.noDeadlines')}
               </div>
             ) : (
               <div className="space-y-2">
@@ -290,10 +293,10 @@ export default function DashboardView() {
                     ok: 'border-hairline bg-white',
                   };
                   const urgencyText = {
-                    overdue: { text: `${Math.abs(pb.daysLeft)} ngày quá hạn`, class: 'text-red-500' },
-                    urgent: { text: `Còn ${pb.daysLeft} ngày`, class: 'text-red-500' },
-                    warning: { text: `Còn ${pb.daysLeft} ngày`, class: 'text-amber-600' },
-                    ok: { text: `Còn ${pb.daysLeft} ngày`, class: 'text-muted-soft' },
+                    overdue: { text: t('dashboard.daysOverdue', { count: Math.abs(pb.daysLeft) }), class: 'text-red-500' },
+                    urgent: { text: t('dashboard.daysLeft', { count: pb.daysLeft }), class: 'text-red-500' },
+                    warning: { text: t('dashboard.daysLeft', { count: pb.daysLeft }), class: 'text-amber-600' },
+                    ok: { text: t('dashboard.daysLeft', { count: pb.daysLeft }), class: 'text-muted-soft' },
                   };
                   const meta = getPhaseMeta(pb.phaseType);
                   const uText = urgencyText[urgency];
@@ -324,8 +327,8 @@ export default function DashboardView() {
         <div className="grid lg:grid-cols-3 gap-6 mb-6">
           <motion.div custom={6} variants={fadeUp} initial="hidden" animate="visible"
             className="lg:col-span-2 bg-surface-card rounded-xl border border-hairline p-6">
-            <h2 className="text-sm font-semibold text-ink mb-1">Phân bổ Phase</h2>
-            <p className="text-[10px] text-muted-soft mb-4">Phase nào dồn nhiều block nhất = bottleneck tiềm năng</p>
+            <h2 className="text-sm font-semibold text-ink mb-1">{t('dashboard.phaseDistribution')}</h2>
+            <p className="text-[10px] text-muted-soft mb-4">{t('dashboard.phaseDistributionHint')}</p>
             <div className="space-y-2.5">
               {phaseDistribution.map(({ phase, meta, count }, i) => {
                 const pct = (count / maxPhaseCount) * 100;
@@ -354,7 +357,7 @@ export default function DashboardView() {
             className="bg-surface-card rounded-xl border border-hairline p-6 flex flex-col gap-5">
             <div>
               <div className="flex items-center gap-2 text-[10px] text-stone-400 font-medium mb-1">
-                <Users className="w-3.5 h-3.5" /> Thành viên
+                <Users className="w-3.5 h-3.5" /> {t('dashboard.members')}
               </div>
               <div className="text-2xl font-semibold text-ink tracking-tight">
                 <CountUp value={selectedOrg.members.length} />
@@ -362,7 +365,7 @@ export default function DashboardView() {
             </div>
             <div>
               <div className="flex items-center gap-2 text-[10px] text-stone-400 font-medium mb-1">
-                <GitBranch className="w-3.5 h-3.5" /> Phase đang In progress
+                <GitBranch className="w-3.5 h-3.5" /> {t('dashboard.phasesInProgress')}
               </div>
               <div className="text-2xl font-semibold text-amber-600 tracking-tight">
                 <CountUp value={stats.inProgressPhases} />
@@ -370,7 +373,7 @@ export default function DashboardView() {
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between text-[10px] text-stone-400 font-medium mb-1.5">
-                <span>Task toàn workspace</span>
+                <span>{t('dashboard.workspaceTasks')}</span>
                 <span className="text-ink font-semibold">{stats.doneTasks}/{stats.allTasks} · {taskPct}%</span>
               </div>
               <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
@@ -382,7 +385,7 @@ export default function DashboardView() {
             <button onClick={() => setWorkspaceView('team')}
               className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-hairline
                          text-xs font-medium text-body hover:bg-surface-soft hover:text-ink transition-all">
-              Xem Nhóm <ArrowUpRight className="w-3.5 h-3.5" />
+              {t('dashboard.viewTeam')} <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </motion.div>
         </div>
@@ -394,12 +397,12 @@ export default function DashboardView() {
             <div className="mb-5">
               <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
                 <Activity className="w-4 h-4 text-ink" />
-                Hoạt động gần đây
+                {t('dashboard.recentActivity')}
               </h2>
-              <p className="text-[11px] text-muted-soft mt-0.5 ml-6">Dự án, phase, checklist, bình luận, tài liệu…</p>
+              <p className="text-[11px] text-muted-soft mt-0.5 ml-6">{t('dashboard.recentActivityHint')}</p>
             </div>
             {recentActivity.length === 0 ? (
-              <div className="text-sm text-muted text-center py-6">Chưa có hoạt động</div>
+              <div className="text-sm text-muted text-center py-6">{t('dashboard.noActivity')}</div>
             ) : (
               <div className="space-y-3">
                 {recentActivity.map(act => {
@@ -408,9 +411,9 @@ export default function DashboardView() {
                   const { verb, detail } = formatActivity(act.action, act.target, getUserById);
                   const timeAgo = (() => {
                     const diff = differenceInDays(new Date(), new Date(act.timestamp));
-                    if (diff === 0) return 'Hôm nay';
-                    if (diff === 1) return 'Hôm qua';
-                    return `${diff} ngày trước`;
+                    if (diff === 0) return t('time.today');
+                    if (diff === 1) return t('time.yesterday');
+                    return t('time.daysAgo', { count: diff });
                   })();
                   return (
                     <div key={act.id} className="flex items-start gap-3">
@@ -423,7 +426,7 @@ export default function DashboardView() {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-body leading-relaxed">
-                          <span className="font-medium text-ink">{user?.name || 'Người dùng'}</span>
+                          <span className="font-medium text-ink">{user?.name || t('common.user')}</span>
                           {' '}{verb}
                           {phaseTitle && <span className="text-muted-soft"> — {phaseTitle}</span>}
                           {detail && !phaseTitle && <span className="text-muted-soft"> — {detail}</span>}
@@ -441,10 +444,10 @@ export default function DashboardView() {
           <motion.div custom={9} variants={fadeUp} initial="hidden" animate="visible"
             className="lg:col-span-2 bg-surface-card rounded-xl border border-hairline p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-sm font-semibold text-ink">Dự án gần đây</h2>
+              <h2 className="text-sm font-semibold text-ink">{t('dashboard.recentProjects')}</h2>
               <button onClick={() => setWorkspaceView('pipeline')}
                 className="text-xs text-ink hover:text-[#242424] font-medium transition-colors">
-                Xem tất cả
+                {t('dashboard.viewAll')}
               </button>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -468,7 +471,7 @@ export default function DashboardView() {
                         <FolderKanban className="w-4 h-4 text-muted group-hover:text-ink transition-colors" />
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${cfg.color} ${cfg.bg}`}>
-                        {status}
+                        {t(`projectStatus.${STATUS_KEY[status]}`)}
                       </span>
                     </div>
                     <h3 className="text-sm font-medium text-ink truncate mb-1">{project.name}</h3>
@@ -478,11 +481,11 @@ export default function DashboardView() {
                           {latestPhaseMeta.label}
                         </span>
                       )}
-                      <span className="text-[10px] text-muted-soft">{pbCount} phase</span>
+                      <span className="text-[10px] text-muted-soft">{t('pipeline.phaseCount', { count: pbCount })}</span>
                     </div>
                     <div className="mb-2">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] text-muted font-medium">Tiến độ</span>
+                        <span className="text-[10px] text-muted font-medium">{t('dashboard.progress')}</span>
                         <span className="text-xs font-semibold text-ink">{progress}%</span>
                       </div>
                       <div className="w-full h-1.5 bg-surface-soft rounded-full overflow-hidden">
@@ -494,8 +497,9 @@ export default function DashboardView() {
                     </div>
                     <div className={`text-[10px] ${daysLeft !== null && daysLeft < 7 ? 'text-red-500' : 'text-muted-soft'}`}>
                       {daysLeft === null
-                        ? 'Không có phase đang chạy'
-                        : daysLeft > 0 ? `Còn ${daysLeft} ngày` : `${Math.abs(daysLeft)} ngày quá hạn`}
+                        ? t('dashboard.noRunningPhase')
+                        : daysLeft > 0 ? t('dashboard.daysLeft', { count: daysLeft })
+                          : daysLeft === 0 ? t('dashboard.dueToday') : t('dashboard.daysOverdue', { count: Math.abs(daysLeft) })}
                     </div>
                   </div>
                 );
